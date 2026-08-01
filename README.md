@@ -74,11 +74,24 @@ after a game patch shifts Blizzard's atlas layout.
 
 ## License
 
-FarmMap is released under the **GNU General Public License v3.0** — see
-[LICENSE](LICENSE).
+FarmMap's **own source code** is released under the GNU General Public License
+v3.0 — see [LICENSE](LICENSE).
 
-Bundled third-party libraries keep their own licenses; see
-[THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
+The GPLv3 does **not** extend to everything shipped in this repository:
 
-All artwork and textures were created by hand by the author — no AI-generated
-assets.
+- **Icon textures** (`Textures/atlas-blip-farmmap-*.tga`) are *modified* versions
+  of Blizzard's in-game `Interface\Minimap\ObjectIconsAtlas`, into which the
+  author's own hand-made artwork has been added — colorblind-friendly, vivid
+  and white-outline variants. The underlying Blizzard artwork remains the
+  property of Blizzard Entertainment and is not the author's to relicense; only
+  the author's own additions and modifications are his. They are bundled so the
+  addon can display icons consistent with the game.
+- **Bundled libraries** in `Libs/` keep their own licenses — see
+  [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
+
+**No AI-generated assets are used in this addon.** Every asset added by the
+author was made by hand.
+
+World of Warcraft and Blizzard Entertainment are trademarks or registered
+trademarks of Blizzard Entertainment, Inc. This addon is not affiliated with
+or endorsed by Blizzard Entertainment.

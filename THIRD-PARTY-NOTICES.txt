@@ -1,8 +1,36 @@
 THIRD-PARTY NOTICES — FarmMap
 =============================
 
-FarmMap itself is licensed under the GNU General Public License v3.0
-(see LICENSE).
+FarmMap's own source code is licensed under the GNU General Public License v3.0
+(see LICENSE). The GPLv3 does not extend to the game assets or to the bundled
+libraries described below.
+
+
+GAME ASSETS — Blizzard Entertainment  (Textures/)
+--------------------------------------------------
+  Files    : atlas-blip-farmmap-whiteoutline.tga
+             atlas-blip-farmmap-vivid.tga
+             atlas-blip-farmmap-deuteranopia.tga
+             atlas-blip-farmmap-protanopia.tga
+             atlas-blip-farmmap-tritanopia.tga
+
+  These are MODIFIED versions of Blizzard's in-game texture
+  Interface\Minimap\ObjectIconsAtlas, into which the addon author's own
+  hand-made artwork has been added (colorblind-friendly, vivid and
+  white-outline variants).
+
+  The underlying artwork is the property of Blizzard Entertainment, Inc. and
+  is NOT licensed under the GPLv3 — the addon author has no right to
+  relicense it. Only the author's own additions and modifications are his.
+  The files are bundled so the addon can display icons consistent with the
+  game client.
+
+  No AI-generated assets are used. Everything added by the author was made
+  by hand.
+
+  World of Warcraft and Blizzard Entertainment are trademarks or registered
+  trademarks of Blizzard Entertainment, Inc. This addon is not affiliated
+  with or endorsed by Blizzard Entertainment.
 
 The libraries below are bundled unmodified inside Libs/ so the addon works
 without a separate install. They are the property of their respective authors
