@@ -1,0 +1,13 @@
+# Private working folder — NEVER published.
+# Holds the working notes, the incoming contributions and the packaged builds.
+Claude/
+
+# OS and editor noise
+Thumbs.db
+desktop.ini
+.DS_Store
+*.bak
+*.swp
+*~
+.vscode/
+.idea/

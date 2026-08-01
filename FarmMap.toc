@@ -1,0 +1,28 @@
+## Interface: 120007
+## Title: FarmMap
+## Notes: Records the positions of ores, herbs, fish and wood nodes.
+## Notes-frFR: Enregistre la position des minerais, plantes, poissons et bois.
+## Author: Kroosstii
+## Version: v1.5.0
+## IconTexture: Interface\AddOns\FarmMap\Textures\icon
+## SavedVariables: FarmMapDB FarmMapStatsDB
+
+Libs\HereBeDragons\LibStub\LibStub.lua
+Libs\HereBeDragons\CallbackHandler-1.0\CallbackHandler-1.0.lua
+Libs\HereBeDragons\HereBeDragons-2.0.lua
+Libs\HereBeDragons\HereBeDragons-Pins-2.0.lua
+
+# Minimap button. LibStub and CallbackHandler-1.0 are already loaded
+# above (shipped with HereBeDragons). These two libs depend on them,
+# so they MUST stay after, otherwise they error out on load.
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+
+# Translations. enUS MUST stay first: it is the fallback for every
+# other language. Adding a language = drop the file in lang\ and add
+# its line here. See lang\README.md.
+lang\enUS.lua
+lang\frFR.lua
+lang\koKR.lua
+
+FarmMap.lua

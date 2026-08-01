@@ -1,0 +1,51 @@
+THIRD-PARTY NOTICES — FarmMap
+=============================
+
+FarmMap itself is licensed under the GNU General Public License v3.0
+(see LICENSE).
+
+The libraries below are bundled unmodified inside Libs/ so the addon works
+without a separate install. They are the property of their respective authors
+and remain under their own licenses, which are NOT superseded by the GPLv3
+covering FarmMap.
+
+
+HereBeDragons-2.0  (Libs/HereBeDragons/)
+----------------------------------------
+  Author   : Nevcairiel (Hendrik Leppkes)
+  License  : BSD  (declared in Libs/HereBeDragons/HereBeDragons.toc)
+  Upstream : https://www.wowace.com/projects/herebedragons
+             https://github.com/Nevcairiel/HereBeDragons
+  Includes : HereBeDragons-2.0, HereBeDragons-Pins-2.0,
+             HereBeDragons-Migrate
+
+LibStub  (Libs/HereBeDragons/LibStub/)
+--------------------------------------
+  Authors  : Kaelten, Cladhaire, ckknight, Mikk, Ammo, Nevcairiel, joshborke
+  License  : Public Domain
+             ("LibStub is hereby placed in the Public Domain",
+              stated in the file header)
+  Upstream : https://www.wowace.com/projects/libstub
+
+CallbackHandler-1.0  (Libs/HereBeDragons/CallbackHandler-1.0/)
+--------------------------------------------------------------
+  Origin   : Ace3 project
+  Upstream : https://www.wowace.com/projects/ace3
+  License  : see upstream; the file is distributed unmodified as shipped
+             with HereBeDragons
+
+LibDataBroker-1.1  (Libs/LibDataBroker-1.1/)
+--------------------------------------------
+  Author   : Tekkub
+  Upstream : https://github.com/tekkub/libdatabroker-1-1
+  License  : see upstream; distributed unmodified
+
+LibDBIcon-1.0  (Libs/LibDBIcon-1.0/)
+------------------------------------
+  Upstream : https://www.curseforge.com/wow/addons/libdbicon-1-0
+             https://www.wowace.com/projects/libdbicon-1-0
+  License  : see upstream; distributed unmodified
+
+
+If you are the author of any library listed here and want the attribution
+corrected, or the library removed, please open an issue on the repository.
