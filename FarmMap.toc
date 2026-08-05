@@ -3,7 +3,7 @@
 ## Notes: Records the positions of ores, herbs, fish and wood nodes.
 ## Notes-frFR: Enregistre la position des minerais, plantes, poissons et bois.
 ## Author: Kroosstii
-## Version: v1.5.0
+## Version: v1.5.1
 ## IconTexture: Interface\AddOns\FarmMap\Textures\icon
 ## SavedVariables: FarmMapDB FarmMapStatsDB
 

@@ -1,16 +1,16 @@
 -- ============================================================
 --  FarmMap — Addon principal
 --  Auteur  : Kroosstii (Dkroosstii-Dalaran)
---  Version : v1.5.0
---  MàJ     : 31/07/2026
+--  Version : v1.5.1
+--  MàJ     : 05/08/2026
 -- ============================================================
 
 -- ns : table partagée entre tous les fichiers de l'addon.
 -- Les fichiers lang\*.lua y déposent leurs traductions avant
 -- que ce fichier ne soit chargé (cf. ordre du .toc).
 local addonName, ns = ...
-local addonVersion = "v1.5.0"
-local lastUpdate   = "31/07/2026"
+local addonVersion = "v1.5.1"
+local lastUpdate   = "05/08/2026"
 
 -- Libs
 local HBD     = LibStub("HereBeDragons-2.0")
