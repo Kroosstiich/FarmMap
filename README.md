@@ -72,6 +72,14 @@ styles. Existing packs:
 The in-game `/fm atlas` calibrator helps find the correct icon coordinates
 after a game patch shifts Blizzard's atlas layout.
 
+## Development
+
+FarmMap's Lua code is written with AI assistance (Claude Opus 5, by Anthropic).
+Every change is reviewed and tested in game by the author before it is released.
+
+This concerns the **code only**. The artwork is not AI-generated — see the
+License section below for how the two differ.
+
 ## License
 
 FarmMap's **own source code** is released under the GNU General Public License
