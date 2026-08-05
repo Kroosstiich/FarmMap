@@ -9,6 +9,27 @@ between the quotes, and add one line to `FarmMap.toc`.
 
 ---
 
+## 0. The easy way: translate in your browser / Le plus simple : dans votre navigateur
+
+Before anything else — **you may not need this file at all.** FarmMap's phrases
+can be translated directly in your browser, one at a time, with nothing to
+download and no Lua to edit:
+
+**https://legacy.curseforge.com/wow/addons/farmmap/localization**
+
+> **Important:** use the **website** for this, not the CurseForge desktop app —
+> the app does not offer the localization page.
+
+*Avant tout : **vous n'avez peut-être pas besoin de ce fichier.** Les phrases de
+FarmMap se traduisent directement dans le navigateur, une par une, sans rien
+télécharger. Utilisez bien le **site web**, pas l'application CurseForge.*
+
+The rest of this guide is for people who would rather work on a file — which is
+still the fastest route for a full language, and the only one that lets you test
+in game before sending anything.
+
+---
+
 ## 1. Create your file / Créez votre fichier
 
 Copy `lang/enUS.lua` and rename it to your WoW locale code:
