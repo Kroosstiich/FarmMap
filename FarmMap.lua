@@ -26,6 +26,19 @@ local DB_VERSION = 2
 -- Locale détectée une seule fois au chargement
 local gameLocale = GetLocale()
 
+-- Police adaptée au client : chaque client WoW ne livre que les
+-- polices de sa propre langue. FRIZQT__ est latin-only → illisible
+-- en coréen, chinois, japonais ou russe. On sélectionne donc la
+-- police fournie avec le client pour le texte flottant.
+local clientLocale = GetLocale()
+local LOCALE_FONTS = {
+    zhCN = "Fonts\\ARKai_T.ttf",
+    koKR = "Fonts\\2002.TTF",
+    zhTW = "Fonts\\blei00d.TTF",
+    ruRU = "Fonts\\FRIZQT___CYRILLIC.TTF",
+}
+local FLOATING_FONT    = LOCALE_FONTS[clientLocale] or "Fonts\\FRIZQT__.TTF"
+
 -- ============================================================
 -- DÉCLARATIONS ANTICIPÉES
 -- (fonctions définies plus bas mais référencées plus haut)
@@ -195,7 +208,7 @@ local TIER_TEXTURES = {
 --       },
 --       blip = "Interface\\AddOns\\MonPack\\atlas-blip",  -- optionnel
 --   })
--- ============================================================
+-- ============================================================c
 
 FarmMapStyles = {}
 local _registeredStyles = {}
@@ -935,7 +948,7 @@ local function ShowFloatingLoot(items, itemIDs, quantities)
         local gap     = 6
 
         local txtName = block:CreateFontString(nil, "OVERLAY")
-        txtName:SetFont("Fonts\\FRIZQT__.TTF", fontSize, "OUTLINE")
+        txtName:SetFont(FLOATING_FONT, fontSize, "OUTLINE")
         txtName:SetPoint("BOTTOMLEFT", block, "BOTTOMLEFT", 0, lineY)
         txtName:SetHeight(lineH)
         txtName:SetJustifyH("LEFT")
@@ -952,7 +965,7 @@ local function ShowFloatingLoot(items, itemIDs, quantities)
         end
 
         local txtQty = block:CreateFontString(nil, "OVERLAY")
-        txtQty:SetFont("Fonts\\FRIZQT__.TTF", fontSize, "OUTLINE")
+        txtQty:SetFont(FLOATING_FONT, fontSize, "OUTLINE")
         txtQty:SetHeight(lineH)
         txtQty:SetJustifyH("LEFT")
         txtQty:SetJustifyV("MIDDLE")
