@@ -26,18 +26,13 @@ local DB_VERSION = 2
 -- Locale détectée une seule fois au chargement
 local gameLocale = GetLocale()
 
--- Police adaptée au client : chaque client WoW ne livre que les
--- polices de sa propre langue. FRIZQT__ est latin-only → illisible
--- en coréen, chinois, japonais ou russe. On sélectionne donc la
--- police fournie avec le client pour le texte flottant.
-local clientLocale = GetLocale()
 local LOCALE_FONTS = {
     zhCN = "Fonts\\ARKai_T.ttf",
     koKR = "Fonts\\2002.TTF",
     zhTW = "Fonts\\blei00d.TTF",
     ruRU = "Fonts\\FRIZQT___CYRILLIC.TTF",
 }
-local FLOATING_FONT    = LOCALE_FONTS[clientLocale] or "Fonts\\FRIZQT__.TTF"
+local FLOATING_FONT    = LOCALE_FONTS[gameLocale] or "Fonts\\FRIZQT__.TTF"
 
 -- ============================================================
 -- DÉCLARATIONS ANTICIPÉES
