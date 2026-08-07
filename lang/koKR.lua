@@ -151,7 +151,7 @@ ns.locales.koKR = {
 
         MIGR_PREFIX            = "FarmMap 업데이트:",
         MIGR_DONE              = "데이터베이스가 최신 상태입니다.",
-        MIGR_TOTAL             = "DB 업데이트 완료 —",
+        MIGR_TOTAL             = "DB 업데이트 완료 -",
         MIGR_ENTRIES           = "개의 항목이 수정되었습니다.",
         UNKNOWN                = "알 수 없음",
         UNKNOWN_EXP            = "알 수 없음",
