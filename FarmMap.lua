@@ -26,6 +26,14 @@ local DB_VERSION = 3
 -- Locale détectée une seule fois au chargement
 local gameLocale = GetLocale()
 
+local LOCALE_FONTS = {
+    zhCN = "Fonts\\ARKai_T.ttf",
+    koKR = "Fonts\\2002.TTF",
+    zhTW = "Fonts\\blei00d.TTF",
+    ruRU = "Fonts\\FRIZQT___CYRILLIC.TTF",
+}
+local FLOATING_FONT    = LOCALE_FONTS[gameLocale] or "Fonts\\FRIZQT__.TTF"
+
 -- ============================================================
 -- DÉCLARATIONS ANTICIPÉES
 -- (fonctions définies plus bas mais référencées plus haut)
@@ -195,7 +203,7 @@ local TIER_TEXTURES = {
 --       },
 --       blip = "Interface\\AddOns\\MonPack\\atlas-blip",  -- optionnel
 --   })
--- ============================================================
+-- ============================================================c
 
 FarmMapStyles = {}
 local _registeredStyles = {}
@@ -1014,7 +1022,7 @@ local function ShowFloatingLoot(items, itemIDs, quantities)
         local gap     = 6
 
         local txtName = block:CreateFontString(nil, "OVERLAY")
-        txtName:SetFont("Fonts\\FRIZQT__.TTF", fontSize, "OUTLINE")
+        txtName:SetFont(FLOATING_FONT, fontSize, "OUTLINE")
         txtName:SetPoint("BOTTOMLEFT", block, "BOTTOMLEFT", 0, lineY)
         txtName:SetHeight(lineH)
         txtName:SetJustifyH("LEFT")
@@ -1031,7 +1039,7 @@ local function ShowFloatingLoot(items, itemIDs, quantities)
         end
 
         local txtQty = block:CreateFontString(nil, "OVERLAY")
-        txtQty:SetFont("Fonts\\FRIZQT__.TTF", fontSize, "OUTLINE")
+        txtQty:SetFont(FLOATING_FONT, fontSize, "OUTLINE")
         txtQty:SetHeight(lineH)
         txtQty:SetJustifyH("LEFT")
         txtQty:SetJustifyV("MIDDLE")

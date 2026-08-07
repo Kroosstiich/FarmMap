@@ -2,6 +2,7 @@
 ## Title: FarmMap
 ## Notes: Records the positions of ores, herbs, fish and wood nodes.
 ## Notes-frFR: Enregistre la position des minerais, plantes, poissons et bois.
+## Notes-zhCN: 记录矿石、草药、鱼和树木节点的位置。
 ## Author: Kroosstii
 ## Version: v1.5.2
 ## IconTexture: Interface\AddOns\FarmMap\Textures\icon
@@ -24,5 +25,6 @@ Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
 lang\enUS.lua
 lang\frFR.lua
 lang\koKR.lua
+lang\zhCN.lua
 
 FarmMap.lua
