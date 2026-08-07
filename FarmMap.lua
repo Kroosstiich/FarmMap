@@ -1,7 +1,7 @@
 -- ============================================================
 --  FarmMap — Addon principal
 --  Auteur  : Kroosstii (Dkroosstii-Dalaran)
---  Version : v1.5.3
+--  Version : v1.6.0
 --  MàJ     : 05/08/2026
 -- ============================================================
 
@@ -9,7 +9,7 @@
 -- Les fichiers lang\*.lua y déposent leurs traductions avant
 -- que ce fichier ne soit chargé (cf. ordre du .toc).
 local addonName, ns = ...
-local addonVersion = "v1.5.3"
+local addonVersion = "v1.6.0"
 local lastUpdate   = "06/08/2026"
 
 -- Libs
@@ -21,7 +21,7 @@ local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterAllEvents()
 
 -- Version de la structure de la DB (migrations)
-local DB_VERSION = 3
+local DB_VERSION = 4
 
 -- Locale détectée une seule fois au chargement
 local gameLocale = GetLocale()
@@ -62,8 +62,10 @@ local OpenImportPopup
 -- CONSTANTES & DONNÉES STATIQUES
 -- ============================================================
 
--- Noms d'extensions par expID (retourné par GetItemInfo)
-local expNames = {
+-- Noms d'extensions par expID (renvoyé par GetItemInfo).
+-- Dernier recours uniquement : la résolution passe d'abord par le fichier de
+-- langue actif, puis par la globale de Blizzard, déjà localisée.
+local EXP_FALLBACK = {
     [0]  = "Classic",       [1]  = "TBC",
     [2]  = "WotLK",         [3]  = "Cata",
     [4]  = "MoP",           [5]  = "WoD",
@@ -71,6 +73,35 @@ local expNames = {
     [8]  = "Shadowlands",   [9]  = "Dragonflight",
     [10] = "The War Within",[11] = "Midnight",
 }
+
+-- Résout le nom d'une extension pour l'affichage.
+--
+-- L'ordre est délibéré :
+--
+--   1. la clé EXP_<id> du fichier de langue ACTIF, lue directement dans sa
+--      table via rawget et surtout pas dans L. L contient le repli anglais :
+--      s'y fier renverrait « Midnight » à un joueur coréen alors que Blizzard
+--      sait déjà le lui dire en coréen. C'est exactement le bug signalé.
+--   2. EXPANSION_NAME<id>, la globale de Blizzard. Correcte dans les 12 langues
+--      client, sans aucun travail de traducteur, et avec la terminologie
+--      officielle plutôt qu'une approximation.
+--   3. la table ci-dessus, si la globale n'existe pas encore pour une extension
+--      trop récente.
+--
+-- Un traducteur qui veut imposer sa propre formulation n'a qu'à définir
+-- EXP_<id> dans son fichier : il passe alors devant Blizzard.
+local function ExpansionName(expID)
+    if type(expID) ~= "number" then return nil end
+
+    local loc = ns.locales[gameLocale]
+    local own = loc and loc.strings and rawget(loc.strings, "EXP_" .. expID)
+    if type(own) == "string" and own ~= "" then return own end
+
+    local blizzard = _G["EXPANSION_NAME" .. expID]
+    if type(blizzard) == "string" and blizzard ~= "" then return blizzard end
+
+    return EXP_FALLBACK[expID]
+end
 
 -- IDs de compétence pour la détection de profession
 local PROFESSION_SKILL_IDS = {
@@ -411,6 +442,37 @@ end
 -- depuis une base exportee avant la v1.5.2, qui ne contenait pas les ids).
 migrations[3] = BackfillItemIDs
 
+-- V4 : recuperation de l'expID a partir du nom d'extension stocke.
+--
+-- expName a toujours ete ecrit depuis la table anglaise codee en dur, quelle
+-- que soit la langue du joueur : la correspondance inverse est donc fiable et
+-- ne depend pas du client. Un noeud recolte avant cette version retrouve ainsi
+-- son identifiant, et son infobulle se met a parler la langue du joueur.
+--
+-- Couvre aussi les chaines "ID: 11" produites par l'ancien repli quand l'objet
+-- n'etait pas encore en cache au moment de la recolte.
+migrations[4] = function()
+    local byName = {}
+    for id, name in pairs(EXP_FALLBACK) do byName[name] = id end
+
+    local fixed = 0
+    for _, nodes in pairs(FarmMapDB) do
+        if type(nodes) == "table" then
+            for _, node in ipairs(nodes) do
+                if type(node) == "table" and node.expID == nil
+                   and type(node.expName) == "string" then
+                    local id = byName[node.expName]
+                    if not id then
+                        id = tonumber(node.expName:match("^ID:%s*(%d+)$") or "")
+                    end
+                    if id then node.expID = id ; fixed = fixed + 1 end
+                end
+            end
+        end
+    end
+    return fixed
+end
+
 local function RunMigrations(verbose)
     local currentVersion = FarmMapDB.version or 0
     if currentVersion >= DB_VERSION then
@@ -515,8 +577,9 @@ local function SerializeDB()
                     table.insert(itemIDs, string.format("%d", iid))
                 end
                 table.insert(lines, string.format(
-                    "    {x=%.6f,y=%.6f,type=%q,name=%q,nameID=%d,expName=%q,items={%s},itemIDs={%s}},",
-                    n.x, n.y, n.type or "", n.name or "", tonumber(n.nameID) or 0, n.expName or "",
+                    "    {x=%.6f,y=%.6f,type=%q,name=%q,nameID=%d,expID=%d,expName=%q,items={%s},itemIDs={%s}},",
+                    n.x, n.y, n.type or "", n.name or "", tonumber(n.nameID) or 0,
+                    tonumber(n.expID) or -1, n.expName or "",
                     table.concat(items, ","), table.concat(itemIDs, ",")
                 ))
             end
@@ -805,8 +868,12 @@ local function CreatePoint(nodeData, isMinimap)
             if localName then displayName = localName end
         end
         GameTooltip:AddLine(displayName or nodeData.type, 1, 0.82, 0)
-        if nodeData.expName and nodeData.type ~= "Bois" then
-            GameTooltip:AddLine(L.EXPANSION .. " : " .. nodeData.expName, 0.4, 0.6, 1)
+        -- expID d'abord : il se resout dans la langue du client. expName n'est
+        -- qu'un repli pour les noeuds enregistres avant que l'id ne soit stocke,
+        -- et reste alors fige dans la langue de celui qui les a recoltes.
+        local expText = ExpansionName(nodeData.expID) or nodeData.expName
+        if expText and nodeData.type ~= "Bois" then
+            GameTooltip:AddLine(L.EXPANSION .. " : " .. expText, 0.4, 0.6, 1)
         end
         if nodeData.items and #nodeData.items > 0 then
             GameTooltip:AddLine(" ")
@@ -1174,6 +1241,7 @@ local function CaptureLootData()
 
     local lootItems, lootItemIDs, lootQuantities, lootQualities = {}, {}, {}, {}
     local nodeName, nodeNameID, extensionName = L.UNKNOWN, 0, L.UNKNOWN_EXP
+    local nodeExpID
 
     for i = 1, GetNumLootItems() do
         local link = GetLootSlotLink(i)
@@ -1187,7 +1255,12 @@ local function CaptureLootData()
                 if nodeName == L.UNKNOWN then
                     nodeName      = name
                     nodeNameID    = itemID
-                    extensionName = expNames[expID] or ("ID: " .. (expID or "?"))
+                    -- On retient l'identifiant, pas le nom : c'est lui qui est
+                    -- stocke en base et exporte. Une chaine resolue figerait le
+                    -- noeud dans la langue de celui qui l'a recolte.
+                    nodeExpID     = tonumber(expID)
+                    extensionName = ExpansionName(nodeExpID)
+                                    or ("ID: " .. (expID or "?"))
                 end
                 table.insert(lootItems,      name)
                 table.insert(lootItemIDs,    itemID)
@@ -1209,6 +1282,7 @@ local function CaptureLootData()
         nodeName      = nodeName,
         nodeNameID    = nodeNameID,
         extensionName = extensionName,
+        expID         = nodeExpID,
     }
     AddDebug("LOOT_CAPTURE", nodeName .. " (" .. #lootItems .. " slots)")
 end
@@ -1237,6 +1311,7 @@ local function ProcessHarvestLoot()
     local nodeName       = data.nodeName
     local nodeNameID     = data.nodeNameID
     local extensionName  = data.extensionName
+    local nodeExpID      = data.expID
 
     if nodeName == L.UNKNOWN and #lootItems == 0 then
         AddDebug("LOOT", "empty items, ignored")
@@ -1254,6 +1329,7 @@ local function ProcessHarvestLoot()
             existingNode.name    = nodeName
             existingNode.nameID  = nodeNameID
             existingNode.expName = extensionName
+            existingNode.expID   = nodeExpID
             existingNode.locale  = gameLocale
             -- Pêche : fusion des items (le même spot peut donner des poissons différents)
             -- Herbo/Minage : écrase (le nœud repousse avec les mêmes items)
@@ -1282,6 +1358,7 @@ local function ProcessHarvestLoot()
             type    = foundType,   name    = nodeName,
             nameID  = nodeNameID,  items   = lootItems,
             itemIDs = lootItemIDs, expName = extensionName,
+            expID   = nodeExpID,
             locale  = gameLocale,
         }
         table.insert(FarmMapDB[mapID], node)

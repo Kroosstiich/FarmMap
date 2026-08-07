@@ -153,6 +153,28 @@ ns.locales.frFR = {
         PACKS_DESC             = " Styles issus de sous-addons installés.\n Sélectionner un pack désactive le preset actif dans Couleurs (et inversement).",
         PACKS_EMPTY            = "|cffaaaaaa Aucun pack installé.\n Installez un sous-addon FarmMap_* pour voir les packs ici.|r",
 
+        -- Noms d'extension affichés dans les infobulles de nœuds.
+        --
+        -- Volontairement laissés en commentaire. FarmMap lit les globales
+        -- EXPANSION_NAME<id> de Blizzard, DÉJÀ traduites dans chaque client —
+        -- un joueur coréen voit le nom officiel coréen sans que personne
+        -- n'ait rien traduit. Décommenter une ligne ici passe devant Blizzard
+        -- pour cette langue uniquement : à ne faire que pour la formulation
+        -- avec laquelle on n'est pas d'accord.
+        --
+        -- EXP_0  = "Classic",
+        -- EXP_1  = "Burning Crusade",
+        -- EXP_2  = "Wrath of the Lich King",
+        -- EXP_3  = "Cataclysm",
+        -- EXP_4  = "Mists of Pandaria",
+        -- EXP_5  = "Warlords of Draenor",
+        -- EXP_6  = "Legion",
+        -- EXP_7  = "Battle for Azeroth",
+        -- EXP_8  = "Shadowlands",
+        -- EXP_9  = "Dragonflight",
+        -- EXP_10 = "The War Within",
+        -- EXP_11 = "Midnight",
+
         -- /fm atlas — calibreur d'atlas d'icônes. Outil de dev, mais la
         -- page de l'addon y renvoie les créateurs de packs : il doit
         -- donc être lisible par les non-francophones aussi.

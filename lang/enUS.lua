@@ -149,6 +149,28 @@ ns.locales.enUS = {
         PACKS_DESC             = " Styles from installed sub-addons.\n Selecting a pack disables the active preset in Colors (and vice versa).",
         PACKS_EMPTY            = "|cffaaaaaa No packs installed.\n Install a FarmMap_* sub-addon to see packs here.|r",
 
+        -- Expansion names shown in node tooltips.
+        --
+        -- Deliberately left commented out. FarmMap reads Blizzard's own
+        -- EXPANSION_NAME<id> globals, which are ALREADY translated in every
+        -- game client — a Korean player sees the official Korean name without
+        -- anyone translating anything. Uncommenting a line here overrides
+        -- Blizzard for this language only, so do it just for the wording you
+        -- disagree with, and leave the rest alone.
+        --
+        -- EXP_0  = "Classic",
+        -- EXP_1  = "The Burning Crusade",
+        -- EXP_2  = "Wrath of the Lich King",
+        -- EXP_3  = "Cataclysm",
+        -- EXP_4  = "Mists of Pandaria",
+        -- EXP_5  = "Warlords of Draenor",
+        -- EXP_6  = "Legion",
+        -- EXP_7  = "Battle for Azeroth",
+        -- EXP_8  = "Shadowlands",
+        -- EXP_9  = "Dragonflight",
+        -- EXP_10 = "The War Within",
+        -- EXP_11 = "Midnight",
+
         -- /fm atlas — icon atlas calibrator. It is a developer tool,
         -- but the addon page points pack creators to it, so it needs
         -- to be readable by non-French speakers too.
