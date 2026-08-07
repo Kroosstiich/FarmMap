@@ -15,7 +15,7 @@ ns.locales.zhCN = {
     name       = "简体中文",   -- shown in the language panel
     latinName  = "Simplified Chinese",   -- latin fallback, always readable
     translator = "bluse",
-    order      = 30,          -- sort order in the language panel
+    order      = 40,          -- sort order in the language panel (koKR uses 30)
 
     -- OPTIONAL: localized slash aliases.
     slash = {

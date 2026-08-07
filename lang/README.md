@@ -209,3 +209,4 @@ characters are destroyed.
 | `enUS` | English | Kroosstii |
 | `frFR` | Français | Kroosstii |
 | `koKR` | 한국어 | Crazyyoungs |
+| `zhCN` | 简体中文 | bluse |

@@ -1,7 +1,7 @@
 -- ============================================================
 --  FarmMap — Addon principal
 --  Auteur  : Kroosstii (Dkroosstii-Dalaran)
---  Version : v1.5.2
+--  Version : v1.5.3
 --  MàJ     : 05/08/2026
 -- ============================================================
 
@@ -9,8 +9,8 @@
 -- Les fichiers lang\*.lua y déposent leurs traductions avant
 -- que ce fichier ne soit chargé (cf. ordre du .toc).
 local addonName, ns = ...
-local addonVersion = "v1.5.2"
-local lastUpdate   = "05/08/2026"
+local addonVersion = "v1.5.3"
+local lastUpdate   = "06/08/2026"
 
 -- Libs
 local HBD     = LibStub("HereBeDragons-2.0")
@@ -26,13 +26,25 @@ local DB_VERSION = 3
 -- Locale détectée une seule fois au chargement
 local gameLocale = GetLocale()
 
+-- Police du texte flottant de récolte. Contribution de bluse : le chemin était
+-- codé en dur sur FRIZQT__.TTF, qui n'a aucun glyphe CJK — sur un client chinois
+-- ou coréen, le nom de l'objet récolté s'affichait en carrés.
+--
+-- Indexé sur GetLocale() et non sur gameLocale : le texte flottant affiche des
+-- noms d'objets, que le jeu renvoie toujours dans la langue du CLIENT, jamais
+-- dans la langue forcée dans les options. Les deux valeurs coïncident ici, mais
+-- gameLocale change si le joueur force une langue — s'y indexer donnerait la
+-- police du coréen pour afficher des noms français.
+--
+-- Repli sur STANDARD_TEXT_FONT plutôt que sur FRIZQT__.TTF : Blizzard y résout
+-- la police correcte du client, y compris pour les locales absentes de la table.
 local LOCALE_FONTS = {
     zhCN = "Fonts\\ARKai_T.ttf",
     koKR = "Fonts\\2002.TTF",
     zhTW = "Fonts\\blei00d.TTF",
     ruRU = "Fonts\\FRIZQT___CYRILLIC.TTF",
 }
-local FLOATING_FONT    = LOCALE_FONTS[gameLocale] or "Fonts\\FRIZQT__.TTF"
+local FLOATING_FONT = LOCALE_FONTS[GetLocale()] or STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
 
 -- ============================================================
 -- DÉCLARATIONS ANTICIPÉES
@@ -203,7 +215,7 @@ local TIER_TEXTURES = {
 --       },
 --       blip = "Interface\\AddOns\\MonPack\\atlas-blip",  -- optionnel
 --   })
--- ============================================================c
+-- ============================================================
 
 FarmMapStyles = {}
 local _registeredStyles = {}
