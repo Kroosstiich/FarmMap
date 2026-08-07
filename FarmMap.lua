@@ -1,7 +1,7 @@
 -- ============================================================
 --  FarmMap — Addon principal
 --  Auteur  : Kroosstii (Dkroosstii-Dalaran)
---  Version : v1.5.1
+--  Version : v1.5.2
 --  MàJ     : 05/08/2026
 -- ============================================================
 
@@ -9,7 +9,7 @@
 -- Les fichiers lang\*.lua y déposent leurs traductions avant
 -- que ce fichier ne soit chargé (cf. ordre du .toc).
 local addonName, ns = ...
-local addonVersion = "v1.5.1"
+local addonVersion = "v1.5.2"
 local lastUpdate   = "05/08/2026"
 
 -- Libs
@@ -21,7 +21,7 @@ local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterAllEvents()
 
 -- Version de la structure de la DB (migrations)
-local DB_VERSION = 2
+local DB_VERSION = 3
 
 -- Locale détectée une seule fois au chargement
 local gameLocale = GetLocale()
@@ -337,6 +337,60 @@ migrations[2] = function()
     return fixed
 end
 
+-- Retrouve l'itemID a partir d'un nom d'objet.
+--
+-- GetItemInfo accepte un nom, mais ne renvoie pas l'id : il faut passer par le
+-- lien et l'extraire. Deux limites qui commandent tout le reste :
+--   - l'objet doit etre dans le cache du client, sinon nil ;
+--   - le nom doit etre dans la langue du client.
+-- Un noeud importe d'une base francaise reste donc irrecuperable sur un client
+-- coreen : l'id n'a jamais ete ecrit, et le nom ne permet pas de le retrouver.
+local function ItemIDFromName(name)
+    if type(name) ~= "string" or name == "" then return nil end
+    local _, link = GetItemInfo(name)
+    if type(link) ~= "string" then return nil end
+    local id = link:match("item:(%d+)")
+    return id and tonumber(id) or nil
+end
+
+-- Recompose les identifiants manquants des noeuds deja enregistres, pour que
+-- l'affichage puisse les relocaliser au lieu de rester fige sur le nom stocke.
+--
+-- Deliberement re-executable : GetItemInfo depend du cache du client, qui se
+-- remplit au fil de la session. Une premiere passe au chargement en retrouve
+-- une partie, un clic ulterieur sur « Mettre a jour la DB » en retrouve
+-- davantage. C'est pour cette raison que ManualMigration l'appelle toujours,
+-- meme quand la version de schema est deja a jour.
+local function BackfillItemIDs()
+    local fixed = 0
+    for _, nodes in pairs(FarmMapDB) do
+        if type(nodes) == "table" then
+            for _, node in ipairs(nodes) do
+                if type(node) == "table" then
+                    if (not node.nameID or node.nameID == 0) and node.name then
+                        local id = ItemIDFromName(node.name)
+                        if id then node.nameID = id ; fixed = fixed + 1 end
+                    end
+                    if type(node.items) == "table" then
+                        node.itemIDs = node.itemIDs or {}
+                        for idx, itemName in ipairs(node.items) do
+                            if not node.itemIDs[idx] or node.itemIDs[idx] == 0 then
+                                local id = ItemIDFromName(itemName)
+                                if id then node.itemIDs[idx] = id ; fixed = fixed + 1 end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return fixed
+end
+
+-- V3 : recuperation des identifiants absents (noeuds anciens, ou importes
+-- depuis une base exportee avant la v1.5.2, qui ne contenait pas les ids).
+migrations[3] = BackfillItemIDs
+
 local function RunMigrations(verbose)
     local currentVersion = FarmMapDB.version or 0
     if currentVersion >= DB_VERSION then
@@ -361,8 +415,18 @@ local function RunMigrations(verbose)
     end
 end
 
+-- Le bouton « Mettre a jour la DB » relance toujours la recuperation des ids,
+-- meme quand le schema est deja a jour : elle depend du cache d'objets du
+-- client, donc un second clic plus tard dans la session en retrouve davantage.
+-- Sans ca, un joueur dont le cache etait froid au chargement resterait avec des
+-- noeuds non relocalisables sans aucun moyen de reessayer.
 local function ManualMigration()
     RunMigrations(true)
+    local recovered = BackfillItemIDs()
+    if recovered > 0 then
+        print("|cffffd100" .. L.MIGR_PREFIX .. "|r " .. recovered .. L.MIGR_ENTRIES)
+        RefreshAllPins()
+    end
 end
 
 -- ============================================================
@@ -405,20 +469,35 @@ end
 -- SÉRIALISATION DB (import / export)
 -- ============================================================
 
+-- Les identifiants d'objet (nameID, itemIDs) sont exportés en plus des noms.
+-- Sans eux, un nœud importé reste figé dans la langue de celui qui l'a exporté :
+-- l'affichage sait relocaliser via GetItemInfo(id) (cf. le tooltip), mais il ne
+-- le fait que si l'id est présent. Il ne l'était pas dans le format d'origine,
+-- si bien que la relocalisation ne servait que pour ses propres récoltes —
+-- jamais pour une base partagée, c'est-à-dire précisément là où elle compte.
+--
+-- items et itemIDs doivent rester alignés index par index : le tooltip lit
+-- itemIDs[idx] pour l'item idx. Les nœuds anciens, sans itemIDs, sortent donc
+-- des 0, valeur que l'affichage traite déjà comme « pas d'id ».
 local function SerializeDB()
     local lines = { "return {" }
     for mapID, nodes in pairs(FarmMapDB) do
         if type(nodes) == "table" and #nodes > 0 then
             table.insert(lines, "  [" .. mapID .. "]={")
             for _, n in ipairs(nodes) do
-                local items = {}
-                for _, item in ipairs(n.items or {}) do
+                local items, itemIDs = {}, {}
+                for idx, item in ipairs(n.items or {}) do
                     table.insert(items, string.format("%q", item))
+                    -- tonumber() et pas tostring() : un id non numerique sortirait
+                    -- sans guillemets et produirait un export au Lua invalide,
+                    -- donc une base impossible a reimporter.
+                    local iid = tonumber(n.itemIDs and n.itemIDs[idx]) or 0
+                    table.insert(itemIDs, string.format("%d", iid))
                 end
                 table.insert(lines, string.format(
-                    "    {x=%.6f,y=%.6f,type=%q,name=%q,expName=%q,items={%s}},",
-                    n.x, n.y, n.type or "", n.name or "", n.expName or "",
-                    table.concat(items, ",")
+                    "    {x=%.6f,y=%.6f,type=%q,name=%q,nameID=%d,expName=%q,items={%s},itemIDs={%s}},",
+                    n.x, n.y, n.type or "", n.name or "", tonumber(n.nameID) or 0, n.expName or "",
+                    table.concat(items, ","), table.concat(itemIDs, ",")
                 ))
             end
             table.insert(lines, "  },")
