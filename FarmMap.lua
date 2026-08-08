@@ -2,7 +2,7 @@
 --  FarmMap — Addon principal
 --  Auteur  : Kroosstii (Dkroosstii-Dalaran)
 --  Version : v1.6.0
---  Updated : 05/08/2026
+--  Updated : 06/08/2026
 -- ============================================================
 
 -- ns: table shared by every file of the addon.
