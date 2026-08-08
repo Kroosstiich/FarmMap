@@ -2,7 +2,7 @@
 --  FarmMap — Addon principal
 --  Auteur  : Kroosstii (Dkroosstii-Dalaran)
 --  Version : v1.6.0
---  Updated : 06/08/2026
+--  Updated : 08/08/2026
 -- ============================================================
 
 -- ns: table shared by every file of the addon.
@@ -10,7 +10,7 @@
 -- this file is loaded (see the .toc order).
 local addonName, ns = ...
 local addonVersion = "v1.6.0"
-local lastUpdate   = "06/08/2026"
+local lastUpdate   = "08/08/2026"
 
 -- Libs
 local HBD     = LibStub("HereBeDragons-2.0")
