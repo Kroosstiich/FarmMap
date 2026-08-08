@@ -2,12 +2,12 @@
 --  FarmMap — Addon principal
 --  Auteur  : Kroosstii (Dkroosstii-Dalaran)
 --  Version : v1.6.0
---  MàJ     : 05/08/2026
+--  Updated : 05/08/2026
 -- ============================================================
 
--- ns : table partagée entre tous les fichiers de l'addon.
--- Les fichiers lang\*.lua y déposent leurs traductions avant
--- que ce fichier ne soit chargé (cf. ordre du .toc).
+-- ns: table shared by every file of the addon.
+-- The lang\*.lua files register their translations in it before
+-- this file is loaded (see the .toc order).
 local addonName, ns = ...
 local addonVersion = "v1.6.0"
 local lastUpdate   = "06/08/2026"
@@ -16,28 +16,28 @@ local lastUpdate   = "06/08/2026"
 local HBD     = LibStub("HereBeDragons-2.0")
 local HBDPins = LibStub("HereBeDragons-Pins-2.0")
 
--- Frame principal pour les events
+-- Main frame for events
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterAllEvents()
 
--- Version de la structure de la DB (migrations)
+-- DB schema version (migrations)
 local DB_VERSION = 4
 
--- Locale détectée une seule fois au chargement
+-- Client locale, read once at load
 local gameLocale = GetLocale()
 
--- Police du texte flottant de récolte. Contribution de bluse : le chemin était
--- codé en dur sur FRIZQT__.TTF, qui n'a aucun glyphe CJK — sur un client chinois
--- ou coréen, le nom de l'objet récolté s'affichait en carrés.
+-- Font of the floating harvest text. Contributed by bluse: the path was
+-- hardcoded to FRIZQT__.TTF, which carries no CJK glyph - on a Chinese or
+-- Korean client the harvested item name showed up as empty boxes.
 --
--- Indexé sur GetLocale() et non sur gameLocale : le texte flottant affiche des
--- noms d'objets, que le jeu renvoie toujours dans la langue du CLIENT, jamais
--- dans la langue forcée dans les options. Les deux valeurs coïncident ici, mais
--- gameLocale change si le joueur force une langue — s'y indexer donnerait la
--- police du coréen pour afficher des noms français.
+-- Indexed on GetLocale() and not on gameLocale: the floating text shows item
+-- names, which the game always returns in the CLIENT language, never in the
+-- language forced in the options. Both values match here, but gameLocale
+-- changes when the player forces a language - indexing on it would pick the
+-- Korean font to display French names.
 --
--- Repli sur STANDARD_TEXT_FONT plutôt que sur FRIZQT__.TTF : Blizzard y résout
--- la police correcte du client, y compris pour les locales absentes de la table.
+-- Falls back to STANDARD_TEXT_FONT rather than FRIZQT__.TTF: Blizzard resolves
+-- the correct client font there, including for locales absent from the table.
 local LOCALE_FONTS = {
     zhCN = "Fonts\\ARKai_T.ttf",
     koKR = "Fonts\\2002.TTF",
@@ -47,8 +47,8 @@ local LOCALE_FONTS = {
 local FLOATING_FONT = LOCALE_FONTS[GetLocale()] or STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
 
 -- ============================================================
--- DÉCLARATIONS ANTICIPÉES
--- (fonctions définies plus bas mais référencées plus haut)
+-- FORWARD DECLARATIONS
+-- (functions defined further down but referenced above)
 -- ============================================================
 
 local RefreshAllPins
@@ -59,12 +59,12 @@ local OpenExportPopup
 local OpenImportPopup
 
 -- ============================================================
--- CONSTANTES & DONNÉES STATIQUES
+-- CONSTANTS & STATIC DATA
 -- ============================================================
 
--- Noms d'extensions par expID (renvoyé par GetItemInfo).
--- Dernier recours uniquement : la résolution passe d'abord par le fichier de
--- langue actif, puis par la globale de Blizzard, déjà localisée.
+-- Expansion names by expID (returned by GetItemInfo).
+-- Last resort only: resolution goes through the active language file first,
+-- then through Blizzard's global, which is already localized.
 local EXP_FALLBACK = {
     [0]  = "Classic",       [1]  = "TBC",
     [2]  = "WotLK",         [3]  = "Cata",
@@ -74,22 +74,22 @@ local EXP_FALLBACK = {
     [10] = "The War Within",[11] = "Midnight",
 }
 
--- Résout le nom d'une extension pour l'affichage.
+-- Resolves an expansion name for display.
 --
--- L'ordre est délibéré :
+-- The order is deliberate:
 --
---   1. la clé EXP_<id> du fichier de langue ACTIF, lue directement dans sa
---      table via rawget et surtout pas dans L. L contient le repli anglais :
---      s'y fier renverrait « Midnight » à un joueur coréen alors que Blizzard
---      sait déjà le lui dire en coréen. C'est exactement le bug signalé.
---   2. EXPANSION_NAME<id>, la globale de Blizzard. Correcte dans les 12 langues
---      client, sans aucun travail de traducteur, et avec la terminologie
---      officielle plutôt qu'une approximation.
---   3. la table ci-dessus, si la globale n'existe pas encore pour une extension
---      trop récente.
+--   1. the EXP_<id> key of the ACTIVE language file, read straight from its
+--      own table via rawget and never from L. L holds the English fallback:
+--      relying on it would return "Midnight" to a Korean player when Blizzard
+--      already knows how to say it in Korean. That is the reported bug itself.
+--   2. EXPANSION_NAME<id>, Blizzard's global. Correct in all 12 client
+--      languages, with no translator work at all, and with the official
+--      terminology rather than an approximation.
+--   3. the table above, if the global does not exist yet for an expansion
+--      that is too recent.
 --
--- Un traducteur qui veut imposer sa propre formulation n'a qu'à définir
--- EXP_<id> dans son fichier : il passe alors devant Blizzard.
+-- A translator who wants to impose their own wording only has to define
+-- EXP_<id> in their file: it then takes precedence over Blizzard.
 local function ExpansionName(expID)
     if type(expID) ~= "number" then return nil end
 
@@ -103,15 +103,15 @@ local function ExpansionName(expID)
     return EXP_FALLBACK[expID]
 end
 
--- IDs de compétence pour la détection de profession
+-- Skill line IDs used for profession detection
 local PROFESSION_SKILL_IDS = {
     Herbo  = 182,
     Minage = 186,
     Peche  = 356,
 }
 
--- SpellIDs de récolte → type de nœud
--- Ajouter ici les IDs découverts via le debug [SPELL_RAW]
+-- Harvest spellIDs -> node type
+-- Add here the IDs discovered through the [SPELL_RAW] debug output
 local HARVEST_SPELLS = {
     -- Herbo
         -- Midnight
@@ -125,45 +125,45 @@ local HARVEST_SPELLS = {
         -- Classic
     [265837] = "Minage",
 
-    -- Pêche
+    -- Fishing
     [131474]  = "Peche",
     [131476]  = "Peche",
     [1225292] = "Peche",
 
-    -- Bûcheronnage
+    -- Logging
     [1239682] = "Bois",
 }
 
--- Couleurs RGB par type (utilisées pour les pins et l'UI)
+-- RGB colors per type (used for pins and for the UI)
 local TYPE_COLORS = {
     Herbo   = {0.2, 0.8, 0.2},
     Minage  = {0.8, 0.5, 0.0},
     Peche   = {0.2, 0.6, 1.0},
     Bois    = {0.9, 0.6, 0.1},
-    -- Nœuds primordiaux / abondants (teinte or)
+    -- Primordial / abundant nodes (gold tint)
     HerboR  = {0.6, 1.0, 0.2},
     MinageR = {1.0, 0.82, 0.0},
     PecheR  = {0.4, 0.9, 1.0},
 }
 
--- Lookup rapide pour les nœuds riches (teinture or sur les pins)
+-- Fast lookup for rich nodes (gold tint on the pins)
 local RICH_TYPES = { HerboR = true, MinageR = true, PecheR = true }
 
--- Ordre d'affichage des types dans le panel couleurs
+-- Display order of the types in the colors panel
 local TYPE_ORDER = { "Peche", "Herbo", "Minage", "Bois" }
 
 -- Chemins de textures
 local TEX_PATH     = "Interface\\AddOns\\FarmMap\\Textures\\"
 local BLIP_DEFAULT = "Interface\\Minimap\\ObjectIconsAtlas"
 
--- Compat 12.0.7+ : Minimap:SetBlipTexture() (et les méthodes sœurs SetIconTexture,
+-- 12.0.7+ compat: Minimap:SetBlipTexture() (and the sibling methods
 -- SetPlayerTexture, SetPOIArrowTexture, SetCorpsePOIArrowTexture, SetStaticPOIArrowTexture)
--- ont été retirées par Blizzard en 12.0.7, SANS remplacement (changelog Widgets officieux :
--- 6 retraits, 0 ajout). Fonctionnalité de remplacement d'atlas natif désactivée en
--- conséquence : HAS_NATIVE_BLIP est figé à false ci-dessous. Si Blizzard restaure un jour
--- ces méthodes, décommente la ligne de détection dynamique (et supprime le "= false" en
--- dessous) : tout le reste (ApplyMinimapStyle, les checks useBlip, etc.) retombe
--- automatiquement sur le système natif sans aucun autre changement nécessaire.
+-- were removed by Blizzard in 12.0.7, with NO replacement (unofficial Widgets
+-- changelog: 6 removals, 0 additions). The native atlas replacement feature is
+-- disabled as a result: HAS_NATIVE_BLIP is pinned to false below. Should Blizzard
+-- ever restore those methods, uncomment the dynamic detection line (and drop the
+-- "= false" underneath): everything else (ApplyMinimapStyle, the useBlip checks,
+-- and so on) falls back to the native system with no further change needed.
 -- local HAS_NATIVE_BLIP = type(Minimap.SetBlipTexture) == "function"
 local HAS_NATIVE_BLIP = false
 
@@ -173,7 +173,7 @@ local function SetNativeBlip(tex)
     end
 end
 
--- Atlas blip pour remplacement Blizzard (minimap uniquement)
+-- Blip atlas for the Blizzard replacement (minimap only)
 local BLIP_TEXTURES = {
     blank        = TEX_PATH .. "atlas-blip-farmmap-whiteoutline",
     vivid        = TEX_PATH .. "atlas-blip-farmmap-vivid",
@@ -182,11 +182,11 @@ local BLIP_TEXTURES = {
     tritanopia   = TEX_PATH .. "atlas-blip-farmmap-tritanopia",
 }
 
--- Coordonnées UV dans l'atlas Blizzard (ObjectIconsAtlas) — worldmap et fallback
--- Calibrées pour le patch 12.0.7 via le calibreur /fm atlas (glisser-déposer,
--- canvas 1024x1024, icônes 32x32). MinageR garde son ancienne position
--- (le minerai brillant n'a pas bougé) : c'est la seule variante "riche"
--- qui ne suit pas automatiquement son type de base.
+-- UV coordinates inside the Blizzard atlas (ObjectIconsAtlas) - world map and fallback.
+-- Calibrated for patch 12.0.7 with the /fm atlas calibrator (drag and drop,
+-- 1024x1024 canvas, 32x32 icons). MinageR keeps its former position
+-- (the shiny ore did not move): it is the only "rich" variant that does not
+-- automatically follow its base type.
 local WORLD_MAP_TEXCOORDS = {
     Minage  = {0.5073, 0.5385, 0.6070, 0.6352},
     Herbo   = {0.5095, 0.5407, 0.5753, 0.6066},
@@ -197,10 +197,10 @@ local WORLD_MAP_TEXCOORDS = {
     PecheR  = {0.5081, 0.5401, 0.5389, 0.5684},
 }
 
--- Pins built-in : coordonnées UV dans chaque atlas blip pour les pins HBDPins
--- Même structure que les packs externes (pins par type). Référence
--- WORLD_MAP_TEXCOORDS plutôt que de dupliquer les coordonnées : à chaque
--- patch, une seule table à mettre à jour (cf. /fm atlas).
+-- Built-in pins: UV coordinates inside each blip atlas for the HBDPins pins.
+-- Same structure as external packs (pins per type). References
+-- WORLD_MAP_TEXCOORDS instead of duplicating the coordinates: one single table
+-- to update per patch (see /fm atlas).
 local BUILTIN_PINS = {}
 for presetKey, texPath in pairs(BLIP_TEXTURES) do
     BUILTIN_PINS[presetKey] = {
@@ -214,7 +214,7 @@ for presetKey, texPath in pairs(BLIP_TEXTURES) do
     }
 end
 
--- Couleurs de rareté WoW (qualité 0→6)
+-- WoW rarity colors (quality 0->6)
 local QUALITY_COLORS = {
     [0] = "ff9d9d9d",  -- Gris
     [1] = "ffffffff",  -- Blanc
@@ -225,15 +225,15 @@ local QUALITY_COLORS = {
     [6] = "ffe6cc80",  -- Beige
 }
 
--- Textures icônes de rang de craft (tier 1 et 2)
+-- Craft tier icon textures (tier 1 and 2)
 local TIER_TEXTURES = {
     [1] = "Interface\\Professions\\professionsquality12tier1.blp",
     [2] = "Interface\\Professions\\professionsquality12tier2.blp",
 }
 
 -- ============================================================
--- SYSTÈME DE STYLES EXTERNES
--- API publique pour les sous-addons (FarmMap_Colors_*)
+-- EXTERNAL STYLE SYSTEM
+-- Public API for sub-addons (FarmMap_Colors_*)
 --
 -- Exemple d'utilisation depuis un sous-addon :
 --   FarmMapStyles.Register("monpack", {
@@ -251,7 +251,7 @@ local TIER_TEXTURES = {
 FarmMapStyles = {}
 local _registeredStyles = {}
 
--- Enregistre un pack de style. Déclenche un rebuild du panel Couleurs si l'UI est déjà chargée.
+-- Registers a style pack. Triggers a rebuild of the Colors panel if the UI is already loaded.
 function FarmMapStyles.Register(styleKey, data)
     if _registeredStyles[styleKey] then
         print("|cffffd100FarmMap :|r Style déjà enregistré : " .. styleKey)
@@ -265,12 +265,12 @@ function FarmMapStyles.Register(styleKey, data)
     if FarmMap_OnStyleRegistered then FarmMap_OnStyleRegistered(styleKey, data) end
 end
 
--- Retourne les données d'un style enregistré (nil si inconnu)
+-- Returns the data of a registered style (nil if unknown)
 function FarmMapStyles.Get(styleKey)
     return _registeredStyles[styleKey]
 end
 
--- Retourne la liste de tous les styles : { key, label, hasBlip }
+-- Returns the list of every style: { key, label, hasBlip }
 function FarmMapStyles.GetAll()
     local list = {}
     for k, v in pairs(_registeredStyles) do
@@ -281,14 +281,14 @@ end
 
 -- ============================================================
 -- LOCALISATION
--- Les langues vivent dans lang\<locale>.lua et s'enregistrent
--- elles-mêmes dans ns.locales (voir lang\README.md).
+-- Languages live in lang\<locale>.lua and register themselves
+-- into ns.locales (see lang\README.md).
 --
--- Ajouter une langue = déposer un fichier + une ligne dans le
--- .toc. Aucune modification de ce fichier n'est nécessaire.
+-- Adding a language = drop a file in and add one line to the
+-- .toc. No change to this file is ever required.
 --
--- Toute clé absente d'une traduction retombe automatiquement
--- sur l'anglais : une traduction partielle ne casse jamais
+-- Any key a translation leaves out falls back automatically
+-- to English: a partial translation never breaks
 -- l'addon et n'affiche jamais de texte vide.
 -- ============================================================
 
@@ -296,9 +296,9 @@ ns.locales = ns.locales or {}
 
 local L = {}
 
--- Reconstruit L en place : les closures de l'UI gardent la même
--- référence de table. Base anglaise, puis surcharge par la langue
--- demandée — d'où le repli automatique sur l'anglais.
+-- Rebuilds L in place: the UI closures keep the same table
+-- reference. English base, then overridden by the requested
+-- language - hence the automatic fallback to English.
 local function ApplyLanguage(lang)
     wipe(L)
 
@@ -315,7 +315,7 @@ local function ApplyLanguage(lang)
     gameLocale = lang
 end
 
--- Liste des langues disponibles, triée pour le panneau Langue.
+-- List of available languages, sorted for the Language panel.
 local function GetAvailableLocales()
     local list = {}
     for code, data in pairs(ns.locales) do
@@ -329,9 +329,9 @@ local function GetAvailableLocales()
     return list
 end
 
--- Libellé d'une langue : endonyme + nom latin en repli.
--- Sur un client FR/EN, "한국어" s'affiche en carrés vides ; le
--- suffixe latin garantit que l'entrée reste identifiable.
+-- Label of a language: endonym plus latin name as a fallback.
+-- On a FR/EN client "한국어" may render as empty boxes; the latin
+-- suffix guarantees the entry stays identifiable.
 local function GetLocaleLabel(data)
     if data.latinName and data.latinName ~= data.name then
         return data.name .. " (" .. data.latinName .. ")"
@@ -339,11 +339,11 @@ local function GetLocaleLabel(data)
     return data.name or "?"
 end
 
--- Renvoie une chaîne dans la langue du CLIENT, indépendamment de la
--- langue forcée dans l'addon. Sert à /fm default : c'est la commande
--- de secours quand on a forcé une langue qu'on ne sait pas lire — ou
--- qu'on arrive à lire sans la comprendre. Confirmer dans la langue
--- vers laquelle on rebascule est la seule chose sûrement utile.
+-- Returns a string in the CLIENT language, regardless of the language
+-- forced in the addon. Used by /fm default: it is the emergency command
+-- for when someone forced a language they cannot read - or can read
+-- without understanding it. Confirming in the language we switch back
+-- to is the only thing that is reliably useful.
 local function ClientString(key)
     local loc = ns.locales[GetLocale()] or ns.locales.enUS
     return (loc and loc.strings and loc.strings[key]) or L[key] or ""
@@ -352,12 +352,12 @@ end
 ApplyLanguage(gameLocale)
 
 -- ============================================================
--- MIGRATION DE BASE DE DONNÉES
+-- DATABASE MIGRATIONS
 -- ============================================================
 
 local migrations = {}
 
--- V1 : ajout des champs name, expName, items, type
+-- V1: added the name, expName, items and type fields
 migrations[1] = function()
     local fixed = 0
     for mapID, nodes in pairs(FarmMapDB) do
@@ -373,7 +373,7 @@ migrations[1] = function()
     return fixed
 end
 
--- V2 : ajout des champs itemIDs, nameID, locale
+-- V2: added the itemIDs, nameID and locale fields
 migrations[2] = function()
     local fixed = 0
     for mapID, nodes in pairs(FarmMapDB) do
@@ -390,12 +390,12 @@ end
 
 -- Retrouve l'itemID a partir d'un nom d'objet.
 --
--- GetItemInfo accepte un nom, mais ne renvoie pas l'id : il faut passer par le
--- lien et l'extraire. Deux limites qui commandent tout le reste :
---   - l'objet doit etre dans le cache du client, sinon nil ;
---   - le nom doit etre dans la langue du client.
--- Un noeud importe d'une base francaise reste donc irrecuperable sur un client
--- coreen : l'id n'a jamais ete ecrit, et le nom ne permet pas de le retrouver.
+-- GetItemInfo accepts a name but does not return the id: it has to go through
+-- the link and extract it. Two limits drive everything else:
+--   - the item must be in the client cache, otherwise nil;
+--   - the name must be in the client language.
+-- A node imported from a French database is therefore unrecoverable on a Korean
+-- client: the id was never written, and the name cannot be looked up.
 local function ItemIDFromName(name)
     if type(name) ~= "string" or name == "" then return nil end
     local _, link = GetItemInfo(name)
@@ -404,14 +404,13 @@ local function ItemIDFromName(name)
     return id and tonumber(id) or nil
 end
 
--- Recompose les identifiants manquants des noeuds deja enregistres, pour que
--- l'affichage puisse les relocaliser au lieu de rester fige sur le nom stocke.
+-- Rebuilds the missing identifiers of already recorded nodes, so that the
+-- display can re-localize them instead of staying stuck on the stored name.
 --
--- Deliberement re-executable : GetItemInfo depend du cache du client, qui se
--- remplit au fil de la session. Une premiere passe au chargement en retrouve
--- une partie, un clic ulterieur sur « Mettre a jour la DB » en retrouve
--- davantage. C'est pour cette raison que ManualMigration l'appelle toujours,
--- meme quand la version de schema est deja a jour.
+-- Deliberately re-runnable: GetItemInfo depends on the client cache, which
+-- fills up over the session. A first pass at load recovers some of them, a
+-- later click on "Update DB" recovers more. That is why ManualMigration
+-- always calls it, even when the schema version is already up to date.
 local function BackfillItemIDs()
     local fixed = 0
     for _, nodes in pairs(FarmMapDB) do
@@ -438,19 +437,19 @@ local function BackfillItemIDs()
     return fixed
 end
 
--- V3 : recuperation des identifiants absents (noeuds anciens, ou importes
--- depuis une base exportee avant la v1.5.2, qui ne contenait pas les ids).
+-- V3: recovery of missing identifiers (old nodes, or nodes imported from a
+-- database exported before v1.5.2, which did not carry the ids).
 migrations[3] = BackfillItemIDs
 
 -- V4 : recuperation de l'expID a partir du nom d'extension stocke.
 --
--- expName a toujours ete ecrit depuis la table anglaise codee en dur, quelle
--- que soit la langue du joueur : la correspondance inverse est donc fiable et
--- ne depend pas du client. Un noeud recolte avant cette version retrouve ainsi
--- son identifiant, et son infobulle se met a parler la langue du joueur.
+-- expName has always been written from the hardcoded English table, whatever
+-- the player's language: the reverse lookup is therefore reliable and does not
+-- depend on the client. A node harvested before this version thus recovers its
+-- identifier, and its tooltip starts speaking the player's language.
 --
--- Couvre aussi les chaines "ID: 11" produites par l'ancien repli quand l'objet
--- n'etait pas encore en cache au moment de la recolte.
+-- Also covers the "ID: 11" strings produced by the old fallback when the item
+-- was not yet cached at harvest time.
 migrations[4] = function()
     local byName = {}
     for id, name in pairs(EXP_FALLBACK) do byName[name] = id end
@@ -497,11 +496,11 @@ local function RunMigrations(verbose)
     end
 end
 
--- Le bouton « Mettre a jour la DB » relance toujours la recuperation des ids,
--- meme quand le schema est deja a jour : elle depend du cache d'objets du
--- client, donc un second clic plus tard dans la session en retrouve davantage.
--- Sans ca, un joueur dont le cache etait froid au chargement resterait avec des
--- noeuds non relocalisables sans aucun moyen de reessayer.
+-- The "Update DB" button always re-runs the id recovery, even when the schema
+-- is already up to date: it depends on the client item cache, so a second click
+-- later in the session recovers more. Without this, a player whose cache was
+-- cold at load would be left with nodes that cannot be re-localized, and no way
+-- to try again.
 local function ManualMigration()
     RunMigrations(true)
     local recovered = BackfillItemIDs()
@@ -519,8 +518,8 @@ local playerProfessions = {}
 
 local function CheckProfessions()
     playerProfessions = {}
-    -- GetProfessions() : prof1, prof2, archéo, pêche, cuisine
-    -- ipairs s'arrête au premier nil → pêche jamais détectée sans ce fix
+    -- GetProfessions(): prof1, prof2, archaeology, fishing, cooking
+    -- ipairs stops at the first nil -> fishing never detected without this fix
     local p1, p2, p3, p4, p5 = GetProfessions()
     for _, index in ipairs({ p1 or false, p2 or false, p3 or false, p4 or false, p5 or false }) do
         if index then
@@ -530,8 +529,8 @@ local function CheckProfessions()
             end
         end
     end
-    -- Si aucune profession détectée, les données ne sont pas encore prêtes :
-    -- on ne touche pas aux états persistés pour éviter de les écraser à tort.
+    -- If no profession was detected, the data is not ready yet:
+    -- leave the persisted states alone rather than wrongly overwriting them.
     local anyProfFound = next(playerProfessions) ~= nil
     if not anyProfFound then return end
     local checks = {
@@ -548,19 +547,19 @@ local function CheckProfessions()
 end
 
 -- ============================================================
--- SÉRIALISATION DB (import / export)
+-- DB SERIALIZATION (import / export)
 -- ============================================================
 
--- Les identifiants d'objet (nameID, itemIDs) sont exportés en plus des noms.
--- Sans eux, un nœud importé reste figé dans la langue de celui qui l'a exporté :
--- l'affichage sait relocaliser via GetItemInfo(id) (cf. le tooltip), mais il ne
--- le fait que si l'id est présent. Il ne l'était pas dans le format d'origine,
--- si bien que la relocalisation ne servait que pour ses propres récoltes —
--- jamais pour une base partagée, c'est-à-dire précisément là où elle compte.
+-- The item identifiers (nameID, itemIDs) are exported alongside the names.
+-- Without them an imported node stays frozen in the language of whoever
+-- exported it: the display can re-localize through GetItemInfo(id) (see the
+-- tooltip), but only when the id is present. It was absent from the original
+-- format, so re-localization only ever served one's own harvests - never a
+-- shared database, which is precisely where it matters.
 --
--- items et itemIDs doivent rester alignés index par index : le tooltip lit
--- itemIDs[idx] pour l'item idx. Les nœuds anciens, sans itemIDs, sortent donc
--- des 0, valeur que l'affichage traite déjà comme « pas d'id ».
+-- items and itemIDs must stay aligned index by index: the tooltip reads
+-- itemIDs[idx] for item idx. Old nodes without itemIDs therefore emit 0,
+-- a value the display already treats as "no id".
 local function SerializeDB()
     local lines = { "return {" }
     for mapID, nodes in pairs(FarmMapDB) do
@@ -570,9 +569,9 @@ local function SerializeDB()
                 local items, itemIDs = {}, {}
                 for idx, item in ipairs(n.items or {}) do
                     table.insert(items, string.format("%q", item))
-                    -- tonumber() et pas tostring() : un id non numerique sortirait
-                    -- sans guillemets et produirait un export au Lua invalide,
-                    -- donc une base impossible a reimporter.
+                    -- tonumber() and not tostring(): a non-numeric id would come
+                    -- out unquoted and produce an export with invalid Lua,
+                    -- hence a database that cannot be imported back.
                     local iid = tonumber(n.itemIDs and n.itemIDs[idx]) or 0
                     table.insert(itemIDs, string.format("%d", iid))
                 end
@@ -603,7 +602,7 @@ end
 -- MINIMAP : STYLE & BLIP
 -- ============================================================
 
--- Retourne la table pins d'un style (built-in ou externe)
+-- Returns the pins table of a style (built-in or external)
 local function GetStylePins(styleKey)
     local ext = FarmMapStyles.Get(styleKey)
     if ext and ext.pins then return ext.pins end
@@ -625,7 +624,7 @@ local function ApplyMinimapStyle(style)
 end
 
 -- ============================================================
--- FENÊTRE DEBUG
+-- DEBUG WINDOW
 -- ============================================================
 
 local debugHistory = {}
@@ -853,12 +852,12 @@ local function CreatePoint(nodeData, isMinimap)
         end
     end
 
-    -- Teinture or pour les nœuds riches
+    -- Gold tint for rich nodes
     if isRich then
         f.tex:SetVertexColor(1, 0.85, 0.1)
     end
 
-    -- Tooltip au survol
+    -- Tooltip on hover
     f:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:ClearLines()
@@ -868,9 +867,9 @@ local function CreatePoint(nodeData, isMinimap)
             if localName then displayName = localName end
         end
         GameTooltip:AddLine(displayName or nodeData.type, 1, 0.82, 0)
-        -- expID d'abord : il se resout dans la langue du client. expName n'est
-        -- qu'un repli pour les noeuds enregistres avant que l'id ne soit stocke,
-        -- et reste alors fige dans la langue de celui qui les a recoltes.
+        -- expID first: it resolves in the client language. expName is only a
+        -- fallback for nodes recorded before the id was stored, and stays
+        -- frozen in the language of whoever harvested them.
         local expText = ExpansionName(nodeData.expID) or nodeData.expName
         if expText and nodeData.type ~= "Bois" then
             GameTooltip:AddLine(L.EXPANSION .. " : " .. expText, 0.4, 0.6, 1)
@@ -960,7 +959,7 @@ local function CreatePoint(nodeData, isMinimap)
 end
 
 -- ============================================================
--- REFRESH DES PINS
+-- PIN REFRESH
 -- ============================================================
 
 local refreshPending = false
@@ -1030,7 +1029,7 @@ local function DoRefresh()
     HBDPins:RemoveAllMinimapIcons(addonName)
     RefreshWorldMapPins()
     if not FarmMapDB then return end
-    -- N'utilise pas les pins HBDPins minimap seulement si un blip natif est actif
+    -- Skips the HBDPins minimap pins only when a native blip is active
     local mmStyle = FarmMapDB.minimapStyle
     local ext     = FarmMapStyles.Get(mmStyle)
     local useBlip = HAS_NATIVE_BLIP and FarmMapDB.replaceBlip and ((ext and ext.blip) or BLIP_TEXTURES[mmStyle])
@@ -1055,7 +1054,7 @@ RefreshAllPins = function()
 end
 
 -- ============================================================
--- TEXTE FLOTTANT À LA RÉCOLTE
+-- FLOATING TEXT ON HARVEST
 -- ============================================================
 
 local function ShowFloatingLoot(items, itemIDs, quantities)
@@ -1161,9 +1160,9 @@ local lastHarvestType = nil
 local pendingLoot     = false
 local pendingLootData = nil
 
--- Décalage de position pour la pêche :
--- Le joueur doit se tenir ~15 yards en arrière du pool pour pouvoir lancer.
--- On avance la position dans la direction où il regarde pour marquer le pool.
+-- Position offset for fishing:
+-- The player has to stand ~15 yards back from the pool to be able to cast.
+-- We push the position forward along their facing to mark the pool itself.
 local FISHING_OFFSET_YARDS = 15
 
 local function GetFishingPosition(mapID)
@@ -1173,12 +1172,12 @@ local function GetFishingPosition(mapID)
     local facing = GetPlayerFacing()
     if not facing then return pos end
 
-    -- Coordonnées monde (yards) via HBD
+    -- World coordinates (yards) through HBD
     local wx, wy = HBD:GetWorldCoordinatesFromZone(pos.x, pos.y, mapID)
     if not wx then return pos end
 
-    -- Dans WoW : facing 0 = nord, sens horaire.
-    -- En coords monde : X croît vers l'est, Y croît vers le nord.
+    -- In WoW: facing 0 = north, clockwise.
+    -- In world coords: X grows eastward, Y grows northward.
     local dx =  math.sin(facing) * FISHING_OFFSET_YARDS
     local dy = -math.cos(facing) * FISHING_OFFSET_YARDS
 
@@ -1194,14 +1193,14 @@ local function GetItemIDFromLink(link)
     return tonumber(link:match("item:(%d+)")) or 0
 end
 
--- GameObjects à ignorer : spawns invoqués ou contextuels, pas des bancs naturels
+-- GameObjects to ignore: summoned or contextual spawns, not natural nodes
 local GAMEOBJECT_BLACKLIST = {
     [524813] = true,  -- Oceanic Vortex (Voidstorm / Angler's Anomaly)
 }
 
--- Items à ne pas sauvegarder dans la DB :
--- drops aléatoires présents sur tous les nœuds d'un même type,
--- non spécifiques à la position (motes, knowledge points, bonus random)
+-- Items that must not be saved into the DB:
+-- random drops present on every node of a given type,
+-- not specific to the position (motes, knowledge points, random bonuses)
 local ITEM_BLACKLIST = {
     [237496] = true,  -- (à identifier)
     [238465] = true,  -- (à identifier)
@@ -1215,7 +1214,7 @@ local ITEM_BLACKLIST = {
 }
 
 local function CaptureLootData()
-    -- Vérifie que la source est un GameObject (nœud de récolte, pas un mob)
+    -- Check that the source is a GameObject (a harvest node, not a mob)
     local sourceGUID = GetLootSourceInfo(1)
     if sourceGUID then
         local sourceType = sourceGUID:match("^([^%-]+)")
@@ -1235,8 +1234,8 @@ local function CaptureLootData()
     local pos    = mapID and C_Map.GetPlayerMapPosition(mapID, "player")
     if not mapID or not pos then return end
 
-    -- Pré-calcul du décalage pêche (le type de récolte n'est pas encore connu ici,
-    -- ProcessHarvestLoot choisira entre pos et posFishing selon le type détecté)
+    -- Pre-computes the fishing offset (the harvest type is not known yet here,
+    -- ProcessHarvestLoot will pick between pos and posFishing once it is)
     local posFishing = GetFishingPosition(mapID)
 
     local lootItems, lootItemIDs, lootQuantities, lootQualities = {}, {}, {}, {}
@@ -1255,9 +1254,9 @@ local function CaptureLootData()
                 if nodeName == L.UNKNOWN then
                     nodeName      = name
                     nodeNameID    = itemID
-                    -- On retient l'identifiant, pas le nom : c'est lui qui est
-                    -- stocke en base et exporte. Une chaine resolue figerait le
-                    -- noeud dans la langue de celui qui l'a recolte.
+                    -- We keep the identifier, not the name: it is the id that
+                    -- gets stored and exported. A resolved string would freeze
+                    -- the node in the language of whoever harvested it.
                     nodeExpID     = tonumber(expID)
                     extensionName = ExpansionName(nodeExpID)
                                     or ("ID: " .. (expID or "?"))
@@ -1331,8 +1330,8 @@ local function ProcessHarvestLoot()
             existingNode.expName = extensionName
             existingNode.expID   = nodeExpID
             existingNode.locale  = gameLocale
-            -- Pêche : fusion des items (le même spot peut donner des poissons différents)
-            -- Herbo/Minage : écrase (le nœud repousse avec les mêmes items)
+            -- Fishing: merge the items (the same spot can yield different fish)
+            -- Herbalism/Mining: overwrite (the node regrows with the same items)
             if foundType == "Peche" or foundType == "PecheR" then
                 local seenIDs = {}
                 for _, id in ipairs(existingNode.itemIDs or {}) do seenIDs[id] = true end
@@ -1386,7 +1385,7 @@ end
 RecordStat = function(foundType)
     FarmMapStatsDB        = FarmMapStatsDB        or { counts = {} }
     FarmMapStatsDB.counts = FarmMapStatsDB.counts or {}
-    -- Les nœuds riches (R) comptent sous la même clé que leur parent
+    -- Rich nodes (R) are counted under the same key as their parent
     local statKey = foundType:gsub("R$", "")
     FarmMapStatsDB.counts[statKey] = (FarmMapStatsDB.counts[statKey] or 0) + 1
     if FarmMap_RefreshStats then FarmMap_RefreshStats() end
@@ -1657,7 +1656,7 @@ end
 -- INTERFACE OPTIONS
 -- ============================================================
 
--- Helper : rangée de preset cliquable dans le panel Couleurs
+-- Helper: clickable preset row in the Colors panel
 local function MakePresetRow(parent, anchorFrame, anchorOffsetY, presetKey, dbKey, label)
     local row = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     row:SetSize(280, 30)
@@ -1701,8 +1700,8 @@ local function MakePresetRow(parent, anchorFrame, anchorOffsetY, presetKey, dbKe
     row:SetScript("OnMouseDown", function()
         FarmMapDB[dbKey] = presetKey
         if dbKey == "minimapStyle" then
-            -- Ancien : activait automatiquement replaceBlip pour les packs externes.
-            -- Désactivé avec la fonctionnalité de remplacement d'atlas natif (12.0.7+).
+            -- Formerly: automatically enabled replaceBlip for external packs.
+            -- Disabled along with the native atlas replacement feature (12.0.7+).
             -- if FarmMapStyles.Get(presetKey) then
             --     FarmMapDB.replaceBlip = true
             --     if FarmMapReplaceBlipCheck then
@@ -1735,7 +1734,7 @@ local function CreateOptions()
     title:SetPoint("TOPLEFT", 16, -16)
     title:SetText(L.OPTIONS_TITLE)
 
-    -- Crédit du traducteur de la langue actuellement affichée.
+    -- Translator credit for the language currently displayed.
     local activeLocale   = ns.locales[gameLocale] or ns.locales.enUS
     local translatorName = (activeLocale and activeLocale.translator) or "—"
 
@@ -1773,8 +1772,8 @@ local function CreateOptions()
             showMinimapPins  = FarmMapDB.showMinimapPins,
             language         = FarmMapDB.language,
             showFloatingText = FarmMapDB.showFloatingText,
-            -- Position et visibilité du bouton minimap : vider la base
-            -- de nœuds ne doit pas replacer le bouton.
+            -- Position and visibility of the minimap button: clearing the node
+            -- database must not move the button back.
             minimapIcon      = FarmMapDB.minimapIcon,
         }
         HBDPins:RemoveAllMinimapIcons(addonName)
@@ -1813,7 +1812,7 @@ local function CreateOptions()
     local category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
     Settings.RegisterAddOnCategory(category)
 
-    -- Mémorisé pour que le bouton minimap puisse ouvrir ce panneau.
+    -- Remembered so the minimap button can open this panel.
     ns.optionsCategory = category
 
     -- ---- PANEL AFFICHAGE ----
@@ -1930,12 +1929,12 @@ local function CreateOptions()
     langDesc:SetText("|cffaaaaaa" .. L.LANG_DESC .. "|r")
     langDesc:SetJustifyH("LEFT")
 
-    -- Message « /reload requis », ancré sous le sélecteur.
+    -- "/reload required" message, anchored below the selector.
     local langReloadMsg = langPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     langReloadMsg:SetText("")
 
-    -- Options construites dynamiquement depuis lang\*.lua : déposer un
-    -- fichier de langue suffit, il n'y a rien à modifier ici.
+    -- Options built dynamically from lang\*.lua: dropping a language
+    -- file in is enough, there is nothing to change here.
     local LANG_OPTS = { { key = "auto", label = L.LANG_AUTO } }
     for _, entry in ipairs(GetAvailableLocales()) do
         LANG_OPTS[#LANG_OPTS + 1] = {
@@ -1944,9 +1943,9 @@ local function CreateOptions()
         }
     end
 
-    -- Sélecteur : API Blizzard_Menu (11.0+), l'ancien UIDropDownMenu
-    -- ayant été retiré en 11.0. Le libellé du bouton est déduit
-    -- automatiquement de l'entrée radio cochée.
+    -- Selector: Blizzard_Menu API (11.0+), the old UIDropDownMenu
+    -- having been removed in 11.0. The button label is derived
+    -- automatically from the checked radio entry.
     local langDropdown = CreateFrame("DropdownButton", nil, langPanel, "WowStyle1DropdownTemplate")
     langDropdown:SetPoint("TOPLEFT", langDesc, "BOTTOMLEFT", 0, -12)
     langDropdown:SetSize(220, 30)
@@ -1969,8 +1968,8 @@ local function CreateOptions()
     langReloadMsg:SetPoint("TOPLEFT", langDropdown, "BOTTOMLEFT", 0, -10)
 
     -- ---- REMERCIEMENTS TRADUCTEURS ----
-    -- Construits depuis les fichiers de langue installés : un nouveau
-    -- traducteur apparaît ici sans aucune modification de code.
+    -- Built from the installed language files: a new translator
+    -- shows up here without any code change.
     local thanksTitle = langPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     thanksTitle:SetPoint("TOPLEFT", langDropdown, "BOTTOMLEFT", 0, -48)
     thanksTitle:SetText(L.LANG_THANKS)
@@ -1990,8 +1989,8 @@ local function CreateOptions()
     thanksList:SetSpacing(4)
     thanksList:SetText(table.concat(thanksLines, "\n"))
 
-    -- /fm default peut changer la langue pendant que le panneau est
-    -- ouvert : on régénère pour que le libellé du bouton suive.
+    -- /fm default can change the language while the panel is open:
+    -- regenerate so the button label follows.
     langPanel:SetScript("OnShow", function()
         langDropdown:GenerateMenu()
     end)
@@ -2014,13 +2013,13 @@ local function CreateOptions()
     mmSep:SetText(L.MINIMAP_SECTION)
     mmSep:SetTextColor(1, 0.82, 0, 1)
 
-    -- Compat 12.0.7+ : Minimap:SetBlipTexture n'existe plus (voir HAS_NATIVE_BLIP en
-    -- haut du fichier). La case reste visible mais grisée (Disable + texte du label
-    -- grisé manuellement) pour que le joueur comprenne que ce n'est pas un bug, juste
-    -- une fonctionnalité retirée par Blizzard. blipDesc explique la situation à la place
-    -- de l'ancienne description. Si Blizzard restaure les méthodes natives un jour :
-    -- remettre SetChecked sur FarmMapDB.replaceBlip, ré-Enable(), remettre l'OnClick
-    -- d'origine (cf. historique), et restaurer les anciens textes L.REPLACE_BLIP_DESC.
+    -- 12.0.7+ compat: Minimap:SetBlipTexture no longer exists (see HAS_NATIVE_BLIP
+    -- at the top of the file). The checkbox stays visible but greyed out (Disable
+    -- plus a manually greyed label) so the player understands this is not a bug,
+    -- just a feature Blizzard removed. blipDesc explains the situation in place of
+    -- the former description. Should Blizzard ever restore the native methods:
+    -- put SetChecked back on FarmMapDB.replaceBlip, re-Enable(), restore the
+    -- original OnClick (see history), and restore the old L.REPLACE_BLIP_DESC text.
     local checkBlip = CreateFrame("CheckButton", "FarmMapReplaceBlipCheck", colorPanel, "InterfaceOptionsCheckButtonTemplate")
     checkBlip:SetPoint("TOPLEFT", mmSep, "BOTTOMLEFT", 0, -4)
     _G[checkBlip:GetName() .. "Text"]:SetText(L.REPLACE_BLIP)
@@ -2033,9 +2032,9 @@ local function CreateOptions()
     blipDesc:SetText("|cffaaaaaa" .. L.REPLACE_BLIP_DESC .. "|r")
     blipDesc:SetJustifyH("LEFT")
 
-    -- Case fonctionnelle, indépendante de checkBlip : affiche ou masque les pins
-    -- FarmMap (HBDPins) sur la minimap. La carte du monde n'est jamais concernée,
-    -- elle garde toujours ses pins personnalisés.
+    -- Functional checkbox, independent from checkBlip: shows or hides the FarmMap
+    -- pins (HBDPins) on the minimap. The world map is never affected,
+    -- it always keeps its custom pins.
     local checkPins = CreateFrame("CheckButton", "FarmMapShowMinimapPinsCheck", colorPanel, "InterfaceOptionsCheckButtonTemplate")
     checkPins:SetPoint("TOPLEFT", blipDesc, "BOTTOMLEFT", -20, -8)
     _G[checkPins:GetName() .. "Text"]:SetText(L.SHOW_MINIMAP_PINS)
@@ -2045,7 +2044,7 @@ local function CreateOptions()
         RefreshAllPins()
     end)
 
-    -- Bouton minimap (LibDBIcon). La case est masquée si les libs sont
+    -- Minimap button (LibDBIcon). The checkbox is hidden when the libs are
     -- absentes — l'addon reste fonctionnel sans elles.
     local checkMinimapBtn
     if ns.HasMinimapButton and ns.HasMinimapButton() then
@@ -2072,7 +2071,7 @@ local function CreateOptions()
     local mmRows = {}
     local wmRows = {}
 
-    -- Presets intégrés (fixes)
+    -- Built-in presets (fixed)
     local MM_PRESETS_BASE = {
         { key = "blank",        label = L.PRESET_BLANK },
         { key = "vivid",        label = L.PRESET_VIVID },
@@ -2089,7 +2088,7 @@ local function CreateOptions()
         { key = "tritanopia",   label = L.PRESET_TRIT  },
     }
 
-    -- Rebuild des rows built-in uniquement (pas de styles externes ici)
+    -- Rebuilds the built-in rows only (no external styles here)
     local function BuildPresetRows()
         for _, row in ipairs(mmRows) do row:Hide() ; row:SetParent(nil) end
         for _, row in ipairs(wmRows) do row:Hide() ; row:SetParent(nil) end
@@ -2115,11 +2114,11 @@ local function CreateOptions()
         if FarmMap_SyncColorPanel then FarmMap_SyncColorPanel() end
     end
 
-    -- Sync visuel : désactive la sélection si le style actif est un pack externe
+    -- Visual sync: clears the selection when the active style is an external pack
     local function SyncColorPanel()
         local mmStyle = FarmMapDB.minimapStyle  or "blank"
         local wmStyle = FarmMapDB.worldmapStyle or "atlas"
-        -- checkBlip est désactivée (Disable) et toujours décochée, rien à synchroniser ici
+        -- checkBlip is disabled and always unchecked, nothing to sync here
         for _, row in ipairs(mmRows) do
             local active = (row.presetKey == mmStyle) and not FarmMapStyles.Get(mmStyle)
             if active then
@@ -2189,7 +2188,7 @@ local function CreateOptions()
     local pkMmRows = {}
     local pkWmRows = {}
 
-    -- Rebuild des rows de packs externes
+    -- Rebuilds the external pack rows
     local function BuildPackRows()
         for _, row in ipairs(pkMmRows) do row:Hide() ; row:SetParent(nil) end
         for _, row in ipairs(pkWmRows) do row:Hide() ; row:SetParent(nil) end
@@ -2238,7 +2237,7 @@ local function CreateOptions()
         if FarmMap_SyncPackPanel then FarmMap_SyncPackPanel() end
     end
 
-    -- Sync visuel packs : désactive si le style actif est un preset built-in
+    -- Pack visual sync: clears the selection when the active style is a built-in preset
     local function SyncPackPanel()
         local mmStyle = FarmMapDB.minimapStyle  or "blank"
         local wmStyle = FarmMapDB.worldmapStyle or "atlas"
@@ -2267,10 +2266,10 @@ local function CreateOptions()
     FarmMap_SyncPackPanel = SyncPackPanel
     packPanel:SetScript("OnShow", SyncPackPanel)
 
-    -- Callback déclenché par FarmMapStyles.Register (sous-addon chargé après l'UI)
+    -- Callback fired by FarmMapStyles.Register (sub-addon loaded after the UI)
     FarmMap_OnStyleRegistered = function(styleKey, data)
         BuildPackRows()
-        -- Sync Couleurs aussi (pour déselectionner si besoin)
+        -- Sync Colors too (to deselect if needed)
         if FarmMap_SyncColorPanel then FarmMap_SyncColorPanel() end
     end
 
@@ -2348,9 +2347,9 @@ end
 
 -- ============================================================
 -- BOUTON MINIMAP (LibDBIcon)
--- Les deux libs sont traitées comme optionnelles : si elles
--- manquent, l'addon se charge normalement et seul le bouton est
--- absent (la case correspondante est alors masquée des options).
+-- Both libs are treated as optional: if they are missing, the
+-- addon loads normally and only the button is absent (the
+-- matching checkbox is then hidden from the options).
 -- ============================================================
 
 local LDB     = LibStub and LibStub("LibDataBroker-1.1", true)
@@ -2375,8 +2374,8 @@ local function CreateMinimapButton()
     if not ns.HasMinimapButton() then return end
     if LDBIcon:IsRegistered(addonName) then return end
 
-    -- NewDataObject renvoie nil si le nom est déjà pris (rechargement
-    -- de l'addon sans relog) : on récupère l'objet existant.
+    -- NewDataObject returns nil when the name is already taken (addon
+    -- reloaded without a relog): fetch the existing object instead.
     local dataObject = LDB:GetDataObjectByName(addonName) or LDB:NewDataObject(addonName, {
         type = "launcher",
         text = addonName,
@@ -2404,17 +2403,17 @@ local function CreateMinimapButton()
 
     if not dataObject then return end
 
-    -- LibDBIcon écrit la position du bouton dans cette table, elle doit
-    -- donc être persistée dans les SavedVariables.
+    -- LibDBIcon writes the button position into this table, so it has
+    -- to be persisted in the SavedVariables.
     FarmMapDB.minimapIcon = FarmMapDB.minimapIcon or { hide = false }
     LDBIcon:Register(addonName, dataObject, FarmMapDB.minimapIcon)
 end
 
 -- ============================================================
--- GESTION DES EVENTS
+-- EVENT HANDLING
 -- ============================================================
 
--- Filtre pour AddDebug (seuls ces events sont loggés)
+-- Filter for AddDebug (only these events are logged)
 local farmMapEvents = {
     ADDON_LOADED             = true,
     LOOT_READY               = true,
@@ -2432,7 +2431,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     -- ---- Chargement de l'addon ----
     if event == "ADDON_LOADED" and arg1 == addonName then
         FarmMapDB = FarmMapDB or {}
-        -- Valeurs par défaut
+        -- Default values
         FarmMapDB.showDebug        = FarmMapDB.showDebug        ~= nil and FarmMapDB.showDebug        or false
         FarmMapDB.debugCapture     = FarmMapDB.debugCapture     ~= nil and FarmMapDB.debugCapture     or false
         FarmMapDB.showFloatingText = FarmMapDB.showFloatingText ~= nil and FarmMapDB.showFloatingText or false
@@ -2448,29 +2447,29 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         FarmMapDB.worldmapStyle    = FarmMapDB.worldmapStyle    ~= nil and FarmMapDB.worldmapStyle    or "atlas"
         FarmMapDB.replaceBlip      = FarmMapDB.replaceBlip      ~= nil and FarmMapDB.replaceBlip      or false
         FarmMapDB.language         = FarmMapDB.language         or "auto"
-        -- Table gérée par LibDBIcon (position angulaire + hide).
+        -- Table managed by LibDBIcon (angular position + hide).
         FarmMapDB.minimapIcon      = FarmMapDB.minimapIcon      or { hide = false }
 
         FarmMapStatsDB        = FarmMapStatsDB        or {}
         FarmMapStatsDB.counts = FarmMapStatsDB.counts or {}
 
-        -- Applique la langue sauvegardée si elle diffère du système
+        -- Apply the saved language if it differs from the system one
         local savedLang = FarmMapDB.language
         if savedLang ~= "auto" and savedLang ~= GetLocale() then
             ApplyLanguage(savedLang)
         end
 
-        -- Alias de commandes localisés. Après ApplyLanguage, pour
-        -- suivre la langue réellement active, et pas celle du client.
+        -- Localized command aliases. After ApplyLanguage, so they follow
+        -- the language actually active rather than the client one.
         ns.SetupSlashLocalization()
 
-        -- Restaure l'état de la capture debug
+        -- Restore the debug capture state
         debugActive = FarmMapDB.debugCapture
         debugCheckCapture:SetChecked(debugActive)
 
         RunMigrations()
-        -- Avant CreateOptions : initialise FarmMapDB.minimapIcon, que la
-        -- case « afficher le bouton minimap » lit pour son état initial.
+        -- Before CreateOptions: initializes FarmMapDB.minimapIcon, which the
+        -- "show the minimap button" checkbox reads for its initial state.
         CreateMinimapButton()
         CreateOptions()
         CreateFilterButtons()
@@ -2489,7 +2488,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             ApplyMinimapStyle(FarmMapDB.minimapStyle or "blank")
         end)
 
-    -- ---- Détection de récolte ----
+    -- ---- Harvest detection ----
     elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
         local unit, _, spellID = ...
         if unit == "player" then
@@ -2507,13 +2506,13 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             end
         end
 
-    -- ---- Remise à jour du blip après changement de zone ----
+    -- ---- Blip refresh after a zone change ----
     elseif event == "MINIMAP_UPDATE_TRACKING" or event == "ZONE_CHANGED_NEW_AREA" then
         if FarmMapDB and FarmMapDB.replaceBlip then
             ApplyMinimapStyle(FarmMapDB.minimapStyle or "blank")
         end
 
-    -- ---- Loot prêt ----
+    -- ---- Loot ready ----
     elseif event == "LOOT_READY" then
         CaptureLootData()
         pendingLoot = true
@@ -2534,14 +2533,14 @@ end)
 
 -- ============================================================
 -- CALIBREUR D'ATLAS (OUTIL DEV — /fm atlas)
--- Sert à retrouver visuellement les coordonnées UV des icônes
--- de récolte dans Interface\Minimap\ObjectIconsAtlas après un
--- changement de patch. Glisse directement l'icône zoomée pour la
--- repositionner (la taille du cadre reste fixe, seule la position
--- bouge), ou tape les valeurs à la main dans les 4 petits champs.
--- Le bouton "Imprimer la table" sort une table Lua prête à coller
--- dans WORLD_MAP_TEXCOORDS et BUILTIN_PINS (MinageR/HerboR/PecheR
--- copient simplement Minage/Herbo/Peche, comme dans la table d'origine).
+-- Used to visually find the UV coordinates of the harvest icons
+-- inside Interface\Minimap\ObjectIconsAtlas after a patch changes
+-- them. Drag the zoomed icon directly to reposition it (the frame
+-- size stays fixed, only the position moves), or type the values
+-- by hand into the 4 small fields.
+-- The "Print the table" button outputs a Lua table ready to paste
+-- into WORLD_MAP_TEXCOORDS and BUILTIN_PINS (MinageR/HerboR/PecheR
+-- simply copy Minage/Herbo/Peche, as in the original table).
 -- ============================================================
 
 local calibFrame
@@ -2553,8 +2552,8 @@ local CALIB_TYPES = {
     { key = "Bois",   label = L.TYPE_Bois   or "Bois",   color = {1,    0.85, 0.2 } },
 }
 
--- Petite fenêtre avec le texte déjà sélectionné (Ctrl+A/Ctrl+C marche tel quel),
--- même principe que OpenExportPopup un peu plus haut dans le fichier.
+-- Small window with the text already selected (Ctrl+A/Ctrl+C works as is),
+-- same principle as OpenExportPopup a little higher in the file.
 local function OpenAtlasCopyPopup(text)
     if FarmMapAtlasCopyPopup then
         FarmMapAtlasCopyPopup.eb:SetText(text)
@@ -2695,7 +2694,7 @@ local function CreateAtlasCalibrator()
             row.current = vals
         end
 
-        -- Met à jour les 4 champs sans déclencher 4 recalculs intermédiaires incohérents
+        -- Updates the 4 fields without triggering 4 inconsistent intermediate recomputes
         local function ApplyVals(l, r, t, b)
             for _, name in ipairs(fieldNames) do
                 row.edits[name]:SetScript("OnTextChanged", nil)
@@ -2736,9 +2735,9 @@ local function CreateAtlasCalibrator()
         end
         Recompute()
 
-        -- Glisser-déposer : seule la position bouge, la taille reste fixe.
-        -- L'icône suit la souris (comme un outil "main" classique) : on
-        -- décale la fenêtre de recadrage dans le sens inverse du glissement.
+        -- Drag and drop: only the position moves, the size stays fixed.
+        -- The icon follows the mouse (like a classic "hand" tool): the
+        -- crop window is shifted in the opposite direction of the drag.
         local drag = { active = false }
         zoomFrame:SetScript("OnMouseDown", function(self, button)
             if button ~= "LeftButton" then return end
@@ -2816,10 +2815,10 @@ end
 -- COMMANDES SLASH
 -- ============================================================
 
--- Aide : une clé de traduction par commande, plutôt qu'un seul bloc
--- de texte. Une commande ajoutée plus tard s'affiche en anglais dans
--- les langues pas encore mises à jour, au lieu de disparaître de la
--- liste (le repli par clé ne fonctionne pas sur une table entière).
+-- Help: one translation key per command rather than a single block
+-- of text. A command added later still shows up in English for the
+-- languages not updated yet, instead of disappearing from the
+-- list (per-key fallback does not work on a whole table).
 local SLASH_COMMANDS = {
     { cmd = "help",    key = "SLASH_CMD_HELP"    },
     { cmd = "debug",   key = "SLASH_CMD_DEBUG"   },
@@ -2833,19 +2832,19 @@ local SLASH_COMMANDS = {
     { cmd = "version", key = "SLASH_CMD_VERSION" },
 }
 
--- Alias toujours actifs quelle que soit la langue : ce sont les
--- variantes les plus probables sur la commande de secours, celle
--- qu'on tape justement quand plus rien n'est lisible.
+-- Aliases always active whatever the language: these are the most
+-- likely variants on the emergency command, the one you type
+-- precisely when nothing is readable any more.
 local BASE_ALIASES = {
     defaut = "default",
     reset  = "default",
 }
 
--- Alias localisés : alias tapé -> commande canonique anglaise.
--- Reconstruit à ADDON_LOADED, une fois la langue résolue.
+-- Localized aliases: typed alias -> canonical English command.
+-- Rebuilt at ADDON_LOADED, once the language is resolved.
 local commandAliases = {}
 
--- Alias inverses (commande -> liste d'alias), pour l'affichage de
+-- Reverse aliases (command -> list of aliases), for the help
 -- l'aide uniquement.
 local aliasDisplay = {}
 
@@ -2865,8 +2864,8 @@ local function BuildCommandAliases()
             for _, alias in ipairs(aliases) do
                 if type(alias) == "string" and alias ~= "" then
                     alias = alias:lower()
-                    -- Un alias ne peut jamais masquer une commande
-                    -- canonique : la doc anglaise reste toujours vraie.
+                    -- An alias can never mask a canonical command:
+                    -- the English documentation always stays true.
                     local isCanonical = false
                     for _, entry in ipairs(SLASH_COMMANDS) do
                         if entry.cmd == alias then isCanonical = true end
@@ -2882,8 +2881,8 @@ local function BuildCommandAliases()
     end
 end
 
--- Préfixes localisés (/carte, /granja...). /fm et /farmmap restent
--- toujours actifs : ils occupent les slots 1 et 2.
+-- Localized prefixes (/carte, /granja...). /fm and /farmmap stay
+-- always active: they occupy slots 1 and 2.
 local function RegisterSlashPrefixes()
     local loc = ns.locales[gameLocale]
     local prefixes = loc and loc.slash and loc.slash.prefix
@@ -2898,7 +2897,7 @@ local function RegisterSlashPrefixes()
     end
 end
 
--- Appelé depuis ADDON_LOADED, après ApplyLanguage.
+-- Called from ADDON_LOADED, after ApplyLanguage.
 function ns.SetupSlashLocalization()
     BuildCommandAliases()
     RegisterSlashPrefixes()
@@ -2913,10 +2912,10 @@ SlashCmdList["FARMMAP"] = function(msg)
 
     if cmd == "" or cmd == "help" then
         print(L.SLASH_HELP_TITLE)
-        -- Pas d'alignement par espaces : la fenêtre de chat utilise une
-        -- police proportionnelle, et le hangul est en chasse double.
-        -- Compter les caractères n'aligne rien — c'est la couleur qui
-        -- sépare la commande de sa description.
+        -- No alignment through spaces: the chat window uses a
+        -- proportional font, and hangul is double width.
+        -- Counting characters aligns nothing - colour is what
+        -- separates the command from its description.
         for _, entry in ipairs(SLASH_COMMANDS) do
             local line = string.format("|cffffd100/fm %s|r  |cffaaaaaa%s|r",
                 entry.cmd, L[entry.key] or "")
@@ -2928,9 +2927,9 @@ SlashCmdList["FARMMAP"] = function(msg)
             print(line)
         end
 
-    -- Retour à la langue du client. C'est la commande de secours quand
-    -- on s'est trompé de langue : la confirmation sort dans la langue
-    -- du client, pas dans la langue forcée.
+    -- Back to the client language. This is the emergency command when
+    -- someone picked the wrong language: the confirmation comes out in
+    -- the client language, not in the forced one.
     elseif cmd == "default" then
         FarmMapDB.language = "auto"
         print("|cffffd100FarmMap :|r " .. ClientString("SLASH_DEFAULT_DONE"))
@@ -2965,8 +2964,8 @@ SlashCmdList["FARMMAP"] = function(msg)
             showMinimapPins  = FarmMapDB.showMinimapPins,
             language         = FarmMapDB.language,
             showFloatingText = FarmMapDB.showFloatingText,
-            -- Position et visibilité du bouton minimap : vider la base
-            -- de nœuds ne doit pas replacer le bouton.
+            -- Position and visibility of the minimap button: clearing the node
+            -- database must not move the button back.
             minimapIcon      = FarmMapDB.minimapIcon,
         }
         FarmMapDB = saved
