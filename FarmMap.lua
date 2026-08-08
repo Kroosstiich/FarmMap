@@ -1,7 +1,7 @@
 -- ============================================================
 --  FarmMap — Addon principal
 --  Auteur  : Kroosstii (Dkroosstii-Dalaran)
---  Version : v1.6.0
+--  Version : v1.6.1
 --  Updated : 08/08/2026
 -- ============================================================
 
@@ -9,7 +9,7 @@
 -- The lang\*.lua files register their translations in it before
 -- this file is loaded (see the .toc order).
 local addonName, ns = ...
-local addonVersion = "v1.6.0"
+local addonVersion = "v1.6.1"
 local lastUpdate   = "08/08/2026"
 
 -- Libs
@@ -1736,7 +1736,7 @@ local function CreateOptions()
 
     -- Translator credit for the language currently displayed.
     local activeLocale   = ns.locales[gameLocale] or ns.locales.enUS
-    local translatorName = (activeLocale and activeLocale.translator) or "—"
+    local translatorName = (activeLocale and activeLocale.translator) or "-"
 
     local credits = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     credits:SetPoint("TOPLEFT", 16, -45)
@@ -2524,7 +2524,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                 if pendingLoot then
                     pendingLoot     = false
                     pendingLootData = nil
-                    AddDebug("LOOT", "timeout — no spell detected, ignored")
+                    AddDebug("LOOT", "timeout - no spell detected, ignored")
                 end
             end)
         end
@@ -2982,7 +2982,7 @@ SlashCmdList["FARMMAP"] = function(msg)
             { k = "Peche",  label = L.TYPE_Peche  },
             { k = "Bois",   label = L.TYPE_Bois   },
         }
-        print("|cffffd100FarmMap — " .. L.STATS_TITLE .. "|r")
+        print("|cffffd100FarmMap - " .. L.STATS_TITLE .. "|r")
         for _, t in ipairs(types) do
             local n   = counts[t.k] or 0
             total     = total + n
@@ -2996,7 +2996,7 @@ SlashCmdList["FARMMAP"] = function(msg)
         ManualMigration()
 
     elseif cmd == "version" then
-        print("|cffffd100FarmMap|r — " .. L.SLASH_VERSION .. " : |cffffffff" .. addonVersion .. "|r  (" .. lastUpdate .. ")")
+        print("|cffffd100FarmMap|r - " .. L.SLASH_VERSION .. " : |cffffffff" .. addonVersion .. "|r  (" .. lastUpdate .. ")")
 
     else
         print("|cffffd100FarmMap :|r " .. L.SLASH_UNKNOWN)

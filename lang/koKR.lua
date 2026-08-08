@@ -120,10 +120,10 @@ ns.locales.koKR = {
         IMPORT_BTN             = "가져오기",
         IMPORT_SUCCESS         = "개의 노드를 성공적으로 가져왔습니다.",
         IMPORT_ERROR           = "오류",
-        IMPORT_DONE            = "가져오기 완료 — ",
+        IMPORT_DONE            = "가져오기 완료 - ",
         IMPORT_DONE2           = "개의 노드가 추가되었습니다.",
         CLOSE                  = "닫기",
-        PROF_DISABLED          = " 전문 기술 미감지 — 표시 비활성화.",
+        PROF_DISABLED          = " 전문 기술 미감지 - 표시 비활성화.",
 
         DEBUG_TITLE            = "FarmMap.debug",
         DEBUG_CAPTURE          = " 캡처",
@@ -131,7 +131,7 @@ ns.locales.koKR = {
         DEBUG_COPY             = "복사",
         DEBUG_COPY_TITLE       = "디버그 로그 복사 (Ctrl+A, Ctrl+C)",
 
-        SLASH_HELP_TITLE       = "|cffffd100=== FarmMap — 명령어 ===|r",
+        SLASH_HELP_TITLE       = "|cffffd100=== FarmMap - 명령어 ===|r",
         SLASH_CMD_HELP         = "이 도움말 표시",
         SLASH_CMD_DEBUG        = "디버그 창 표시/숨기기",
         SLASH_CMD_EXPORT       = "DB 내보내기 창 열기",
@@ -171,11 +171,11 @@ ns.locales.koKR = {
 
         -- /fm atlas — 아이콘 아틀라스 보정기. 우선순위 낮음: 자체 아이콘
         -- 팩을 제작하는 사용자를 위한 개발자 도구입니다.
-        ATLAS_TITLE            = "FarmMap — 아틀라스 보정 (ObjectIconsAtlas)",
+        ATLAS_TITLE            = "FarmMap - 아틀라스 보정 (ObjectIconsAtlas)",
         ATLAS_HINT             = "아이콘을 좌클릭 후 드래그하여 위치를 변경할 수 있습니다. 크기는 (32x32)로 고정되며 위치만 이동합니다.",
         ATLAS_PRINT            = "테이블 복사",
         ATLAS_RESET            = "초기화",
-        ATLAS_COPY_TITLE       = "FarmMap — 아틀라스 좌표",
+        ATLAS_COPY_TITLE       = "FarmMap - 아틀라스 좌표",
         ATLAS_COPY_HINT        = "선택 완료됨: Ctrl+C를 눌러 복사한 뒤, WORLD_MAP_TEXCOORDS (및 BUILTIN_PINS)에 붙여넣으세요.",
     },
 }
