@@ -65,6 +65,7 @@ The full step-by-step guide for the file route is in
 | `frFR` | Français | Kroosstii |
 | `koKR` | 한국어 | Crazyyoungs |
 | `zhCN` | 简体中文 | bluse |
+| `ruRU` | Русский | ZamestoTV |
 
 Pull requests adding a language are welcome, and translators are credited both
 in-game and here.

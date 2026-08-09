@@ -210,3 +210,4 @@ characters are destroyed.
 | `frFR` | Français | Kroosstii |
 | `koKR` | 한국어 | Crazyyoungs |
 | `zhCN` | 简体中文 | bluse |
+| `ruRU` | Русский | ZamestoTV |

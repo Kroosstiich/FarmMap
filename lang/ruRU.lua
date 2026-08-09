@@ -2,9 +2,7 @@
 --  FarmMap — Russian (ruRU)
 --  Translator: ZamestoTV
 --
---  REFERENCE LOCALE. Every other language falls back to this
---  file for any key it does not define, so this file must
---  always stay complete.
+--  Falls back to enUS for any key not defined here.
 --
 --  Adding a new language? Read lang/README.md first.
 -- ============================================================
@@ -17,12 +15,11 @@ ns.locales.ruRU = {
     name       = "Русский",   -- shown in the language panel
     latinName  = "Russian",   -- latin fallback, always readable
     translator = "ZamestoTV",
-    order      = 10,          -- sort order in the language panel
+    order      = 50,          -- sort order in the language panel (zhCN uses 40)
 
     -- OPTIONAL: localized slash aliases. English stays canonical —
     -- /fm, /farmmap and every English sub-command always keep working,
     -- so the addon page and any guide written in English stay correct.
-    -- Nothing to add here: this file IS the English one.
     slash = {
         prefix   = {},   -- extra chat commands, e.g. { "/farm" }
         commands = {},   -- extra sub-commands, e.g. { clear = { "wipe" } }
