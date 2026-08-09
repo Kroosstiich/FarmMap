@@ -76,7 +76,7 @@ commented out by default:
 
 ```
 Creator     : Dkroosstii-Dalaran
-Discord     : Kroosstii
+Discord     : discord.gg/4BEGpmktK7
 Translation : YourName
 Twitch      : twitch.tv/yourname     <- your line
 Version     : v1.6.2
@@ -199,23 +199,21 @@ but shows as `□□□` on an English or French client. Install a font add-on s
 
 ## 6. Send it / Envoyez-le
 
-Join the **FarmMap Discord server** — the invite link is on the
-[CurseForge project page](https://www.curseforge.com/wow/addons/farmmap)
-(look for the Discord link in the right-hand sidebar, or at the bottom of the
-page on mobile). Post your `.lua` file there and it will be reviewed and included
-in the next release, with you credited in-game and on the project page.
+Join the **FarmMap Discord server**: **https://discord.gg/4BEGpmktK7**
+
+Post your `.lua` file there and it will be reviewed and included in the next
+release, with you credited in-game and on the project page.
 
 You can also leave a comment on the CurseForge page if you prefer.
 
 Please send the **file itself**, not a screenshot or pasted text — the file is
 what gets shipped, and copy-pasting text through chat is what breaks encoding.
 
-*Rejoignez le **serveur Discord de FarmMap** — le lien d'invitation est sur la
-[page CurseForge du projet](https://www.curseforge.com/wow/addons/farmmap)
-(colonne de droite, ou en bas de page sur mobile). Déposez-y votre fichier
-`.lua` : il sera relu et intégré à la prochaine version, avec votre crédit en jeu
-et sur la page du projet. Envoyez bien **le fichier**, pas une capture d'écran ni
-du texte collé — c'est le copier-coller par chat qui casse l'encodage.*
+*Rejoignez le **serveur Discord de FarmMap** : **https://discord.gg/4BEGpmktK7**
+Déposez-y votre fichier `.lua` : il sera relu et intégré à la prochaine version,
+avec votre crédit en jeu et sur la page du projet. Envoyez bien **le fichier**,
+pas une capture d'écran ni du texte collé — c'est le copier-coller par chat qui
+casse l'encodage.*
 
 ---
 

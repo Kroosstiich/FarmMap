@@ -68,7 +68,8 @@ The full step-by-step guide for the file route is in
 | `ruRU` | Русский | ZamestoTV |
 
 Pull requests adding a language are welcome, and translators are credited both
-in-game and here.
+in-game and here. You can also send your file on the
+[FarmMap Discord](https://discord.gg/4BEGpmktK7) if you would rather not use git.
 
 ## Icon packs
 

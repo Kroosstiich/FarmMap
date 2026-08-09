@@ -1740,7 +1740,10 @@ local function CreateOptions()
 
     local creditLines = {
         string.format("|cff00ff00%s :|r Dkroosstii-Dalaran", L.CREDITS_CREATOR),
-        string.format("|cff00dbff%s :|r Kroosstii",          L.CREDITS_DISCORD),
+        -- Server invite and not the "Kroosstii" tag it used to be: a tag
+        -- means a friend request, which Kroosstii turns down. The invite
+        -- is the only route that actually reaches him.
+        string.format("|cff00dbff%s :|r discord.gg/4BEGpmktK7", L.CREDITS_DISCORD),
         string.format("|cffffd100%s :|r %s",                 L.CREDITS_TRANSLATOR, translatorName),
     }
 
