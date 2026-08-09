@@ -52,7 +52,7 @@ ns.locales.deDE = {
     name       = "Deutsch",   -- your language, written in your language
     latinName  = "German",    -- latin-alphabet name (shown as a fallback)
     translator = "YourName",  -- credited in-game, in the Options panel
-    order      = 40,          -- position in the language list (next free number)
+    order      = 60,          -- position in the language list (next free number)
     strings = {
         ...
     },
@@ -61,6 +61,36 @@ ns.locales.deDE = {
 
 `translator` is displayed in the addon's credits — put whatever name you want to
 be known by.
+
+### Optional: your link / Votre lien
+
+You can add a line of your own right under the translation credit. It is yours —
+a way to be reached, or a plug for your channel. Both fields are optional and
+commented out by default:
+
+```lua
+    translator   = "YourName",
+    contactLabel = "Twitch",
+    contactValue = "twitch.tv/yourname",
+```
+
+```
+Creator     : Dkroosstii-Dalaran
+Discord     : Kroosstii
+Translation : YourName
+Twitch      : twitch.tv/yourname     <- your line
+Version     : v1.6.2
+```
+
+The label is free text — `Twitch`, `Discord`, `GitHub`, `YouTube`, anything —
+and it is **never translated**: a brand name reads the same in every language.
+The line only shows for players using *your* language. Leave both out for no
+line at all; filling only one of the two drops it as well.
+
+*Vous pouvez ajouter votre propre ligne sous le crédit de traduction : un moyen
+d'être contacté, ou la pub de votre chaîne. Le libellé est libre et n'est jamais
+traduit. La ligne n'apparaît que pour les joueurs qui utilisent **votre** langue.
+Laissez les deux champs commentés pour ne rien afficher.*
 
 ## 3. Translate / Traduisez
 

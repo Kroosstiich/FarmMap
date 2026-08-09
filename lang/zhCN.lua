@@ -17,6 +17,11 @@ ns.locales.zhCN = {
     translator = "bluse",
     order      = 40,          -- sort order in the language panel (koKR uses 30)
 
+    -- OPTIONAL: your link, shown under the translation credit. The
+    -- label is free text and is never translated. See enUS.lua.
+    -- contactLabel = "Twitch",
+    -- contactValue = "twitch.tv/yourname",
+
     -- OPTIONAL: localized slash aliases.
     slash = {
         prefix   = {},   -- extra chat commands, e.g. { "/farm" }

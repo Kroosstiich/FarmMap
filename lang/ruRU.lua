@@ -17,6 +17,11 @@ ns.locales.ruRU = {
     translator = "ZamestoTV",
     order      = 50,          -- sort order in the language panel (zhCN uses 40)
 
+    -- OPTIONAL: your link, shown under the translation credit. The
+    -- label is free text and is never translated. See enUS.lua.
+    -- contactLabel = "Twitch",
+    -- contactValue = "twitch.tv/yourname",
+
     -- OPTIONAL: localized slash aliases. English stays canonical —
     -- /fm, /farmmap and every English sub-command always keep working,
     -- so the addon page and any guide written in English stay correct.

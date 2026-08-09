@@ -19,6 +19,22 @@ ns.locales.enUS = {
     translator = "Kroosstii",
     order      = 10,          -- sort order in the language panel
 
+    -- OPTIONAL: your link, shown in the options right under the
+    -- translation credit. Yours to use as you like - a way to be
+    -- reached, or a plug for your channel.
+    --
+    -- The label is free text and is NEVER translated: "Twitch" is a
+    -- brand name, it reads the same in every language.
+    --
+    --   contactLabel = "Twitch",  contactValue = "twitch.tv/yourname"
+    --   contactLabel = "Discord", contactValue = "yourname"
+    --   contactLabel = "GitHub",  contactValue = "github.com/yourname"
+    --
+    -- Leave both commented out for no line at all - that is the
+    -- default. Filling only one of the two drops the line as well.
+    -- contactLabel = "Twitch",
+    -- contactValue = "twitch.tv/yourname",
+
     -- OPTIONAL: localized slash aliases. English stays canonical —
     -- /fm, /farmmap and every English sub-command always keep working,
     -- so the addon page and any guide written in English stay correct.

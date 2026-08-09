@@ -1738,18 +1738,38 @@ local function CreateOptions()
     local activeLocale   = ns.locales[gameLocale] or ns.locales.enUS
     local translatorName = (activeLocale and activeLocale.translator) or "-"
 
+    local creditLines = {
+        string.format("|cff00ff00%s :|r Dkroosstii-Dalaran", L.CREDITS_CREATOR),
+        string.format("|cff00dbff%s :|r Kroosstii",          L.CREDITS_DISCORD),
+        string.format("|cffffd100%s :|r %s",                 L.CREDITS_TRANSLATOR, translatorName),
+    }
+
+    -- OPTIONAL contact line, owned by the translator of the language being
+    -- displayed: a Twitch channel, a Discord tag, a GitHub profile. The
+    -- label is free text and never goes through L - "Twitch" is a brand
+    -- name, it is not translated. Both halves are required: a half-filled
+    -- pair drops the line rather than printing "Twitch : ".
+    local contactLabel = activeLocale and activeLocale.contactLabel
+    local contactValue = activeLocale and activeLocale.contactValue
+    if type(contactLabel) == "string" and contactLabel ~= ""
+    and type(contactValue) == "string" and contactValue ~= "" then
+        creditLines[#creditLines + 1] =
+            string.format("|cff00dbff%s :|r %s", contactLabel, contactValue)
+    end
+
+    creditLines[#creditLines + 1] = string.format("|cffffffff%s :|r %s", L.CREDITS_VERSION, addonVersion)
+    creditLines[#creditLines + 1] = string.format("|cffffffff%s :|r %s", L.CREDITS_UPDATE,  lastUpdate)
+
     local credits = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     credits:SetPoint("TOPLEFT", 16, -45)
     credits:SetJustifyH("LEFT")
-    credits:SetText(string.format(
-        "|cff00ff00%s :|r Dkroosstii-Dalaran\n|cff00dbff%s :|r Kroosstii\n|cffffd100%s :|r %s\n|cffffffff%s :|r %s\n|cffffffff%s :|r %s",
-        L.CREDITS_CREATOR,    L.CREDITS_DISCORD,
-        L.CREDITS_TRANSLATOR, translatorName,
-        L.CREDITS_VERSION,    addonVersion,
-        L.CREDITS_UPDATE,     lastUpdate))
+    credits:SetText(table.concat(creditLines, "\n"))
 
+    -- Anchored under the credits and no longer at a fixed -126: the block
+    -- is 5 or 6 lines depending on whether the translator filled a contact
+    -- in, and line height varies with the client font.
     local dbSep = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    dbSep:SetPoint("TOPLEFT", 16, -126)
+    dbSep:SetPoint("TOPLEFT", credits, "BOTTOMLEFT", 0, -14)
     dbSep:SetText(L.DB_SECTION)
     dbSep:SetTextColor(1, 0.82, 0, 1)
 

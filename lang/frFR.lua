@@ -16,6 +16,11 @@ ns.locales.frFR = {
     translator = "Kroosstii",
     order      = 20,
 
+    -- OPTIONNEL : votre lien, affiché sous le crédit de traduction.
+    -- Le libellé est libre et n'est jamais traduit. Voir enUS.lua.
+    -- contactLabel = "Twitch",
+    -- contactValue = "twitch.tv/votrenom",
+
     -- OPTIONNEL : alias de commandes en français. L'anglais reste
     -- canonique — /fm, /farmmap et toutes les sous-commandes anglaises
     -- restent actives, donc la page CurseForge reste juste. Ce ne sont

@@ -31,6 +31,12 @@ ns.locales.koKR = {
     translator = "Crazyyoungs",
     order      = 30,
 
+    -- OPTIONAL: your link, shown under the translation credit. The
+    -- label is free text and is never translated. See enUS.lua.
+    -- (Left in English on purpose - not machine-translated.)
+    -- contactLabel = "Twitch",
+    -- contactValue = "twitch.tv/yourname",
+
     -- 선택 사항: 한국어 슬래시(/) 명령어 단축어 설정. (영문 명령어는 기본 유지)
     -- /fm, /farmmap 및 모든 영문 하위 명령어는 항상 정상 작동합니다.
     -- 이 설정은 추가 사항일 뿐이며, 설정을 비워 두어도 무방합니다.
