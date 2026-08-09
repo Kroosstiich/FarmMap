@@ -1,7 +1,7 @@
 -- ============================================================
 --  FarmMap — Addon principal
 --  Auteur  : Kroosstii (Dkroosstii-Dalaran)
---  Version : v1.6.2
+--  Version : v1.6.3
 --  Updated : 09/08/2026
 -- ============================================================
 
@@ -9,7 +9,7 @@
 -- The lang\*.lua files register their translations in it before
 -- this file is loaded (see the .toc order).
 local addonName, ns = ...
-local addonVersion = "v1.6.2"
+local addonVersion = "v1.6.3"
 local lastUpdate   = "09/08/2026"
 
 -- Libs
