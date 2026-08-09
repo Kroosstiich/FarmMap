@@ -1975,11 +1975,15 @@ local function CreateOptions()
     thanksTitle:SetText(L.LANG_THANKS)
     thanksTitle:SetTextColor(1, 0.82, 0, 1)
 
+    -- GetLocaleLabel and not data.name: this list is the one place that
+    -- shows every language at once, so it is the most exposed to a client
+    -- missing the glyphs. Without the latin suffix a Chinese line reads
+    -- as four empty boxes on a FR/EN client and nothing identifies it.
     local thanksLines = {}
     for _, entry in ipairs(GetAvailableLocales()) do
         thanksLines[#thanksLines + 1] = string.format(
             "|cffffffff%s|r  -  |cff00dbff%s|r",
-            entry.data.name or entry.code,
+            GetLocaleLabel(entry.data),
             entry.data.translator or "?")
     end
 
