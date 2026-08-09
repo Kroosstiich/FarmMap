@@ -31,9 +31,8 @@ ns.locales.koKR = {
     translator = "Crazyyoungs",
     order      = 30,
 
-    -- OPTIONAL: your link, shown under the translation credit. The
-    -- label is free text and is never translated. See enUS.lua.
-    -- (Left in English on purpose - not machine-translated.)
+    -- 선택 사항: 번역 크레딧 아래에 표시될 링크입니다.
+    -- 라벨은 자유 텍스트이며 절대 번역되지 않습니다. enUS.lua 파일을 참조하세요.
     -- contactLabel = "Twitch",
     -- contactValue = "twitch.tv/yourname",
 
@@ -63,9 +62,9 @@ ns.locales.koKR = {
         CREDITS_TRANSLATOR     = "번역",
         CREDITS_VERSION        = "버전",
         CREDITS_UPDATE         = "최신 업데이트",
-        CREDITS_COPY_CLICK     = "Click to copy",   -- [TRANSLATE]
-        CREDITS_COPY_KEY       = "Ctrl+C to copy",  -- [TRANSLATE]
-        CREDITS_COPIED         = "Copied!",         -- [TRANSLATE]
+        CREDITS_COPY_CLICK     = "클릭하여 복사",
+        CREDITS_COPY_KEY       = "Ctrl+C를 눌러 복사",
+        CREDITS_COPIED         = "복사되었습니다!",
 
         DB_SECTION             = "데이터베이스",
         DB_CLEAR               = "데이터베이스 초기화",
