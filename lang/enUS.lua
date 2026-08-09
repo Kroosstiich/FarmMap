@@ -52,6 +52,14 @@ ns.locales.enUS = {
         CREDITS_VERSION        = "Version",
         CREDITS_UPDATE         = "Updated",
 
+        -- Copyable credit rows (the Discord invite, and the translator's
+        -- own link if they filled one in). WoW has no clipboard API, so
+        -- the click only selects the text - the player still presses
+        -- Ctrl+C, and CREDITS_COPIED confirms once they have.
+        CREDITS_COPY_CLICK     = "Click to copy",
+        CREDITS_COPY_KEY       = "Ctrl+C to copy",
+        CREDITS_COPIED         = "Copied!",
+
         DB_SECTION             = "Database",
         DB_CLEAR               = "Clear database",
         DB_CLEARED             = "Database cleared.",

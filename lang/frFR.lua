@@ -44,6 +44,9 @@ ns.locales.frFR = {
         CREDITS_TRANSLATOR     = "Traduction",
         CREDITS_VERSION        = "Version",
         CREDITS_UPDATE         = "MàJ",
+        CREDITS_COPY_CLICK     = "Cliquez pour copier",
+        CREDITS_COPY_KEY       = "Ctrl+C pour copier",
+        CREDITS_COPIED         = "Copié !",
 
         DB_SECTION             = "Base de données",
         DB_CLEAR               = "Vider la base de données",

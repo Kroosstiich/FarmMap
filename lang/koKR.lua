@@ -63,6 +63,9 @@ ns.locales.koKR = {
         CREDITS_TRANSLATOR     = "번역",
         CREDITS_VERSION        = "버전",
         CREDITS_UPDATE         = "최신 업데이트",
+        CREDITS_COPY_CLICK     = "Click to copy",   -- [TRANSLATE]
+        CREDITS_COPY_KEY       = "Ctrl+C to copy",  -- [TRANSLATE]
+        CREDITS_COPIED         = "Copied!",         -- [TRANSLATE]
 
         DB_SECTION             = "데이터베이스",
         DB_CLEAR               = "데이터베이스 초기화",

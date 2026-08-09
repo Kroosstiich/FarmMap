@@ -59,6 +59,37 @@ local OpenExportPopup
 local OpenImportPopup
 
 -- ============================================================
+-- BUTTON SIZING
+-- ============================================================
+
+-- Every button label goes through a translation, and a label that fits
+-- in English rarely fits everywhere: "Clear database" is 14 characters,
+-- "Vider la base de données" is 24 and "Очистить базу данных" is 20.
+-- A fixed width silently spills the text past the button border.
+--
+-- Grows only. The width passed to SetSize stays the floor, so a language
+-- that already fits keeps the exact layout it has today.
+local BUTTON_TEXT_PADDING = 24
+
+local function FitButton(btn, minWidth)
+    local fs = btn:GetFontString()
+    if not fs then return end
+    minWidth = minWidth or btn:GetWidth()
+
+    local function apply()
+        local w = fs:GetStringWidth()
+        if w and w > 0 then
+            btn:SetWidth(math.max(minWidth, math.ceil(w) + BUTTON_TEXT_PADDING))
+        end
+    end
+
+    -- Usually right away, but GetStringWidth returns 0 on a string the
+    -- client has not laid out yet - the next frame always has it.
+    apply()
+    C_Timer.After(0, apply)
+end
+
+-- ============================================================
 -- CONSTANTS & STATIC DATA
 -- ============================================================
 
@@ -710,6 +741,7 @@ local debugClearBtn = CreateFrame("Button", nil, debugBottomBar, "UIPanelButtonT
 debugClearBtn:SetSize(55, 18)
 debugClearBtn:SetPoint("LEFT", debugCheckLabel, "RIGHT", 8, 0)
 debugClearBtn:SetText(L.DEBUG_CLEAR)
+FitButton(debugClearBtn)
 debugClearBtn:SetScript("OnClick", function()
     debugHistory = {}
     debugFrame:SetContent("")
@@ -719,6 +751,7 @@ local debugCopyBtn = CreateFrame("Button", nil, debugBottomBar, "UIPanelButtonTe
 debugCopyBtn:SetSize(55, 18)
 debugCopyBtn:SetPoint("LEFT", debugClearBtn, "RIGHT", 4, 0)
 debugCopyBtn:SetText(L.DEBUG_COPY)
+FitButton(debugCopyBtn)
 debugCopyBtn:SetScript("OnClick", function() OpenDebugCopyPopup() end)
 
 local debugGrip = CreateFrame("Button", nil, debugFrame)
@@ -796,6 +829,7 @@ OpenDebugCopyPopup = function()
     closePopup:SetSize(80, 22)
     closePopup:SetPoint("BOTTOM", popup, "BOTTOM", 0, 6)
     closePopup:SetText(L.CLOSE)
+    FitButton(closePopup)
     closePopup:SetScript("OnClick", function() popup:Hide() end)
 
     PopulateEditBox(editBox)
@@ -1152,6 +1186,41 @@ local function ShowFloatingLoot(items, itemIDs, quantities)
     ag:Play()
 end
 
+-- Short-lived text that rises and fades over the frame it is anchored to,
+-- same font and same motion as the harvest text above. Used to answer a
+-- click on the spot rather than printing in the chat frame.
+--
+-- Deliberately NOT gated on FarmMapDB.showFloatingText: that option
+-- silences gathering spam, and a click that answers with nothing reads
+-- as a broken button.
+local function ShowFloatingNotice(anchor, text, r, g, b)
+    if not anchor or not text then return end
+
+    local notice = CreateFrame("Frame", nil, UIParent)
+    notice:SetFrameStrata("TOOLTIP")
+    notice:SetSize(1, 1)
+    notice:SetPoint("BOTTOM", anchor, "TOP", 0, 2)
+
+    local fs = notice:CreateFontString(nil, "OVERLAY")
+    fs:SetFont(FLOATING_FONT, 14, "OUTLINE")
+    fs:SetPoint("BOTTOM")
+    fs:SetText(text)
+    fs:SetTextColor(r or 0, g or 1, b or 0, 1)
+
+    local ag   = notice:CreateAnimationGroup()
+    local move = ag:CreateAnimation("Translation")
+    move:SetDuration(1.5)
+    move:SetOffset(0, 26)
+    move:SetSmoothing("IN")
+    local fade = ag:CreateAnimation("Alpha")
+    fade:SetDuration(1.5)
+    fade:SetFromAlpha(1)
+    fade:SetToAlpha(0)
+    fade:SetSmoothing("OUT")
+    ag:SetScript("OnFinished", function() notice:Hide() end)
+    ag:Play()
+end
+
 -- ============================================================
 -- CAPTURE ET TRAITEMENT DU LOOT
 -- ============================================================
@@ -1449,6 +1518,7 @@ OpenExportPopup = function()
     btnClose:SetSize(90, 22)
     btnClose:SetPoint("BOTTOM", pop, "BOTTOM", 0, 7)
     btnClose:SetText(L.CLOSE)
+    FitButton(btnClose)
     btnClose:SetScript("OnClick", function() pop:Hide() end)
 
     eb:SetText(SerializeDB())
@@ -1506,6 +1576,7 @@ OpenImportPopup = function()
     btnImport:SetSize(100, 22)
     btnImport:SetPoint("BOTTOMLEFT", pop, "BOTTOMLEFT", 10, 7)
     btnImport:SetText(L.IMPORT_BTN)
+    FitButton(btnImport)
     btnImport:SetScript("OnClick", function()
         local str = eb:GetText()
         local data, err = DeserializeDB(str)
@@ -1540,6 +1611,7 @@ OpenImportPopup = function()
     btnClose:SetSize(90, 22)
     btnClose:SetPoint("BOTTOMRIGHT", pop, "BOTTOMRIGHT", -10, 7)
     btnClose:SetText(L.CLOSE)
+    FitButton(btnClose)
     btnClose:SetScript("OnClick", function() pop:Hide() end)
 
     pop:Show()
@@ -1738,13 +1810,13 @@ local function CreateOptions()
     local activeLocale   = ns.locales[gameLocale] or ns.locales.enUS
     local translatorName = (activeLocale and activeLocale.translator) or "-"
 
-    local creditLines = {
-        string.format("|cff00ff00%s :|r Dkroosstii-Dalaran", L.CREDITS_CREATOR),
+    local creditRows = {
+        { color = "00ff00", label = L.CREDITS_CREATOR, value = "Dkroosstii-Dalaran" },
         -- Server invite and not the "Kroosstii" tag it used to be: a tag
         -- means a friend request, which Kroosstii turns down. The invite
         -- is the only route that actually reaches him.
-        string.format("|cff00dbff%s :|r discord.gg/4BEGpmktK7", L.CREDITS_DISCORD),
-        string.format("|cffffd100%s :|r %s",                 L.CREDITS_TRANSLATOR, translatorName),
+        { color = "00dbff", label = L.CREDITS_DISCORD, value = "discord.gg/4BEGpmktK7", copy = true },
+        { color = "ffd100", label = L.CREDITS_TRANSLATOR, value = translatorName },
     }
 
     -- OPTIONAL contact line, owned by the translator of the language being
@@ -1756,17 +1828,79 @@ local function CreateOptions()
     local contactValue = activeLocale and activeLocale.contactValue
     if type(contactLabel) == "string" and contactLabel ~= ""
     and type(contactValue) == "string" and contactValue ~= "" then
-        creditLines[#creditLines + 1] =
-            string.format("|cff00dbff%s :|r %s", contactLabel, contactValue)
+        creditRows[#creditRows + 1] =
+            { color = "00dbff", label = contactLabel, value = contactValue, copy = true }
     end
 
-    creditLines[#creditLines + 1] = string.format("|cffffffff%s :|r %s", L.CREDITS_VERSION, addonVersion)
-    creditLines[#creditLines + 1] = string.format("|cffffffff%s :|r %s", L.CREDITS_UPDATE,  lastUpdate)
+    creditRows[#creditRows + 1] = { color = "ffffff", label = L.CREDITS_VERSION, value = addonVersion }
+    creditRows[#creditRows + 1] = { color = "ffffff", label = L.CREDITS_UPDATE,  value = lastUpdate }
 
-    local credits = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-    credits:SetPoint("TOPLEFT", 16, -45)
-    credits:SetJustifyH("LEFT")
-    credits:SetText(table.concat(creditLines, "\n"))
+    -- WoW gives addons no way to write to the clipboard - the only copy
+    -- that exists is the player pressing Ctrl+C on selected text. So a
+    -- click swaps the row for an EditBox holding just the value, already
+    -- selected: one keystroke away, and the notice says which keystroke.
+    --
+    -- One shared box moved around rather than one per row.
+    local copyBox = CreateFrame("EditBox", nil, panel)
+    copyBox:SetAutoFocus(false)
+    copyBox:SetFontObject("GameFontHighlightSmall")
+    copyBox:SetHeight(16)
+    copyBox:Hide()
+    copyBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    copyBox:SetScript("OnEnterPressed",  function(self) self:ClearFocus() end)
+    copyBox:SetScript("OnEditFocusLost", function(self) self:Hide() end)
+    copyBox:SetScript("OnKeyUp", function(self, key)
+        if key == "C" and IsControlKeyDown() then
+            ShowFloatingNotice(self, L.CREDITS_COPIED, 0, 1, 0)
+            self:ClearFocus()
+        end
+    end)
+
+    -- One FontString per row rather than a single multi-line block: a row
+    -- has to be hit-testable on its own to be clickable, and there is no
+    -- way to hit-test one line inside a shared FontString.
+    local lastCredit
+    for _, row in ipairs(creditRows) do
+        local fs = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+        if lastCredit then
+            fs:SetPoint("TOPLEFT", lastCredit, "BOTTOMLEFT", 0, 0)
+        else
+            fs:SetPoint("TOPLEFT", 16, -45)
+        end
+        fs:SetJustifyH("LEFT")
+        fs:SetText(string.format("|cff%s%s :|r %s", row.color, row.label, row.value))
+
+        if row.copy then
+            local hit = CreateFrame("Button", nil, panel)
+            hit:SetPoint("TOPLEFT", fs, "TOPLEFT", 0, 0)
+            hit:SetSize(10, 12)
+            C_Timer.After(0, function()
+                hit:SetSize(math.max(fs:GetStringWidth(), 10), math.max(fs:GetStringHeight(), 12))
+            end)
+
+            hit:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetText(L.CREDITS_COPY_CLICK, 1, 1, 1)
+                GameTooltip:Show()
+            end)
+            hit:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+            hit:SetScript("OnClick", function(self)
+                copyBox:ClearAllPoints()
+                copyBox:SetPoint("TOPLEFT", fs, "TOPLEFT", 0, 3)
+                copyBox:SetWidth(math.max(fs:GetStringWidth(), 160))
+                copyBox:SetText(row.value)
+                copyBox:Show()
+                copyBox:SetFocus()
+                copyBox:HighlightText()
+                ShowFloatingNotice(self, L.CREDITS_COPY_KEY, 1, 0.82, 0)
+            end)
+        end
+
+        lastCredit = fs
+    end
+
+    local credits = lastCredit
 
     -- Anchored under the credits and no longer at a fixed -126: the block
     -- is 5 or 6 lines depending on whether the translator filled a contact
@@ -1780,6 +1914,7 @@ local function CreateOptions()
     btnReset:SetSize(160, 25)
     btnReset:SetPoint("TOPLEFT", dbSep, "BOTTOMLEFT", 0, -6)
     btnReset:SetText(L.DB_CLEAR)
+    FitButton(btnReset)
     btnReset:SetScript("OnClick", function()
         FarmMapDB = {
             version          = DB_VERSION,
@@ -1808,6 +1943,7 @@ local function CreateOptions()
     btnMigrate:SetSize(160, 25)
     btnMigrate:SetPoint("LEFT", btnReset, "RIGHT", 8, 0)
     btnMigrate:SetText(L.DB_MIGRATE)
+    FitButton(btnMigrate)
     btnMigrate:SetScript("OnClick", function() ManualMigration() end)
 
     local migrateDesc = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
@@ -1819,12 +1955,14 @@ local function CreateOptions()
     btnExport:SetSize(100, 25)
     btnExport:SetPoint("TOPLEFT", migrateDesc, "BOTTOMLEFT", 0, -8)
     btnExport:SetText(L.DB_EXPORT)
+    FitButton(btnExport)
     btnExport:SetScript("OnClick", function() OpenExportPopup() end)
 
     local btnImport = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
     btnImport:SetSize(100, 25)
     btnImport:SetPoint("LEFT", btnExport, "RIGHT", 8, 0)
     btnImport:SetText(L.DB_IMPORT)
+    FitButton(btnImport)
     btnImport:SetScript("OnClick", function() OpenImportPopup() end)
 
     local importExportDesc = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
@@ -2345,6 +2483,7 @@ local function CreateOptions()
     btnResetStats:SetSize(160, 22)
     btnResetStats:SetPoint("TOPLEFT", 16, -70 - #TYPE_LABELS * 24 - 40)
     btnResetStats:SetText(L.STATS_RESET)
+    FitButton(btnResetStats)
     btnResetStats:SetScript("OnClick", function()
         FarmMapStatsDB = { counts = {} }
         if FarmMap_RefreshStats then FarmMap_RefreshStats() end
@@ -2637,6 +2776,7 @@ local function OpenAtlasCopyPopup(text)
     btnClose:SetSize(90, 22)
     btnClose:SetPoint("BOTTOM", pop, "BOTTOM", 0, 7)
     btnClose:SetText(L.CLOSE)
+    FitButton(btnClose)
     btnClose:SetScript("OnClick", function() pop:Hide() end)
 
     eb:SetText(text)
@@ -2815,6 +2955,7 @@ local function CreateAtlasCalibrator()
     printBtn:SetSize(170, 22)
     printBtn:SetPoint("BOTTOMLEFT", 16, 14)
     printBtn:SetText(L.ATLAS_PRINT)
+    FitButton(printBtn)
     printBtn:SetScript("OnClick", function()
         local lines = CollectAtlasLines()
         print("|cffffd100FarmMap :|r colle ceci dans WORLD_MAP_TEXCOORDS (et BUILTIN_PINS) :")
@@ -2828,6 +2969,7 @@ local function CreateAtlasCalibrator()
     resetBtn:SetSize(170, 22)
     resetBtn:SetPoint("LEFT", printBtn, "RIGHT", 10, 0)
     resetBtn:SetText(L.ATLAS_RESET)
+    FitButton(resetBtn)
     resetBtn:SetScript("OnClick", function()
         for _, info in ipairs(CALIB_TYPES) do
             local coords = WORLD_MAP_TEXCOORDS[info.key]
