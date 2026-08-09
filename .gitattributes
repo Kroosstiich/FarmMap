@@ -1,0 +1,9 @@
+# Files that belong to the repository but not to the shipped addon.
+# `git archive` honours export-ignore, which makes the CurseForge zip a
+# single reproducible command instead of a hand-assembled folder:
+#
+#   git archive --format=zip --prefix=FarmMap/ v1.6.2 -o FarmMap-v1.6.2.zip
+#
+# Claude/ needs no line here: it is untracked, so git archive never sees it.
+/.gitignore     export-ignore
+/.gitattributes export-ignore
