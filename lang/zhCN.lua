@@ -36,6 +36,14 @@ ns.locales.zhCN = {
         CREDITS_VERSION        = "版本",
         CREDITS_UPDATE         = "更新日期",
 
+        -- [TRANSLATE] marks English strings added after this translation
+        -- was contributed. They are left in English on purpose, never
+        -- machine-translated. Translate the text and delete the marker;
+        -- until then they simply show in English in game.
+        CREDITS_COPY_CLICK     = "Click to copy",   -- [TRANSLATE]
+        CREDITS_COPY_KEY       = "Ctrl+C to copy",  -- [TRANSLATE]
+        CREDITS_COPIED         = "Copied!",         -- [TRANSLATE]
+
         DB_SECTION             = "数据库",
         DB_CLEAR               = "清除数据库",
         DB_CLEARED             = "数据库已清除。",

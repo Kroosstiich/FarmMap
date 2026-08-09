@@ -130,6 +130,25 @@ PROF_DISABLED  = " not detected — display disabled.",
 wide characters (Korean, Chinese, Japanese), the alignment will not match — that
 is fine, readability matters more than alignment.
 
+### Coming back to a translation: `[TRANSLATE]`
+
+When FarmMap gains a string after your translation shipped, the new line is
+added to your file **in English**, marked like this:
+
+```lua
+CREDITS_COPIED = "Copied!",   -- [TRANSLATE]
+```
+
+It is never machine-translated — a file credited to you only ever contains words
+you chose. Search `[TRANSLATE]` (Ctrl+F) to list everything waiting, translate
+the text, delete the marker. Nothing breaks in the meantime: a marked line just
+shows in English in game, exactly like a missing one would.
+
+*Quand une chaîne est ajoutée après votre traduction, elle arrive dans votre
+fichier **en anglais** avec ce marqueur. Elle n'est jamais traduite
+automatiquement : un fichier à votre nom ne contient que vos mots. Cherchez
+`[TRANSLATE]` pour lister ce qui reste, traduisez, supprimez le marqueur.*
+
 ## 3b. Optional: translate the commands / Traduire les commandes
 
 You can add chat commands in your own language. **The English commands always

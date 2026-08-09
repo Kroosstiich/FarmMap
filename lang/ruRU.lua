@@ -38,6 +38,14 @@ ns.locales.ruRU = {
         CREDITS_VERSION        = "Версия",
         CREDITS_UPDATE         = "Обновлено",
 
+        -- [TRANSLATE] marks English strings added after this translation
+        -- was contributed. They are left in English on purpose, never
+        -- machine-translated. Translate the text and delete the marker;
+        -- until then they simply show in English in game.
+        CREDITS_COPY_CLICK     = "Click to copy",   -- [TRANSLATE]
+        CREDITS_COPY_KEY       = "Ctrl+C to copy",  -- [TRANSLATE]
+        CREDITS_COPIED         = "Copied!",         -- [TRANSLATE]
+
         DB_SECTION             = "База данных",
         DB_CLEAR               = "Очистить базу данных",
         DB_CLEARED             = "База данных очищена.",
