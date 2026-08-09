@@ -33,6 +33,7 @@ ns.locales.koKR = {
 
     -- 선택 사항: 번역 크레딧 아래에 표시될 링크입니다.
     -- 라벨은 자유 텍스트이며 절대 번역되지 않습니다. enUS.lua 파일을 참조하세요.
+    -- (기계 번역되지 않도록 의도적으로 영어로 남겨두었습니다.)
     -- contactLabel = "Twitch",
     -- contactValue = "twitch.tv/yourname",
 
