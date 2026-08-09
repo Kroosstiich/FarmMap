@@ -1845,6 +1845,9 @@ local function CreateOptions()
     copyBox:SetAutoFocus(false)
     copyBox:SetFontObject("GameFontHighlightSmall")
     copyBox:SetHeight(16)
+    -- No insets: an EditBox pads its text by default, which would push
+    -- the value a few pixels right of where it sits when not being copied.
+    copyBox:SetTextInsets(0, 0, 0, 0)
     copyBox:Hide()
     copyBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     copyBox:SetScript("OnEnterPressed",  function(self) self:ClearFocus() end)
@@ -1859,23 +1862,36 @@ local function CreateOptions()
     -- One FontString per row rather than a single multi-line block: a row
     -- has to be hit-testable on its own to be clickable, and there is no
     -- way to hit-test one line inside a shared FontString.
+    --
+    -- Label and value are split too. The copy box holds the value alone -
+    -- nobody wants "Discord : " in their clipboard - so it has to land on
+    -- the value and not at the start of the row, and that needs the value
+    -- to carry its own anchor.
     local lastCredit
     for _, row in ipairs(creditRows) do
-        local fs = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+        local labelFS = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
         if lastCredit then
-            fs:SetPoint("TOPLEFT", lastCredit, "BOTTOMLEFT", 0, 0)
+            labelFS:SetPoint("TOPLEFT", lastCredit, "BOTTOMLEFT", 0, 0)
         else
-            fs:SetPoint("TOPLEFT", 16, -45)
+            labelFS:SetPoint("TOPLEFT", 16, -45)
         end
-        fs:SetJustifyH("LEFT")
-        fs:SetText(string.format("|cff%s%s :|r %s", row.color, row.label, row.value))
+        labelFS:SetJustifyH("LEFT")
+        labelFS:SetText(string.format("|cff%s%s :|r", row.color, row.label))
+
+        local valueFS = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+        valueFS:SetPoint("LEFT", labelFS, "RIGHT", 4, 0)
+        valueFS:SetJustifyH("LEFT")
+        valueFS:SetText(row.value)
 
         if row.copy then
+            -- Hit area spans the whole row: the eye reads "Discord : link"
+            -- as one thing, so aiming at the value alone would feel picky.
             local hit = CreateFrame("Button", nil, panel)
-            hit:SetPoint("TOPLEFT", fs, "TOPLEFT", 0, 0)
+            hit:SetPoint("TOPLEFT", labelFS, "TOPLEFT", 0, 0)
             hit:SetSize(10, 12)
             C_Timer.After(0, function()
-                hit:SetSize(math.max(fs:GetStringWidth(), 10), math.max(fs:GetStringHeight(), 12))
+                local w = labelFS:GetStringWidth() + 4 + valueFS:GetStringWidth()
+                hit:SetSize(math.max(w, 10), math.max(labelFS:GetStringHeight(), 12))
             end)
 
             hit:SetScript("OnEnter", function(self)
@@ -1887,8 +1903,10 @@ local function CreateOptions()
 
             hit:SetScript("OnClick", function(self)
                 copyBox:ClearAllPoints()
-                copyBox:SetPoint("TOPLEFT", fs, "TOPLEFT", 0, 3)
-                copyBox:SetWidth(math.max(fs:GetStringWidth(), 160))
+                -- LEFT to LEFT: an EditBox centres its text vertically, so
+                -- this lines the box up with the value on both axes at once.
+                copyBox:SetPoint("LEFT", valueFS, "LEFT", 0, 0)
+                copyBox:SetWidth(valueFS:GetStringWidth() + 10)
                 copyBox:SetText(row.value)
                 copyBox:Show()
                 copyBox:SetFocus()
@@ -1897,7 +1915,7 @@ local function CreateOptions()
             end)
         end
 
-        lastCredit = fs
+        lastCredit = labelFS
     end
 
     local credits = lastCredit
