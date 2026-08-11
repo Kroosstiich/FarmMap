@@ -61,6 +61,8 @@ ns.locales.ruRU = {
         DISPLAY_FLOAT_SIZE     = "Размер текста",
         DISPLAY_FLOAT_DURATION = "Длительность отображения (сек.)",
         DISPLAY_FLOAT_TIER     = "Показывать иконку ранга",
+        DISPLAY_FLOAT_PROFIT   = "Показывать прибыль",
+        DISPLAY_FLOAT_PROFIT_HINT = "(требуется Auctionator)",
         DELETE_NODE            = "Удалить эту метку",
         DEBUG_SECTION          = "Отладка",
 

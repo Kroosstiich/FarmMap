@@ -63,6 +63,8 @@ ns.locales.frFR = {
         DISPLAY_FLOAT_SIZE     = "Taille du texte",
         DISPLAY_FLOAT_DURATION = "Durée d'affichage (secondes)",
         DISPLAY_FLOAT_TIER     = "Afficher l'icône de rang",
+        DISPLAY_FLOAT_PROFIT   = "Afficher le profit",
+        DISPLAY_FLOAT_PROFIT_HINT = "(nécessite Auctionator)",
         DELETE_NODE            = "Supprimer ce point",
         DEBUG_SECTION          = "Debug",
 

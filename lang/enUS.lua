@@ -75,6 +75,8 @@ ns.locales.enUS = {
         DISPLAY_FLOAT_SIZE     = "Text size",
         DISPLAY_FLOAT_DURATION = "Display duration (seconds)",
         DISPLAY_FLOAT_TIER     = "Show tier icon",
+        DISPLAY_FLOAT_PROFIT   = "Show profit",
+        DISPLAY_FLOAT_PROFIT_HINT = "(requires Auctionator)",
         DELETE_NODE            = "Delete this pin",
         DEBUG_SECTION          = "Debug",
 

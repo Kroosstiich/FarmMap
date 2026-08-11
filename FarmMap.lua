@@ -1086,6 +1086,43 @@ RefreshAllPins = function()
     refreshPending = true
     C_Timer.After(0.05, DoRefresh)
 end
+--Check if Auctionator's price query API is available
+local function IsAuctionatorLoaded()
+    return Auctionator and Auctionator.API.v1 and Auctionator.API.v1.GetAuctionPriceByItemID and Auctionator.API.v1.GetVendorPriceByItemID
+end
+
+
+local function GetPrice(itemID)
+    if not IsAuctionatorLoaded() then return 0 end
+    return Auctionator.API.v1.GetAuctionPriceByItemID("FarmMap", itemID) or Auctionator.API.v1.GetVendorPriceByItemID("FarmMap", itemID) or 0
+end
+
+-- Coin icon texture paths (MoneyFrame built-in textures)
+local COIN_TEXTURES = {
+    gold   = "Interface\\MoneyFrame\\UI-GoldIcon",
+    silver = "Interface\\MoneyFrame\\UI-SilverIcon",
+    copper = "Interface\\MoneyFrame\\UI-CopperIcon",
+}
+
+-- Split copper amount into {denom, value} parts, skipping zero denominations
+local function GetCoinParts(copper)
+    if not copper or copper <= 0 then return nil end
+    local parts = {}
+    local gold = math.floor(copper / 10000)
+    if gold > 0 then
+        parts[#parts + 1] = { denom = "gold", value = gold }
+    end
+    local silver = math.floor((copper % 10000) / 100)
+    if silver > 0 then
+        parts[#parts + 1] = { denom = "silver", value = silver }
+    end
+    local copperRem = copper % 100
+    if copperRem > 0 then
+        parts[#parts + 1] = { denom = "copper", value = copperRem }
+    end
+    if #parts == 0 then return nil end
+    return parts
+end
 
 -- ============================================================
 -- FLOATING TEXT ON HARVEST
@@ -1098,12 +1135,14 @@ local function ShowFloatingLoot(items, itemIDs, quantities)
     local duration = FarmMapDB.floatDuration or 5
     local fscale   = FarmMapDB.floatSize     or 1.0
     local showTier = FarmMapDB.showFloatTier ~= false
+    local showProfit = FarmMapDB.showProfit ~= false and IsAuctionatorLoaded()
     local lineH    = math.floor(20 * fscale)
     local padding  = math.floor(4  * fscale)
     local blockW   = math.floor(320 * fscale)
     local blockH   = #items * (lineH + padding)
     local fontSize = math.floor(13 * fscale)
     local iconSize = math.floor(16 * fscale)
+    local coinSize = math.floor(14 * fscale)
 
     local screenW = UIParent:GetWidth()
     local screenH = UIParent:GetHeight()
@@ -1120,6 +1159,7 @@ local function ShowFloatingLoot(items, itemIDs, quantities)
         local qty        = quantities and quantities[i] or 1
         local craftRank  = 0
         local totalInBag = qty
+        local profit = 0
 
         if iid and iid > 0 then
             local _, _, quality = GetItemInfo(iid)
@@ -1128,6 +1168,7 @@ local function ShowFloatingLoot(items, itemIDs, quantities)
                       C_TradeSkillUI.GetItemReagentQualityByItemInfo(iid)
             if r and r > 0 then craftRank = r end
             totalInBag = (GetItemCount(iid, false) or 0) + qty
+            profit = (GetPrice(iid) * qty or 0) + qty
         end
 
         local lineY   = (i - 1) * (lineH + padding)
@@ -1158,16 +1199,51 @@ local function ShowFloatingLoot(items, itemIDs, quantities)
         txtQty:SetText(string.format("x%d  |cffaaaaaa(%d)|r", qty, totalInBag))
         txtQty:SetPoint("BOTTOMLEFT", block, "BOTTOMLEFT", 0, lineY)
 
+        -- Build coin icon + number pairs for this line
+        local coinParts = showProfit and GetCoinParts(profit) or nil
+        local coinElems = {}
+        if coinParts then
+            for _, part in ipairs(coinParts) do
+                local coinTex = block:CreateTexture(nil, "OVERLAY")
+                coinTex:SetSize(coinSize, coinSize)
+                coinTex:SetTexture(COIN_TEXTURES[part.denom])
+
+                local coinFS = block:CreateFontString(nil, "OVERLAY")
+                coinFS:SetFont(FLOATING_FONT, fontSize, "OUTLINE")
+                coinFS:SetHeight(lineH)
+                coinFS:SetJustifyH("LEFT")
+                coinFS:SetJustifyV("MIDDLE")
+                coinFS:SetText(tostring(part.value))
+
+                coinElems[#coinElems + 1] = { tex = coinTex, fs = coinFS }
+            end
+        end
+
         C_Timer.After(0, function()
             local nameW = txtName:GetStringWidth()
+            local qtyW  = txtQty:GetStringWidth()
+            local offX   = nameW + gap
+
             if iconTex then
                 iconTex:ClearAllPoints()
-                iconTex:SetPoint("BOTTOMLEFT", block, "BOTTOMLEFT", nameW + gap, lineY + (lineH - iconSize) / 2)
-                txtQty:ClearAllPoints()
-                txtQty:SetPoint("BOTTOMLEFT", block, "BOTTOMLEFT", nameW + iconSize + gap * 2, lineY)
-            else
-                txtQty:ClearAllPoints()
-                txtQty:SetPoint("BOTTOMLEFT", block, "BOTTOMLEFT", nameW + gap, lineY)
+                iconTex:SetPoint("BOTTOMLEFT", block, "BOTTOMLEFT", offX, lineY + (lineH - iconSize) / 2)
+                offX = offX + iconSize + gap
+            end
+
+            -- Quantity first
+            txtQty:ClearAllPoints()
+            txtQty:SetPoint("BOTTOMLEFT", block, "BOTTOMLEFT", offX, lineY)
+            offX = offX + qtyW + gap
+
+            -- Coin icons after quantity (number before icon: 1234[G] 56[S] 78[C])
+            for _, elem in ipairs(coinElems) do
+                elem.fs:ClearAllPoints()
+                elem.fs:SetPoint("BOTTOMLEFT", block, "BOTTOMLEFT", offX, lineY)
+                offX = offX + elem.fs:GetStringWidth() + 2
+
+                elem.tex:ClearAllPoints()
+                elem.tex:SetPoint("BOTTOMLEFT", block, "BOTTOMLEFT", offX, lineY + (lineH - coinSize) / 2)
+                offX = offX + coinSize + gap
             end
         end)
     end
@@ -1948,6 +2024,7 @@ local function CreateOptions()
             showMinimapPins  = FarmMapDB.showMinimapPins,
             language         = FarmMapDB.language,
             showFloatingText = FarmMapDB.showFloatingText,
+            showProfit       = FarmMapDB.showProfit,
             -- Position and visibility of the minimap button: clearing the node
             -- database must not move the button back.
             minimapIcon      = FarmMapDB.minimapIcon,
@@ -2052,7 +2129,17 @@ local function CreateOptions()
     checkTier:SetChecked(FarmMapDB and FarmMapDB.showFloatTier ~= false)
     checkTier:SetScript("OnClick", function(self) FarmMapDB.showFloatTier = self:GetChecked() end)
 
-    local sliderSize = MakeSlider(displayPanel, checkTier,  L.DISPLAY_FLOAT_SIZE,     0.5, 2.0, 0.1, "floatSize",     "%.1f")
+    local checkProfit = CreateFrame("CheckButton", "FarmMapShowProfitCheck", displayPanel, "InterfaceOptionsCheckButtonTemplate")
+    checkProfit:SetPoint("TOPLEFT", checkTier, "BOTTOMLEFT", 0, -28)
+    _G[checkProfit:GetName() .. "Text"]:SetText(L.DISPLAY_FLOAT_PROFIT)
+    checkProfit:SetChecked(FarmMapDB and FarmMapDB.showProfit ~= false)
+    checkProfit:SetScript("OnClick", function(self) FarmMapDB.showProfit = self:GetChecked() end)
+
+    local profitHint = displayPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+        profitHint:SetPoint("LEFT", _G[checkProfit:GetName() .. "Text"], "RIGHT", 4, 0)
+    profitHint:SetText("|cffaaaaaa" .. L.DISPLAY_FLOAT_PROFIT_HINT .. "|r")
+
+    local sliderSize = MakeSlider(displayPanel, checkProfit,  L.DISPLAY_FLOAT_SIZE,     0.5, 2.0, 0.1, "floatSize",     "%.1f")
     local sliderDur  = MakeSlider(displayPanel, sliderSize, L.DISPLAY_FLOAT_DURATION, 1,   15,  1,   "floatDuration", "%ds")
 
     local function UpdateFloatDependents()
@@ -2060,6 +2147,9 @@ local function CreateOptions()
         local alpha   = enabled and 1 or 0.4
         checkTier:SetEnabled(enabled)
         _G[checkTier:GetName() .. "Text"]:SetAlpha(alpha)
+        checkProfit:SetEnabled(enabled and IsAuctionatorLoaded())
+        _G[checkProfit:GetName() .. "Text"]:SetAlpha(alpha)
+        profitHint:SetShown(enabled and not IsAuctionatorLoaded())
         for _, s in ipairs({ sliderSize, sliderDur }) do
             s.slider:SetEnabled(enabled)
             s.lbl:SetAlpha(alpha)
@@ -2622,6 +2712,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         FarmMapDB.floatSize        = FarmMapDB.floatSize        ~= nil and FarmMapDB.floatSize        or 1.0
         FarmMapDB.floatDuration    = FarmMapDB.floatDuration    ~= nil and FarmMapDB.floatDuration    or 5
         if FarmMapDB.showFloatTier == nil then FarmMapDB.showFloatTier = true end
+        if FarmMapDB.showProfit    == nil then FarmMapDB.showProfit    = true end
         if FarmMapDB.showHerbo    == nil then FarmMapDB.showHerbo    = true end
         if FarmMapDB.showMinage   == nil then FarmMapDB.showMinage   = true end
         if FarmMapDB.showPeche    == nil then FarmMapDB.showPeche    = true end
@@ -3151,6 +3242,7 @@ SlashCmdList["FARMMAP"] = function(msg)
             showMinimapPins  = FarmMapDB.showMinimapPins,
             language         = FarmMapDB.language,
             showFloatingText = FarmMapDB.showFloatingText,
+            showProfit       = FarmMapDB.showProfit,
             -- Position and visibility of the minimap button: clearing the node
             -- database must not move the button back.
             minimapIcon      = FarmMapDB.minimapIcon,

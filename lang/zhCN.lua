@@ -55,6 +55,8 @@ ns.locales.zhCN = {
         DISPLAY_FLOAT_SIZE     = "文本大小",
         DISPLAY_FLOAT_DURATION = "显示持续时间（秒）",
         DISPLAY_FLOAT_TIER     = "显示品质图标",
+        DISPLAY_FLOAT_PROFIT   = "显示收益",
+        DISPLAY_FLOAT_PROFIT_HINT = "（需要 Auctionator）",
         DELETE_NODE            = "删除此标记",
         DEBUG_SECTION          = "调试",
 
