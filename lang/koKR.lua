@@ -82,6 +82,8 @@ ns.locales.koKR = {
         DISPLAY_FLOAT_SIZE     = "글꼴 크기",
         DISPLAY_FLOAT_DURATION = "표시 시간 (초)",
         DISPLAY_FLOAT_TIER     = "등급 아이콘 표시",
+        DISPLAY_FLOAT_PROFIT   = "수익 표시",
+        DISPLAY_FLOAT_PROFIT_HINT = "(Auctionator 필요)",
         DELETE_NODE            = "이 노드 삭제",
         DEBUG_SECTION          = "디버그",
 
