@@ -15,15 +15,18 @@ routes over time.
   and a slider to fade it out when the cursor is elsewhere
 - Primordial / abundant node support with a distinct visual style
 - Optional floating text on harvest: quantity, tier, total bag count, and the
-  value of what you gathered (value needs [Auctionator](https://www.curseforge.com/wow/addons/auctionator),
-  an optional dependency, with its auction house database already scanned once)
+  value of what you gathered — value display contributed by
+  [buseQ](https://github.com/buseQ); it needs
+  [Auctionator](https://www.curseforge.com/wow/addons/auctionator), an optional
+  dependency, with its auction house database already scanned once
 - Multiple icon styles, including colorblind-friendly presets
   (Deuteranopia, Protanopia, Tritanopia)
 - Minimap button — left click for the options, right click for the debug window
 - Export / import to share your node database with other players
 - Harvest statistics per resource type
-- English, French and Korean, auto-detected from the game client with a manual
-  override in the options
+- English, French, Korean, Simplified Chinese and Russian, auto-detected from the
+  game client with a manual override in the options — Korean by Crazyyoungs,
+  Simplified Chinese by buseQ, Russian by ZamestoTV
 
 ## Installation
 
@@ -45,6 +48,11 @@ changes — the `.toc` is only read at startup.
 | `/fm atlas` | Open the icon atlas calibrator (for icon pack creators) |
 | `/fm default` | Switch back to your game client's language |
 | `/fm version` | Display the current addon version |
+
+`/fm` is a short prefix and other addons claim it — FocusMarker registers it
+too, and addons load alphabetically, so whichever sorts last wins. FarmMap
+detects this at login, names the addon that took it, and switches every command
+it prints to **`/farmmap`**, which always works. Nothing to configure.
 
 ## Translations
 
@@ -68,12 +76,30 @@ The full step-by-step guide for the file route is in
 | `enUS` | English | Kroosstii |
 | `frFR` | Français | Kroosstii |
 | `koKR` | 한국어 | Crazyyoungs |
-| `zhCN` | 简体中文 | bluse |
+| `zhCN` | 简体中文 | buseQ (signs *bluse*) |
 | `ruRU` | Русский | ZamestoTV |
 
 Pull requests adding a language are welcome, and translators are credited both
 in-game and here. You can also send your file on the
 [FarmMap Discord](https://discord.gg/4BEGpmktK7) if you would rather not use git.
+
+## Contributors
+
+Translations are not the only thing this addon owes its users.
+
+- **[buseQ](https://github.com/buseQ)**, who signs his translations *bluse*,
+  wrote the harvest value display and sent it as
+  [pull request #4](https://github.com/Kroosstiich/FarmMap/pull/4): the
+  floating text can now show what the items you just gathered are worth, read
+  from Auctionator through its public API and declared as an optional
+  dependency. The idea and the code are entirely his, and it was merged
+  unchanged. He also contributed the Simplified Chinese translation. Thank you.
+- **Crazyyoungs** asked for the world map filter bar to be movable and to fade
+  out, so it stops colliding with other addons that use the same corner of the
+  map. That request became the Shift-drag, the flip and the opacity slider. He
+  also maintains the Korean translation. Thank you.
+
+Ideas count as much as pull requests — both of these started as a message.
 
 ## Icon packs
 
