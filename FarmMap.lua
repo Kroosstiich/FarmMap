@@ -9,7 +9,7 @@
 -- The lang\*.lua files register their translations in it before
 -- this file is loaded (see the .toc order).
 local addonName, ns = ...
-local addonVersion = "v1.7.1"
+local addonVersion = "v1.7.2"
 local lastUpdate   = "12/08/2026"
 
 -- Libs
