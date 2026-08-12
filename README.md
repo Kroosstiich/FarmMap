@@ -108,8 +108,6 @@ A good part of what FarmMap does today arrived from the people using it.
   maintains the Korean translation, and has twice translated new strings within
   the hour, before anyone thought to tell him they existed. Thank you.
 
-Ideas count as much as pull requests — both of these started as a message.
-
 ## Icon packs
 
 FarmMap exposes a public API so separate addons can register their own icon
