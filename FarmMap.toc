@@ -1,4 +1,4 @@
-## Interface: 120007
+## Interface: 120100, 120007
 ## Title: FarmMap
 ## Notes: Records the positions of ores, herbs, fish and wood nodes.
 ## Notes-frFR: Enregistre la position des minerais, plantes, poissons et bois.
