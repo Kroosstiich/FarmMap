@@ -57,12 +57,12 @@ ns.locales.zhCN = {
         DISPLAY_FLOAT_TIER     = "显示品质图标",
         DISPLAY_FLOAT_PROFIT   = "显示收益",
         DISPLAY_FLOAT_PROFIT_HINT = "（需要 Auctionator）",
-        FILTERBAR_SECTION      = "World map filter bar",       -- [TRANSLATE]
-        FILTERBAR_SIZE         = "Icon size",                  -- [TRANSLATE]
-        FILTERBAR_ALPHA        = "Opacity when not hovered",   -- [TRANSLATE]
-        FILTERBAR_RESET        = "Reset position",             -- [TRANSLATE]
-        FILTERBAR_DRAG_HINT    = "Shift-drag to move the bar", -- [TRANSLATE]
-        FILTERBAR_FLIP_HINT    = "Shift-right-click to flip it horizontal/vertical", -- [TRANSLATE]
+        FILTERBAR_SECTION      = "世界地图筛选栏",
+        FILTERBAR_SIZE         = "图标大小",
+        FILTERBAR_ALPHA        = "未悬停时透明度",
+        FILTERBAR_RESET        = "重置位置",
+        FILTERBAR_DRAG_HINT    = "按住Shift拖动以移动筛选栏",
+        FILTERBAR_FLIP_HINT    = "按住Shift右键点击以水平/垂直翻转",
         DELETE_NODE            = "删除此标记",
         DEBUG_SECTION          = "调试",
 
@@ -136,7 +136,7 @@ ns.locales.zhCN = {
         SLASH_VERSION          = "版本",
         SLASH_CLEAR_CONFIRM    = "数据库已通过命令清除。",
         SLASH_UNKNOWN          = "未知命令。输入 /fm help 查看帮助",
-        SLASH_CONFLICT         = "|cffff8800%s also uses /fm|r - FarmMap answers to |cffffffff%s|r instead.", -- [TRANSLATE]
+        SLASH_CONFLICT         = "|cffff8800%s 也在使用 /fm|r - FarmMap 已接管响应 |cffffffff%s|r。",
         SLASH_DEFAULT_DONE     = "语言已恢复为游戏客户端语言。输入 /reload 以生效。",
 
         MIGR_PREFIX            = "FarmMap 迁移：",
