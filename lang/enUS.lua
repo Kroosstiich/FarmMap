@@ -78,6 +78,7 @@ ns.locales.enUS = {
         DISPLAY_FLOAT_PROFIT   = "Show profit",
         DISPLAY_FLOAT_PROFIT_HINT = "(requires Auctionator)",
         FILTERBAR_SECTION      = "World map filter bar",
+        FILTERBAR_SIZE         = "Icon size",
         FILTERBAR_ALPHA        = "Opacity when not hovered",
         FILTERBAR_RESET        = "Reset position",
         FILTERBAR_DRAG_HINT    = "Shift-drag to move the bar",

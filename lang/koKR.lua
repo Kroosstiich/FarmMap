@@ -84,11 +84,12 @@ ns.locales.koKR = {
         DISPLAY_FLOAT_TIER     = "등급 아이콘 표시",
         DISPLAY_FLOAT_PROFIT   = "수익 표시",
         DISPLAY_FLOAT_PROFIT_HINT = "(Auctionator 필요)",
-        FILTERBAR_SECTION      = "World map filter bar",       -- [TRANSLATE]
-        FILTERBAR_ALPHA        = "Opacity when not hovered",   -- [TRANSLATE]
-        FILTERBAR_RESET        = "Reset position",             -- [TRANSLATE]
-        FILTERBAR_DRAG_HINT    = "Shift-drag to move the bar", -- [TRANSLATE]
-        FILTERBAR_FLIP_HINT    = "Shift-right-click to flip it horizontal/vertical", -- [TRANSLATE]
+        FILTERBAR_SECTION      = "세계지도 필터 바",
+        FILTERBAR_SIZE         = "Icon size",                    -- [TRANSLATE]
+        FILTERBAR_ALPHA        = "마우스를 올리지 않았을 때 투명도",
+        FILTERBAR_RESET        = "위치 초기화",
+        FILTERBAR_DRAG_HINT    = "Shift+드래그하여 바 이동",
+        FILTERBAR_FLIP_HINT    = "Shift+우클릭하여 가로/세로 전환",
         DELETE_NODE            = "이 노드 삭제",
         DEBUG_SECTION          = "디버그",
 

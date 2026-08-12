@@ -1743,25 +1743,42 @@ local function CreateFilterButtons()
     -- The saved position is an offset from the map's left edge, not an absolute
     -- screen position: the bar keeps following the map when it is moved or
     -- resized, and can still be parked outside the map entirely.
+    -- The offset is stored in SCREEN pixels, not in the bar's own units, so that
+    -- resizing the icons does not drag the bar across the map: SetPoint offsets
+    -- are expressed in the moved frame's scale, and that scale is exactly what
+    -- the size slider changes.
     local function ApplyBarPosition()
         local p = FarmMapDB.filterBarPos
         bar:ClearAllPoints()
-        bar:SetPoint("LEFT", WorldMapFrame, "LEFT",
-                     p and p.x or BAR_DEF_X, p and p.y or BAR_DEF_Y)
+        if not (p and p.x and p.y) then
+            bar:SetPoint("LEFT", WorldMapFrame, "LEFT", BAR_DEF_X, BAR_DEF_Y)
+            return
+        end
+        local bs = bar:GetEffectiveScale()
+        bar:SetPoint("LEFT", WorldMapFrame, "LEFT", p.x / bs, p.y / bs)
     end
 
     local function SaveBarPosition()
         local bl, wl = bar:GetLeft(), WorldMapFrame:GetLeft()
         if not bl or not wl then return end
         -- Scales are read explicitly: WorldMapFrame does not always sit at
-        -- UIParent's scale, and SetPoint offsets are in the moved frame's units.
+        -- UIParent's scale, and neither does the bar once resized.
         local bs, ws = bar:GetEffectiveScale(), WorldMapFrame:GetEffectiveScale()
         local bcy = (bar:GetTop() + bar:GetBottom()) / 2
         local wcy = (WorldMapFrame:GetTop() + WorldMapFrame:GetBottom()) / 2
         FarmMapDB.filterBarPos = {
-            x = (bl  * bs - wl  * ws) / bs,
-            y = (bcy * bs - wcy * ws) / bs,
+            x = bl  * bs - wl  * ws,
+            y = bcy * bs - wcy * ws,
         }
+        ApplyBarPosition()
+    end
+
+    -- Icon size, asked for by Crazyyoungs. Scaling the container scales its four
+    -- buttons and the gaps between them in one call, so the strip keeps its
+    -- proportions at any size. The position is re-applied because its offsets
+    -- live in the bar's units, which just changed.
+    local function ApplyBarScale()
+        bar:SetScale(FarmMapDB.filterBarScale or 1.0)
         ApplyBarPosition()
     end
 
@@ -1802,7 +1819,7 @@ local function CreateFilterButtons()
         { btn = btnBois,   key = "showBois",   prof = nil,      label = L.TYPE_Bois,   color = TYPE_COLORS.Bois   },
     }
 
-    ApplyBarPosition()
+    ApplyBarScale()
     bar:SetShown(WorldMapFrame:IsShown())
 
     WorldMapFrame:HookScript("OnShow", function()
@@ -1899,6 +1916,7 @@ local function CreateFilterButtons()
         FarmMapDB.filterBarPos = nil
         ApplyBarPosition()
     end
+    FarmMap_ApplyFilterBarScale = ApplyBarScale
     UpdateButtons()
 end
 
@@ -2132,6 +2150,7 @@ local function CreateOptions()
             filterBarPos     = FarmMapDB.filterBarPos,
             filterBarAlpha   = FarmMapDB.filterBarAlpha,
             filterBarHorizontal = FarmMapDB.filterBarHorizontal,
+            filterBarScale   = FarmMapDB.filterBarScale,
             -- Position and visibility of the minimap button: clearing the node
             -- database must not move the button back.
             minimapIcon      = FarmMapDB.minimapIcon,
@@ -2192,7 +2211,9 @@ local function CreateOptions()
     checkFloat:SetChecked(FarmMapDB and FarmMapDB.showFloatingText or false)
 
     local sliderCount = 0
-    local function MakeSlider(parent, anchorFrame, label, minVal, maxVal, step, dbKey, fmt)
+    -- onChange is optional: sliders that only store a value read at display time
+    -- do not need it, the ones that drive a live frame do.
+    local function MakeSlider(parent, anchorFrame, label, minVal, maxVal, step, dbKey, fmt, onChange)
         sliderCount = sliderCount + 1
         local sliderName = "FarmMapSlider" .. sliderCount
         local container  = CreateFrame("Frame", nil, parent)
@@ -2222,6 +2243,7 @@ local function CreateOptions()
             local v = self:GetValue()
             valTxt:SetText(string.format(fmt, v))
             FarmMapDB[dbKey] = v
+            if onChange then onChange(v) end
         end)
         valTxt:SetText(string.format(fmt, FarmMapDB[dbKey] or minVal))
         container.slider = slider
@@ -2279,7 +2301,9 @@ local function CreateOptions()
     barTitle:SetPoint("TOPLEFT", sliderDur, "BOTTOMLEFT", 0, -18)
     barTitle:SetText(L.FILTERBAR_SECTION)
 
-    local sliderBarAlpha = MakeSlider(displayPanel, barTitle, L.FILTERBAR_ALPHA, 0, 100, 5, "filterBarAlpha", "%d%%")
+    local sliderBarSize  = MakeSlider(displayPanel, barTitle, L.FILTERBAR_SIZE, 0.5, 2.0, 0.1, "filterBarScale", "%.1f",
+        function() if FarmMap_ApplyFilterBarScale then FarmMap_ApplyFilterBarScale() end end)
+    local sliderBarAlpha = MakeSlider(displayPanel, sliderBarSize, L.FILTERBAR_ALPHA, 0, 100, 5, "filterBarAlpha", "%d%%")
 
     local btnResetBar = CreateFrame("Button", nil, displayPanel, "UIPanelButtonTemplate")
     btnResetBar:SetSize(160, 22)
@@ -2839,6 +2863,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         if FarmMapDB.showProfit    == nil then FarmMapDB.showProfit    = true end
         -- 100 = the pre-1.7.0 behaviour, so an existing install sees no change.
         if FarmMapDB.filterBarAlpha == nil then FarmMapDB.filterBarAlpha = 100 end
+        if FarmMapDB.filterBarScale == nil then FarmMapDB.filterBarScale = 1.0 end
         if FarmMapDB.showHerbo    == nil then FarmMapDB.showHerbo    = true end
         if FarmMapDB.showMinage   == nil then FarmMapDB.showMinage   = true end
         if FarmMapDB.showPeche    == nil then FarmMapDB.showPeche    = true end
@@ -3422,6 +3447,7 @@ SlashCmdList["FARMMAP"] = function(msg)
             filterBarPos     = FarmMapDB.filterBarPos,
             filterBarAlpha   = FarmMapDB.filterBarAlpha,
             filterBarHorizontal = FarmMapDB.filterBarHorizontal,
+            filterBarScale   = FarmMapDB.filterBarScale,
             -- Position and visibility of the minimap button: clearing the node
             -- database must not move the button back.
             minimapIcon      = FarmMapDB.minimapIcon,

@@ -66,6 +66,7 @@ ns.locales.frFR = {
         DISPLAY_FLOAT_PROFIT   = "Afficher le profit",
         DISPLAY_FLOAT_PROFIT_HINT = "(nécessite Auctionator)",
         FILTERBAR_SECTION      = "Barre de filtres (carte du monde)",
+        FILTERBAR_SIZE         = "Taille des icônes",
         FILTERBAR_ALPHA        = "Opacité hors survol",
         FILTERBAR_RESET        = "Réinitialiser la position",
         FILTERBAR_DRAG_HINT    = "Maj + glisser pour déplacer la barre",

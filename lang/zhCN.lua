@@ -58,6 +58,7 @@ ns.locales.zhCN = {
         DISPLAY_FLOAT_PROFIT   = "显示收益",
         DISPLAY_FLOAT_PROFIT_HINT = "（需要 Auctionator）",
         FILTERBAR_SECTION      = "World map filter bar",       -- [TRANSLATE]
+        FILTERBAR_SIZE         = "Icon size",                  -- [TRANSLATE]
         FILTERBAR_ALPHA        = "Opacity when not hovered",   -- [TRANSLATE]
         FILTERBAR_RESET        = "Reset position",             -- [TRANSLATE]
         FILTERBAR_DRAG_HINT    = "Shift-drag to move the bar", -- [TRANSLATE]
