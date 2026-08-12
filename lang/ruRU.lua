@@ -42,9 +42,9 @@ ns.locales.ruRU = {
         -- was contributed. They are left in English on purpose, never
         -- machine-translated. Translate the text and delete the marker;
         -- until then they simply show in English in game.
-        CREDITS_COPY_CLICK     = "Click to copy",   -- [TRANSLATE]
-        CREDITS_COPY_KEY       = "Ctrl+C to copy",  -- [TRANSLATE]
-        CREDITS_COPIED         = "Copied!",         -- [TRANSLATE]
+        CREDITS_COPY_CLICK     = "Нажмите, чтобы скопировать",
+        CREDITS_COPY_KEY       = "Ctrl+C для копирования",
+        CREDITS_COPIED         = "Скопировано!",
 
         DB_SECTION             = "База данных",
         DB_CLEAR               = "Очистить базу данных",
@@ -63,12 +63,12 @@ ns.locales.ruRU = {
         DISPLAY_FLOAT_TIER     = "Показывать иконку ранга",
         DISPLAY_FLOAT_PROFIT   = "Показывать прибыль",
         DISPLAY_FLOAT_PROFIT_HINT = "(требуется Auctionator)",
-        FILTERBAR_SECTION      = "World map filter bar",       -- [TRANSLATE]
-        FILTERBAR_SIZE         = "Icon size",                  -- [TRANSLATE]
-        FILTERBAR_ALPHA        = "Opacity when not hovered",   -- [TRANSLATE]
-        FILTERBAR_RESET        = "Reset position",             -- [TRANSLATE]
-        FILTERBAR_DRAG_HINT    = "Shift-drag to move the bar", -- [TRANSLATE]
-        FILTERBAR_FLIP_HINT    = "Shift-right-click to flip it horizontal/vertical", -- [TRANSLATE]
+        FILTERBAR_SECTION      = "Панель фильтров карты мира",
+        FILTERBAR_SIZE         = "Размер значков",
+        FILTERBAR_ALPHA        = "Прозрачность вне курсора",
+        FILTERBAR_RESET        = "Сбросить положение",
+        FILTERBAR_DRAG_HINT    = "Shift+перетаскивание - переместить панель",
+        FILTERBAR_FLIP_HINT    = "Shift+ПКМ - повернуть горизонтально/вертикально",
         DELETE_NODE            = "Удалить эту метку",
         DEBUG_SECTION          = "Отладка",
 
@@ -145,7 +145,7 @@ ns.locales.ruRU = {
         SLASH_VERSION          = "Версия",
         SLASH_CLEAR_CONFIRM    = "БД очищена с помощью команды.",
         SLASH_UNKNOWN          = "Неизвестная команда. Введите /fm help",
-        SLASH_CONFLICT         = "|cffff8800%s also uses /fm|r - FarmMap answers to |cffffffff%s|r instead.", -- [TRANSLATE]
+        SLASH_CONFLICT         = "|cffff8800%s также использует /fm|r - FarmMap теперь отвечает на |cffffffff%s|r.",
         SLASH_DEFAULT_DONE     = "Язык сброшен на язык игрового клиента. Введите /reload для применения.",
 
         MIGR_PREFIX            = "Обновление FarmMap:",
