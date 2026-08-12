@@ -77,7 +77,7 @@ The full step-by-step guide for the file route is in
 | `frFR` | Français | Kroosstii |
 | `koKR` | 한국어 | Crazyyoungs |
 | `zhCN` | 简体中文 | buseQ (signs *bluse*) |
-| `ruRU` | Русский | ZamestoTV |
+| `ruRU` | Русский | Hubbotu (signs *ZamestoTV*) |
 
 Pull requests adding a language are welcome, and translators are credited both
 in-game and here. You can also send your file on the
@@ -85,7 +85,7 @@ in-game and here. You can also send your file on the
 
 ## Contributors
 
-Translations are not the only thing this addon owes its users.
+A good part of what FarmMap does today arrived from the people using it.
 
 - **[buseQ](https://github.com/buseQ)**, who signs his translations *bluse*,
   wrote the harvest value display and sent it as
@@ -93,11 +93,20 @@ Translations are not the only thing this addon owes its users.
   floating text can now show what the items you just gathered are worth, read
   from Auctionator through its public API and declared as an optional
   dependency. The idea and the code are entirely his, and it was merged
-  unchanged. He also contributed the Simplified Chinese translation. Thank you.
+  unchanged. He also contributed the Simplified Chinese translation, and
+  [pull request #1](https://github.com/Kroosstiich/FarmMap/pull/1) before that.
+  Thank you.
+- **[Hubbotu](https://github.com/Hubbotu)**, who signs *ZamestoTV*, contributed
+  the entire Russian localization as
+  [pull request #2](https://github.com/Kroosstiich/FarmMap/pull/2) — a complete
+  locale, every single key, with the colour codes and escapes carried over
+  untouched. Russian was not on any roadmap; it exists because he wrote it.
+  Thank you.
 - **Crazyyoungs** asked for the world map filter bar to be movable and to fade
   out, so it stops colliding with other addons that use the same corner of the
-  map. That request became the Shift-drag, the flip and the opacity slider. He
-  also maintains the Korean translation. Thank you.
+  map. That request became the Shift-drag and the opacity slider. He also
+  maintains the Korean translation, and has twice translated new strings within
+  the hour, before anyone thought to tell him they existed. Thank you.
 
 Ideas count as much as pull requests — both of these started as a message.
 
