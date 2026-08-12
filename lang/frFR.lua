@@ -65,6 +65,11 @@ ns.locales.frFR = {
         DISPLAY_FLOAT_TIER     = "Afficher l'icône de rang",
         DISPLAY_FLOAT_PROFIT   = "Afficher le profit",
         DISPLAY_FLOAT_PROFIT_HINT = "(nécessite Auctionator)",
+        FILTERBAR_SECTION      = "Barre de filtres (carte du monde)",
+        FILTERBAR_ALPHA        = "Opacité hors survol",
+        FILTERBAR_RESET        = "Réinitialiser la position",
+        FILTERBAR_DRAG_HINT    = "Maj + glisser pour déplacer la barre",
+        FILTERBAR_FLIP_HINT    = "Maj + clic droit pour la basculer horizontale/verticale",
         DELETE_NODE            = "Supprimer ce point",
         DEBUG_SECTION          = "Debug",
 
@@ -141,6 +146,7 @@ ns.locales.frFR = {
         SLASH_VERSION          = "Version",
         SLASH_CLEAR_CONFIRM    = "DB vidée via commande.",
         SLASH_UNKNOWN          = "Commande inconnue. Tapez /fm help",
+        SLASH_CONFLICT         = "|cffff8800%s utilise aussi /fm|r - FarmMap répond à |cffffffff%s|r à la place.",
         SLASH_DEFAULT_DONE     = "Langue réinitialisée sur celle du client de jeu. Tapez /reload pour appliquer.",
 
         MIGR_PREFIX            = "FarmMap Migration :",

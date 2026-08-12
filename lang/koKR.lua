@@ -84,6 +84,11 @@ ns.locales.koKR = {
         DISPLAY_FLOAT_TIER     = "등급 아이콘 표시",
         DISPLAY_FLOAT_PROFIT   = "수익 표시",
         DISPLAY_FLOAT_PROFIT_HINT = "(Auctionator 필요)",
+        FILTERBAR_SECTION      = "World map filter bar",       -- [TRANSLATE]
+        FILTERBAR_ALPHA        = "Opacity when not hovered",   -- [TRANSLATE]
+        FILTERBAR_RESET        = "Reset position",             -- [TRANSLATE]
+        FILTERBAR_DRAG_HINT    = "Shift-drag to move the bar", -- [TRANSLATE]
+        FILTERBAR_FLIP_HINT    = "Shift-right-click to flip it horizontal/vertical", -- [TRANSLATE]
         DELETE_NODE            = "이 노드 삭제",
         DEBUG_SECTION          = "디버그",
 
@@ -157,6 +162,7 @@ ns.locales.koKR = {
         SLASH_VERSION          = "버전",
         SLASH_CLEAR_CONFIRM    = "명령어로 데이터베이스를 초기화했습니다.",
         SLASH_UNKNOWN          = "알 수 없는 명령어입니다. /fm help 를 입력하세요.",
+        SLASH_CONFLICT         = "|cffff8800%s also uses /fm|r - FarmMap answers to |cffffffff%s|r instead.", -- [TRANSLATE]
 
         SLASH_DEFAULT_DONE     = "FarmMap 애드온 언어가 한국어로 변경되려면 /reload를 입력하세요.",
 

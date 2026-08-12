@@ -63,6 +63,11 @@ ns.locales.ruRU = {
         DISPLAY_FLOAT_TIER     = "Показывать иконку ранга",
         DISPLAY_FLOAT_PROFIT   = "Показывать прибыль",
         DISPLAY_FLOAT_PROFIT_HINT = "(требуется Auctionator)",
+        FILTERBAR_SECTION      = "World map filter bar",       -- [TRANSLATE]
+        FILTERBAR_ALPHA        = "Opacity when not hovered",   -- [TRANSLATE]
+        FILTERBAR_RESET        = "Reset position",             -- [TRANSLATE]
+        FILTERBAR_DRAG_HINT    = "Shift-drag to move the bar", -- [TRANSLATE]
+        FILTERBAR_FLIP_HINT    = "Shift-right-click to flip it horizontal/vertical", -- [TRANSLATE]
         DELETE_NODE            = "Удалить эту метку",
         DEBUG_SECTION          = "Отладка",
 
@@ -139,6 +144,7 @@ ns.locales.ruRU = {
         SLASH_VERSION          = "Версия",
         SLASH_CLEAR_CONFIRM    = "БД очищена с помощью команды.",
         SLASH_UNKNOWN          = "Неизвестная команда. Введите /fm help",
+        SLASH_CONFLICT         = "|cffff8800%s also uses /fm|r - FarmMap answers to |cffffffff%s|r instead.", -- [TRANSLATE]
         SLASH_DEFAULT_DONE     = "Язык сброшен на язык игрового клиента. Введите /reload для применения.",
 
         MIGR_PREFIX            = "Обновление FarmMap:",

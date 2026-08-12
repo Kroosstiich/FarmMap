@@ -9,8 +9,8 @@
 -- The lang\*.lua files register their translations in it before
 -- this file is loaded (see the .toc order).
 local addonName, ns = ...
-local addonVersion = "v1.6.3"
-local lastUpdate   = "09/08/2026"
+local addonVersion = "v1.7.0"
+local lastUpdate   = "12/08/2026"
 
 -- Libs
 local HBD     = LibStub("HereBeDragons-2.0")
@@ -1706,15 +1706,70 @@ local function CreateFilterButtons()
         Bois   = { l=3, r=-3, t=-1, b=5 },
     }
 
-    local function MakeButton(name, nodeType, anchorTo, offsetY)
-        local btn = CreateFrame("Button", name, UIParent, "BackdropTemplate")
-        btn:SetSize(32, 32)
-        btn:SetFrameStrata("HIGH")
-        if anchorTo == "map" then
-            btn:SetPoint("LEFT", WorldMapFrame, "LEFT", 8, offsetY)
-        else
-            btn:SetPoint("TOP", anchorTo, "BOTTOM", 0, -4)
+    -- The four buttons live inside a container: it is what the player drags and
+    -- what fades out. Its default anchor reproduces the historical layout to the
+    -- pixel (first button centred 20px above the map's left edge midpoint).
+    -- 4 buttons of 32 + 3 gaps of 4 = 140.
+    local BAR_THICK, BAR_LONG  = 32, 140
+    local BAR_DEF_X, BAR_DEF_Y = 8, -34
+
+    local bar = CreateFrame("Frame", "FarmMapFilterBar", UIParent)
+    bar:SetFrameStrata("HIGH")
+    bar:SetMovable(true)
+    -- A drag can never push the bar past the screen edge, so it stays reachable
+    -- without needing the reset button.
+    bar:SetClampedToScreen(true)
+
+    local orderedBtns = {}
+
+    -- Horizontal and vertical are the same strip read along another axis. The
+    -- anchor stays the bar's LEFT point, so flipping keeps the left edge and the
+    -- vertical centre exactly where they were.
+    local function LayoutBar()
+        local horiz = FarmMapDB.filterBarHorizontal
+        bar:SetSize(horiz and BAR_LONG or BAR_THICK, horiz and BAR_THICK or BAR_LONG)
+        for i, btn in ipairs(orderedBtns) do
+            btn:ClearAllPoints()
+            if i == 1 then
+                btn:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
+            elseif horiz then
+                btn:SetPoint("LEFT", orderedBtns[i - 1], "RIGHT", 4, 0)
+            else
+                btn:SetPoint("TOP", orderedBtns[i - 1], "BOTTOM", 0, -4)
+            end
         end
+    end
+
+    -- The saved position is an offset from the map's left edge, not an absolute
+    -- screen position: the bar keeps following the map when it is moved or
+    -- resized, and can still be parked outside the map entirely.
+    local function ApplyBarPosition()
+        local p = FarmMapDB.filterBarPos
+        bar:ClearAllPoints()
+        bar:SetPoint("LEFT", WorldMapFrame, "LEFT",
+                     p and p.x or BAR_DEF_X, p and p.y or BAR_DEF_Y)
+    end
+
+    local function SaveBarPosition()
+        local bl, wl = bar:GetLeft(), WorldMapFrame:GetLeft()
+        if not bl or not wl then return end
+        -- Scales are read explicitly: WorldMapFrame does not always sit at
+        -- UIParent's scale, and SetPoint offsets are in the moved frame's units.
+        local bs, ws = bar:GetEffectiveScale(), WorldMapFrame:GetEffectiveScale()
+        local bcy = (bar:GetTop() + bar:GetBottom()) / 2
+        local wcy = (WorldMapFrame:GetTop() + WorldMapFrame:GetBottom()) / 2
+        FarmMapDB.filterBarPos = {
+            x = (bl  * bs - wl  * ws) / bs,
+            y = (bcy * bs - wcy * ws) / bs,
+        }
+        ApplyBarPosition()
+    end
+
+    -- Positioning is LayoutBar's job alone: the buttons are re-anchored on every
+    -- flip, so setting a point here would only be overwritten.
+    local function MakeButton(name, nodeType)
+        local btn = CreateFrame("Button", name, bar, "BackdropTemplate")
+        btn:SetSize(32, 32)
         btn:SetBackdrop({bgFile="Interface\\ChatFrame\\ChatFrameBackground", edgeFile="Interface\\Tooltips\\UI-Tooltip-Border", tile=true, tileSize=16, edgeSize=16, insets={left=2,right=2,top=2,bottom=2}})
         btn:SetBackdropColor(0, 0, 0, 0.8)
         btn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
@@ -1729,13 +1784,16 @@ local function CreateFilterButtons()
         end
         btn.tex      = tex
         btn.nodeType = nodeType
+        orderedBtns[#orderedBtns + 1] = btn
         return btn
     end
 
-    local btnHerbo  = MakeButton("FarmMapBtnHerbo",  "Herbo",  "map",    20)
-    local btnMinage = MakeButton("FarmMapBtnMinage",  "Minage", btnHerbo,  0)
-    local btnPeche  = MakeButton("FarmMapBtnPeche",   "Peche",  btnMinage, 0)
-    local btnBois   = MakeButton("FarmMapBtnBois",    "Bois",   btnPeche,  0)
+    local btnHerbo  = MakeButton("FarmMapBtnHerbo",  "Herbo")
+    local btnMinage = MakeButton("FarmMapBtnMinage", "Minage")
+    local btnPeche  = MakeButton("FarmMapBtnPeche",  "Peche")
+    local btnBois   = MakeButton("FarmMapBtnBois",   "Bois")
+
+    LayoutBar()
 
     local allBtns = {
         { btn = btnHerbo,  key = "showHerbo",  prof = "Herbo",  label = L.TYPE_Herbo,  color = TYPE_COLORS.Herbo  },
@@ -1744,15 +1802,28 @@ local function CreateFilterButtons()
         { btn = btnBois,   key = "showBois",   prof = nil,      label = L.TYPE_Bois,   color = TYPE_COLORS.Bois   },
     }
 
-    for _, b in ipairs(allBtns) do b.btn:SetShown(WorldMapFrame:IsShown()) end
+    ApplyBarPosition()
+    bar:SetShown(WorldMapFrame:IsShown())
 
     WorldMapFrame:HookScript("OnShow", function()
-        for _, b in ipairs(allBtns) do b.btn:Show() end
+        bar:Show()
         RefreshWorldMapPins()
     end)
     WorldMapFrame:HookScript("OnHide", function()
-        for _, b in ipairs(allBtns) do b.btn:Hide() end
+        bar:Hide()
         HBDPins:RemoveAllWorldMapIcons(addonName)
+    end)
+
+    -- Fade out when the cursor is elsewhere. Alpha does not affect hit testing,
+    -- so at 0 the bar is invisible yet still hoverable — that is the "hide it"
+    -- the request asked for. Throttled, and only ticking while the map is open.
+    local alphaAccum = 0
+    bar:SetScript("OnUpdate", function(self, elapsed)
+        alphaAccum = alphaAccum + elapsed
+        if alphaAccum < 0.1 then return end
+        alphaAccum = 0
+        local idle = (FarmMapDB.filterBarAlpha or 100) / 100
+        self:SetAlpha((self.moving or self:IsMouseOver()) and 1 or idle)
     end)
 
     local function UpdateButtons()
@@ -1784,19 +1855,50 @@ local function CreateFilterButtons()
                 GameTooltip:AddLine(FarmMapDB[data.key] and L.TOGGLE_ON or L.TOGGLE_OFF, 1, 1, 1)
                 GameTooltip:AddLine(L.TOGGLE_HINT, 0.7, 0.7, 0.7)
             end
+            GameTooltip:AddLine(L.FILTERBAR_DRAG_HINT, 0.7, 0.7, 0.7)
+            GameTooltip:AddLine(L.FILTERBAR_FLIP_HINT, 0.7, 0.7, 0.7)
             GameTooltip:Show()
         end)
         data.btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        data.btn:SetScript("OnClick", function(self)
+        -- Right click is only read with Shift held, same modifier as the drag:
+        -- Shift means "act on the bar", a bare click still means "act on the filter".
+        data.btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        data.btn:SetScript("OnClick", function(self, button)
+            if button == "RightButton" then
+                if IsShiftKeyDown() then
+                    FarmMapDB.filterBarHorizontal = not FarmMapDB.filterBarHorizontal
+                    LayoutBar()
+                end
+                return
+            end
             if data.prof and not playerProfessions[data.prof] then return end
             FarmMapDB[data.key] = not FarmMapDB[data.key]
             UpdateButtons()
             RefreshAllPins()
             if GameTooltip:GetOwner() == self then self:GetScript("OnEnter")(self) end
         end)
+
+        -- Shift is required so that a slow click never moves the bar instead of
+        -- toggling the filter. A plain click still reaches OnClick untouched.
+        data.btn:RegisterForDrag("LeftButton")
+        data.btn:SetScript("OnDragStart", function()
+            if not IsShiftKeyDown() then return end
+            bar.moving = true
+            bar:StartMoving()
+        end)
+        data.btn:SetScript("OnDragStop", function()
+            if not bar.moving then return end
+            bar.moving = nil
+            bar:StopMovingOrSizing()
+            SaveBarPosition()
+        end)
     end
 
     FarmMap_UpdateFilterButtons = UpdateButtons
+    FarmMap_ResetFilterBar = function()
+        FarmMapDB.filterBarPos = nil
+        ApplyBarPosition()
+    end
     UpdateButtons()
 end
 
@@ -2025,6 +2127,11 @@ local function CreateOptions()
             language         = FarmMapDB.language,
             showFloatingText = FarmMapDB.showFloatingText,
             showProfit       = FarmMapDB.showProfit,
+            -- Same reasoning for the filter bar: emptying the nodes must not
+            -- send it back to its default corner.
+            filterBarPos     = FarmMapDB.filterBarPos,
+            filterBarAlpha   = FarmMapDB.filterBarAlpha,
+            filterBarHorizontal = FarmMapDB.filterBarHorizontal,
             -- Position and visibility of the minimap button: clearing the node
             -- database must not move the button back.
             minimapIcon      = FarmMapDB.minimapIcon,
@@ -2165,6 +2272,23 @@ local function CreateOptions()
     end)
     displayPanel:SetScript("OnShow", UpdateFloatDependents)
     UpdateFloatDependents()
+
+    -- World map filter bar. Its own section: these settings have nothing to do
+    -- with the floating text above, and must stay usable when it is switched off.
+    local barTitle = displayPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    barTitle:SetPoint("TOPLEFT", sliderDur, "BOTTOMLEFT", 0, -18)
+    barTitle:SetText(L.FILTERBAR_SECTION)
+
+    local sliderBarAlpha = MakeSlider(displayPanel, barTitle, L.FILTERBAR_ALPHA, 0, 100, 5, "filterBarAlpha", "%d%%")
+
+    local btnResetBar = CreateFrame("Button", nil, displayPanel, "UIPanelButtonTemplate")
+    btnResetBar:SetSize(160, 22)
+    btnResetBar:SetPoint("TOPLEFT", sliderBarAlpha, "BOTTOMLEFT", 0, -8)
+    btnResetBar:SetText(L.FILTERBAR_RESET)
+    FitButton(btnResetBar)
+    btnResetBar:SetScript("OnClick", function()
+        if FarmMap_ResetFilterBar then FarmMap_ResetFilterBar() end
+    end)
 
     Settings.RegisterCanvasLayoutSubcategory(category, displayPanel, L.DISPLAY_SECTION)
 
@@ -2713,6 +2837,8 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         FarmMapDB.floatDuration    = FarmMapDB.floatDuration    ~= nil and FarmMapDB.floatDuration    or 5
         if FarmMapDB.showFloatTier == nil then FarmMapDB.showFloatTier = true end
         if FarmMapDB.showProfit    == nil then FarmMapDB.showProfit    = true end
+        -- 100 = the pre-1.7.0 behaviour, so an existing install sees no change.
+        if FarmMapDB.filterBarAlpha == nil then FarmMapDB.filterBarAlpha = 100 end
         if FarmMapDB.showHerbo    == nil then FarmMapDB.showHerbo    = true end
         if FarmMapDB.showMinage   == nil then FarmMapDB.showMinage   = true end
         if FarmMapDB.showPeche    == nil then FarmMapDB.showPeche    = true end
@@ -2761,6 +2887,8 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             CheckProfessions()
             if FarmMap_UpdateFilterButtons then FarmMap_UpdateFilterButtons() end
             ApplyMinimapStyle(FarmMapDB.minimapStyle or "blank")
+            -- After login, so that addons sorting after FarmMap have registered.
+            ns.ResolveSlashPrefix()
         end)
 
     -- ---- Harvest detection ----
@@ -3184,6 +3312,52 @@ end
 SLASH_FARMMAP1 = "/fm"
 SLASH_FARMMAP2 = "/farmmap"
 
+-- /fm is short enough that other addons want it too: FocusMarker takes it, and
+-- addons load alphabetically, so anything sorting after FarmMap registers last
+-- and wins. Rather than hardcode a name, ask who else claims the token — this
+-- catches the next one as well. Returns the rival's command name, or nil.
+--
+-- Called after PLAYER_LOGIN on purpose: at load time the addons that sort after
+-- FarmMap have not registered anything yet, and the check would see nothing.
+local function SlashRival(token)
+    for name in pairs(SlashCmdList) do
+        if name ~= "FARMMAP" then
+            local slot = 1
+            while true do
+                local claimed = _G["SLASH_" .. name .. slot]
+                if not claimed then break end
+                if type(claimed) == "string" and claimed:lower() == token then
+                    return name
+                end
+                slot = slot + 1
+            end
+        end
+    end
+end
+
+-- Every command FarmMap prints goes through this. It stays "/fm" unless the
+-- token was lost, so nothing changes for the players who have no conflict.
+local activePrefix = "/fm"
+
+-- Localized strings spell the command out ("Type /fm help") in all five
+-- languages. Substituting at display time keeps each translator's wording
+-- untouched, where adding a %s placeholder would have orphaned five
+-- translations to re-request over one command name.
+local function Prefixed(text)
+    if activePrefix == "/fm" or type(text) ~= "string" then return text end
+    return (text:gsub("/fm", activePrefix))
+end
+
+function ns.ResolveSlashPrefix()
+    local rival = SlashRival("/fm")
+    if not rival then return end
+
+    activePrefix = "/farmmap"
+    -- Title case reads better than the raw command name (FOCUSMARKER).
+    local pretty = rival:sub(1, 1) .. rival:sub(2):lower()
+    print("|cffffd100FarmMap :|r " .. string.format(L.SLASH_CONFLICT, pretty, activePrefix))
+end
+
 SlashCmdList["FARMMAP"] = function(msg)
     local cmd = strtrim(msg):lower()
     cmd = commandAliases[cmd] or cmd
@@ -3195,12 +3369,12 @@ SlashCmdList["FARMMAP"] = function(msg)
         -- Counting characters aligns nothing - colour is what
         -- separates the command from its description.
         for _, entry in ipairs(SLASH_COMMANDS) do
-            local line = string.format("|cffffd100/fm %s|r  |cffaaaaaa%s|r",
-                entry.cmd, L[entry.key] or "")
+            local line = string.format("|cffffd100%s %s|r  |cffaaaaaa%s|r",
+                activePrefix, entry.cmd, L[entry.key] or "")
             local alt = aliasDisplay[entry.cmd]
             if alt then
-                line = line .. string.format("  |cff888888(/fm %s)|r",
-                    table.concat(alt, ", /fm "))
+                line = line .. string.format("  |cff888888(%s %s)|r",
+                    activePrefix, table.concat(alt, ", " .. activePrefix .. " "))
             end
             print(line)
         end
@@ -3243,6 +3417,11 @@ SlashCmdList["FARMMAP"] = function(msg)
             language         = FarmMapDB.language,
             showFloatingText = FarmMapDB.showFloatingText,
             showProfit       = FarmMapDB.showProfit,
+            -- Same reasoning for the filter bar: emptying the nodes must not
+            -- send it back to its default corner.
+            filterBarPos     = FarmMapDB.filterBarPos,
+            filterBarAlpha   = FarmMapDB.filterBarAlpha,
+            filterBarHorizontal = FarmMapDB.filterBarHorizontal,
             -- Position and visibility of the minimap button: clearing the node
             -- database must not move the button back.
             minimapIcon      = FarmMapDB.minimapIcon,
@@ -3278,6 +3457,6 @@ SlashCmdList["FARMMAP"] = function(msg)
         print("|cffffd100FarmMap|r - " .. L.SLASH_VERSION .. " : |cffffffff" .. addonVersion .. "|r  (" .. lastUpdate .. ")")
 
     else
-        print("|cffffd100FarmMap :|r " .. L.SLASH_UNKNOWN)
+        print("|cffffd100FarmMap :|r " .. Prefixed(L.SLASH_UNKNOWN))
     end
 end

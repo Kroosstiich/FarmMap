@@ -10,9 +10,13 @@ routes over time.
 ## Features
 
 - Automatic node recording on harvest — herbs, ores, fish and wood
-- Pins on both the minimap and the world map, with filter buttons per resource
+- Pins on both the minimap and the world map, with filter buttons per resource —
+  Shift-drag to move the bar, Shift-right-click to flip it horizontal / vertical,
+  and a slider to fade it out when the cursor is elsewhere
 - Primordial / abundant node support with a distinct visual style
-- Optional floating text on harvest: quantity, tier and total bag count
+- Optional floating text on harvest: quantity, tier, total bag count, and the
+  value of what you gathered (value needs [Auctionator](https://www.curseforge.com/wow/addons/auctionator),
+  an optional dependency, with its auction house database already scanned once)
 - Multiple icon styles, including colorblind-friendly presets
   (Deuteranopia, Protanopia, Tritanopia)
 - Minimap button — left click for the options, right click for the debug window

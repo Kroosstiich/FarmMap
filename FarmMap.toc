@@ -1,10 +1,14 @@
-## Interface: 120007
+# Les deux versions sont declarees pendant le deploiement du patch : les
+# royaumes ne passent pas tous en 12.1.0 le meme jour, et un client encore en
+# 12.0.7 afficherait l'addon comme obsolete si seule la 12.1.0 etait la.
+# La liste separee par des virgules est le format standard, voir HereBeDragons.
+## Interface: 120007, 120100
 ## Title: FarmMap
 ## Notes: Records the positions of ores, herbs, fish and wood nodes.
 ## Notes-frFR: Enregistre la position des minerais, plantes, poissons et bois.
 ## Notes-zhCN: 记录矿石、草药、鱼和树木节点的位置。
 ## Author: Kroosstii
-## Version: v1.6.3
+## Version: v1.7.0
 ## IconTexture: Interface\AddOns\FarmMap\Textures\icon
 ## SavedVariables: FarmMapDB FarmMapStatsDB
 ## OptionalDeps: Auctionator
