@@ -1,16 +1,23 @@
 -- ============================================================
 --  FarmMap — Addon principal
 --  Auteur  : Kroosstii (Dkroosstii-Dalaran)
---  Version : v1.6.3
---  Updated : 09/08/2026
+--
+--  Version et date : dans FarmMap.toc (## Version, ## X-Date), lues
+--  depuis celui-ci. Ne pas les recopier ici : c'est ce qui a laisse le
+--  .toc annoncer une version pendant que l'addon en affichait une autre.
 -- ============================================================
 
 -- ns: table shared by every file of the addon.
 -- The lang\*.lua files register their translations in it before
 -- this file is loaded (see the .toc order).
 local addonName, ns = ...
-local addonVersion = "v1.7.2"
-local lastUpdate   = "12/08/2026"
+
+-- Single source of truth for both: the .toc. C_AddOns.GetAddOnMetadata is the
+-- modern entry point, the bare global having been removed in 11.0 - the
+-- fallback only covers a client older than every interface this addon targets.
+local GetMeta      = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
+local addonVersion = GetMeta(addonName, "Version") or "?"
+local lastUpdate   = GetMeta(addonName, "X-Date")  or "?"
 
 -- Libs
 local HBD     = LibStub("HereBeDragons-2.0")
@@ -55,6 +62,8 @@ local RefreshAllPins
 local RefreshWorldMapPins
 local OpenDebugCopyPopup
 local RecordStat
+local RecordNodeStat
+local GetNodeStat
 local OpenExportPopup
 local OpenImportPopup
 
@@ -256,7 +265,9 @@ local QUALITY_COLORS = {
     [6] = "ffe6cc80",  -- Beige
 }
 
--- Craft tier icon textures (tier 1 and 2)
+-- Gathering reagent tier icons: the silver diamond and the gold pentagon.
+-- "quality12" is the 1-of-2 set, which is all gathered reagents ever have -
+-- the five-tier set belongs to crafting reagents and does not apply here.
 local TIER_TEXTURES = {
     [1] = "Interface\\Professions\\professionsquality12tier1.blp",
     [2] = "Interface\\Professions\\professionsquality12tier2.blp",
@@ -840,9 +851,159 @@ end
 -- PINS & TOOLTIPS
 -- ============================================================
 
-local function CreatePoint(nodeData, isMinimap)
+-- Identity of a node inside the per-node statistics store. Built from the
+-- coordinates ALREADY STORED on the node, never from the player's position at
+-- harvest time: the proximity merge at record time refreshes a node's name and
+-- loot but never its x/y, so those stay a fixed anchor for the life of the
+-- entry. The raw type is kept in the key (a rich vein is its own database
+-- entry), while the entry itself stores the type stripped of its R suffix,
+-- which is the granularity the summary groups on.
+local function NodeStatKey(node)
+    return string.format("%s:%.4f:%.4f", node.type or "?", node.x or 0, node.y or 0)
+end
+
+-- Gathering reagent tiers. Each tier is its OWN itemID in retail, so the
+-- statistics store already tells them apart on its own; the icon is what tells
+-- the READER, since every tier of a reagent carries the same name.
+--
+-- One size and one crop for every tier icon, in every list. Hardcoding either
+-- at each call site is what let them drift apart between the tooltip and the
+-- zone summary. The crop matches the one the floating harvest text applies to
+-- these same files.
+local TIER_ICON_SIZE = 16
+local TIER_TEXCOORD  = { 0.078, 0.094, 0.898, 0.930 }
+
+local function ItemTier(itemID)
+    local r = C_TradeSkillUI and C_TradeSkillUI.GetItemReagentQualityByItemInfo
+              and C_TradeSkillUI.GetItemReagentQualityByItemInfo(itemID)
+    return (r and r > 0) and r or 0
+end
+
+
+-- Item name for display. The live client cache first (it is localized), then
+-- the name captured at harvest time, which is all a cold cache leaves us.
+local function StatItemName(itemID)
+    local n = GetItemInfo(itemID)
+    if n then return n end
+    local cached = FarmMapStatsDB and FarmMapStatsDB.itemNames
+    return (cached and cached[itemID]) or ("#" .. tostring(itemID))
+end
+
+-- Quantities as a list ordered by descending amount, so the tooltip and the
+-- zone summary always print the same item in the same place. pairs() alone
+-- would reshuffle the lines between two openings.
+local function SortedItemList(items)
+    local list = {}
+    for id, qty in pairs(items or {}) do
+        -- The tier is resolved once here and carried on the row: the comparator
+        -- runs O(n log n) times and the display reads it again, so querying the
+        -- API at either point would repeat the same lookup for nothing.
+        list[#list + 1] = { id = id, qty = qty, tier = ItemTier(id) }
+    end
+    -- Tiered items first, untiered underneath. Then by name, which groups the
+    -- tiers of one reagent since they all share it, and finally by id, which
+    -- runs in tier order. Sorting by quantity would scatter those tiers across
+    -- the whole list.
+    table.sort(list, function(a, b)
+        local ra = (a.tier > 0) and 0 or 1
+        local rb = (b.tier > 0) and 0 or 1
+        if ra ~= rb then return ra < rb end
+        local na, nb = StatItemName(a.id), StatItemName(b.id)
+        if na ~= nb then return na < nb end
+        return a.id < b.id
+    end)
+    return list
+end
+
+-- Tier rows inside the node tooltip. NOT a second frame: the lines belong to
+-- GameTooltip, we only take over their geometry.
+--
+-- The recipe is the floating harvest text's, and the reason it works is that
+-- the icon is SMALLER than the box holding it and both are centred on that box:
+-- the tooltip line is forced to 20px, its own FontString is centred inside it,
+-- and the 16px icon is anchored to that same FontString. Left alone, a tooltip
+-- line is only as tall as its glyphs and the icon can only ride the baseline -
+-- which is why no offset ever brought the two level.
+local TIP_LINE_H = 20
+local TIP_INDENT = "      "   -- blank run reserving the icon's column
+
+local tierIcons   = {}
+local touchedRows = {}
+
+-- GameTooltip FontStrings are global and shared with every other tooltip in the
+-- game, so the forced height MUST be handed back or every later tooltip inherits
+-- 20px lines.
+local function ResetTooltipRows()
+    for _, i in ipairs(touchedRows) do
+        local fs = _G["GameTooltipTextLeft" .. i]
+        if fs then fs:SetHeight(0) end
+        if tierIcons[i] then tierIcons[i]:Hide() end
+    end
+    wipe(touchedRows)
+end
+
+local tooltipHooked = false
+
+local function AddTierRow(text, tier)
+    if not tooltipHooked then
+        GameTooltip:HookScript("OnHide", ResetTooltipRows)
+        tooltipHooked = true
+    end
+
+    GameTooltip:AddLine(TIP_INDENT .. text, 1, 1, 1)
+
+    local i  = GameTooltip:NumLines()
+    local fs = _G["GameTooltipTextLeft" .. i]
+    if not fs then return end
+    fs:SetHeight(TIP_LINE_H)
+    fs:SetJustifyV("MIDDLE")
+    touchedRows[#touchedRows + 1] = i
+
+    local tex = tier and tier > 0 and TIER_TEXTURES[tier]
+    if not tex then return end
+
+    local icon = tierIcons[i]
+    if not icon then
+        icon = GameTooltip:CreateTexture(nil, "OVERLAY")
+        icon:SetSize(TIER_ICON_SIZE, TIER_ICON_SIZE)
+        icon:SetTexCoord(unpack(TIER_TEXCOORD))
+        tierIcons[i] = icon
+    end
+    icon:SetTexture(tex)
+    icon:ClearAllPoints()
+    icon:SetPoint("LEFT", fs, "LEFT", 0, 0)
+    icon:Show()
+end
+
+-- Base edge of a pin, in pixels, before the player's size setting is applied.
+local PIN_BASE_SIZE = 16
+
+-- Every world map pin currently handed to HBDPins. The size slider walks this
+-- list to resize the pins in place: HBDPins anchors our icon CENTER-on-CENTER
+-- to its own pin frame, so a resized icon stays exactly on its coordinate and
+-- no refresh is needed. Rebuilding the pins instead would recreate thousands
+-- of frames on every step of the slider.
+local activeWorldPins = {}
+
+-- Dropping the pins and forgetting them has to happen together, or the list
+-- keeps resizing frames HBDPins has already released. Every removal goes
+-- through here for that reason.
+local function ClearWorldMapPins()
+    HBDPins:RemoveAllWorldMapIcons(addonName)
+    wipe(activeWorldPins)
+end
+
+local function CreatePoint(nodeData, isMinimap, mapID)
     local f = CreateFrame("Frame", nil, nil)
-    f:SetSize(16, 16)
+    if isMinimap then
+        f:SetSize(PIN_BASE_SIZE, PIN_BASE_SIZE)
+    else
+        -- World map only: the minimap keeps its native size, which is what the
+        -- request asked for.
+        local size = PIN_BASE_SIZE * (FarmMapDB and FarmMapDB.worldPinScale or 1.0)
+        f:SetSize(size, size)
+        activeWorldPins[#activeWorldPins + 1] = f
+    end
     f:EnableMouse(true)
 
     f.tex = f:CreateTexture(nil, "OVERLAY")
@@ -908,7 +1069,28 @@ local function CreatePoint(nodeData, isMinimap)
         if expText and nodeData.type ~= "Bois" then
             GameTooltip:AddLine(L.EXPANSION .. " : " .. expText, 0.4, 0.6, 1)
         end
-        if nodeData.items and #nodeData.items > 0 then
+        -- The loot list, in one of two forms - never both, or the same item
+        -- names would be printed twice.
+        --
+        -- Checked: the harvest history, one line per item AND per tier, since
+        -- each tier is its own itemID. It is a superset of the plain list, with
+        -- the tier and the amount taken here on top.
+        --
+        -- Unchecked: the plain list the node has always shown.
+        --
+        -- Recording never depends on this box - only the display does. The
+        -- counters keep adding up while it is off, so ticking it later reveals
+        -- a full history instead of an empty one, and nothing ever resets.
+        local st = FarmMapDB and FarmMapDB.showNodeItemStats
+                   and GetNodeStat and GetNodeStat(mapID, nodeData)
+        local rows = st and st.it and SortedItemList(st.it) or nil
+
+        if rows and #rows > 0 then
+            GameTooltip:AddLine(" ")
+            for _, it in ipairs(rows) do
+                AddTierRow(StatItemName(it.id) .. "  |cffffffffx" .. it.qty .. "|r", it.tier)
+            end
+        elseif nodeData.items and #nodeData.items > 0 then
             GameTooltip:AddLine(" ")
             local seen = {}
             for idx, item in ipairs(nodeData.items) do
@@ -924,6 +1106,7 @@ local function CreatePoint(nodeData, isMinimap)
                 end
             end
         end
+
         GameTooltip:Show()
     end)
     f:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1033,7 +1216,7 @@ local function BatchAddMinimapPins(list, index)
     local limit = math.min(index + MINIMAP_BATCH - 1, #list)
     for i = index, limit do
         local e = list[i]
-        HBDPins:AddMinimapIconMap(addonName, CreatePoint(e.node, true), e.mapID, e.node.x, e.node.y, true)
+        HBDPins:AddMinimapIconMap(addonName, CreatePoint(e.node, true, e.mapID), e.mapID, e.node.x, e.node.y, true)
     end
     if limit < #list then
         C_Timer.After(0, function() BatchAddMinimapPins(list, limit + 1) end)
@@ -1044,7 +1227,7 @@ local function BatchAddWorldMapPins(list, index)
     local limit = math.min(index + BATCH_SIZE - 1, #list)
     for i = index, limit do
         local e = list[i]
-        HBDPins:AddWorldMapIconMap(addonName, CreatePoint(e.node, false), e.mapID, e.node.x, e.node.y)
+        HBDPins:AddWorldMapIconMap(addonName, CreatePoint(e.node, false, e.mapID), e.mapID, e.node.x, e.node.y)
     end
     if limit < #list then
         C_Timer.After(0, function() BatchAddWorldMapPins(list, limit + 1) end)
@@ -1052,10 +1235,21 @@ local function BatchAddWorldMapPins(list, index)
 end
 
 RefreshWorldMapPins = function()
-    HBDPins:RemoveAllWorldMapIcons(addonName)
+    ClearWorldMapPins()
     if not WorldMapFrame:IsShown() then return end
     local list = CollectVisibleNodes()
     if #list > 0 then BatchAddWorldMapPins(list, 1) end
+end
+
+-- Node icon size, asked for by Crazyyoungs. Resizes the live pins instead of
+-- rebuilding them: the slider steps by 0.1, so this runs a handful of times
+-- over a whole drag, and the player sees the new size while still dragging.
+-- Exposed as a global for the options panel, like FarmMap_ApplyFilterBarScale.
+function FarmMap_ApplyWorldPinScale()
+    local size = PIN_BASE_SIZE * (FarmMapDB and FarmMapDB.worldPinScale or 1.0)
+    for _, pin in ipairs(activeWorldPins) do
+        pin:SetSize(size, size)
+    end
 end
 
 local function DoRefresh()
@@ -1466,6 +1660,9 @@ local function ProcessHarvestLoot()
 
     FarmMapDB[mapID] = FarmMapDB[mapID] or {}
     local isUpdated = false
+    -- The node this harvest belongs to, merged or freshly inserted. The
+    -- per-node statistics need that identity, and only this block knows it.
+    local targetNode = nil
     for _, existingNode in ipairs(FarmMapDB[mapID]) do
         if existingNode.type == foundType and
            math.abs(existingNode.x - pos.x) + math.abs(existingNode.y - pos.y) < 0.003 then
@@ -1492,6 +1689,7 @@ local function ProcessHarvestLoot()
                 existingNode.itemIDs = lootItemIDs
             end
             isUpdated = true
+            targetNode = existingNode
             break
         end
     end
@@ -1506,20 +1704,22 @@ local function ProcessHarvestLoot()
             locale  = gameLocale,
         }
         table.insert(FarmMapDB[mapID], node)
+        targetNode = node
         if ShouldShowNode(foundType) then
             local mmStyle = FarmMapDB.minimapStyle
             local ext     = FarmMapStyles.Get(mmStyle)
             local useBlip = HAS_NATIVE_BLIP and FarmMapDB.replaceBlip and ((ext and ext.blip) or BLIP_TEXTURES[mmStyle])
             if not useBlip and FarmMapDB.showMinimapPins ~= false then
-                HBDPins:AddMinimapIconMap(addonName, CreatePoint(node, true), mapID, pos.x, pos.y, true)
+                HBDPins:AddMinimapIconMap(addonName, CreatePoint(node, true, mapID), mapID, pos.x, pos.y, true)
             end
-            HBDPins:AddWorldMapIconMap(addonName, CreatePoint(node, false), mapID, pos.x, pos.y)
+            HBDPins:AddWorldMapIconMap(addonName, CreatePoint(node, false, mapID), mapID, pos.x, pos.y)
         end
     else
         RefreshAllPins()
     end
 
     RecordStat(foundType)
+    RecordNodeStat(mapID, targetNode, lootItemIDs, lootItems, lootQuantities)
     ShowFloatingLoot(lootItems, lootItemIDs, lootQuantities)
 end
 
@@ -1534,6 +1734,56 @@ RecordStat = function(foundType)
     local statKey = foundType:gsub("R$", "")
     FarmMapStatsDB.counts[statKey] = (FarmMapStatsDB.counts[statKey] or 0) + 1
     if FarmMap_RefreshStats then FarmMap_RefreshStats() end
+end
+
+-- Per-node harvest history, added for the zone summary. Deliberately kept in
+-- FarmMapStatsDB and NOT on the node itself: FarmMapDB is what the export and
+-- import features hand around between players, so personal counters living
+-- there would leak into every export and be overwritten by every import.
+--
+-- Purely additive - counts above keeps its lifetime totals untouched and the
+-- existing statistics panel keeps working, so there is nothing to migrate.
+RecordNodeStat = function(mapID, node, itemIDs, itemNames, quantities)
+    if not (mapID and node) then return end
+    FarmMapStatsDB           = FarmMapStatsDB           or { counts = {} }
+    FarmMapStatsDB.byNode    = FarmMapStatsDB.byNode    or {}
+    FarmMapStatsDB.itemNames = FarmMapStatsDB.itemNames or {}
+
+    local zone = FarmMapStatsDB.byNode[mapID]
+    if not zone then
+        zone = {}
+        FarmMapStatsDB.byNode[mapID] = zone
+    end
+
+    local key   = NodeStatKey(node)
+    local entry = zone[key]
+    if not entry then
+        entry = { t = (node.type or ""):gsub("R$", ""), n = 0, it = {} }
+        zone[key] = entry
+    end
+    entry.n = entry.n + 1
+
+    for i, id in ipairs(itemIDs or {}) do
+        if id and id > 0 then
+            -- Quantity defaults to 1: GetLootSlotInfo leaves it nil on a single
+            -- item, and dropping those would undercount the most common case.
+            local qty = (quantities and quantities[i]) or 1
+            entry.it[id] = (entry.it[id] or 0) + qty
+            -- Names live once in a shared dictionary rather than on every node:
+            -- the same ore appears on thousands of them, and GetItemInfo returns
+            -- nil on a cold cache - exactly when the summary would otherwise
+            -- have nothing to print.
+            if itemNames and itemNames[i] and not FarmMapStatsDB.itemNames[id] then
+                FarmMapStatsDB.itemNames[id] = itemNames[i]
+            end
+        end
+    end
+end
+
+GetNodeStat = function(mapID, node)
+    if not (mapID and node) then return nil end
+    local zone = FarmMapStatsDB and FarmMapStatsDB.byNode and FarmMapStatsDB.byNode[mapID]
+    return zone and zone[NodeStatKey(node)] or nil
 end
 
 -- ============================================================
@@ -1697,6 +1947,246 @@ end
 -- BOUTONS FILTRES (carte du monde)
 -- ============================================================
 
+-- ============================================================
+-- RESUME DE ZONE
+-- ============================================================
+
+local SUMMARY_TYPES = { "Herbo", "Minage", "Peche", "Bois" }
+
+local function TypeHex(t)
+    local c = TYPE_COLORS[t]
+    if not c then return "ffffff" end
+    return string.format("%02x%02x%02x", c[1] * 255, c[2] * 255, c[3] * 255)
+end
+
+-- Maps whose statistics belong to the one currently displayed: itself plus
+-- every descendant. Nodes are always recorded against a zone map, so a
+-- continent or a city with sub-levels would otherwise summarize to zero.
+local function RelevantMapIDs(mapID)
+    local ids = { [mapID] = true }
+    local children = C_Map and C_Map.GetMapChildrenInfo and C_Map.GetMapChildrenInfo(mapID, nil, true)
+    for _, info in ipairs(children or {}) do
+        if info.mapID then ids[info.mapID] = true end
+    end
+    return ids
+end
+
+-- Gathered counts come from the statistics store, never from the node list:
+-- deleting a pin through its right-click menu then drops the pin without
+-- erasing the harvests it produced.
+local function BuildZoneSummary(mapID)
+    local ids      = RelevantMapIDs(mapID)
+    local gathered = { byType = {}, items = {}, total = 0 }
+    local known    = { byType = {}, total = 0 }
+
+    local store = FarmMapStatsDB and FarmMapStatsDB.byNode
+    if store then
+        for id in pairs(ids) do
+            for _, e in pairs(store[id] or {}) do
+                local t = e.t or "?"
+                local n = e.n or 0
+                gathered.byType[t] = (gathered.byType[t] or 0) + n
+                gathered.total     = gathered.total + n
+                for itemID, qty in pairs(e.it or {}) do
+                    gathered.items[itemID] = (gathered.items[itemID] or 0) + qty
+                end
+            end
+        end
+    end
+
+    if FarmMapDB then
+        for id in pairs(ids) do
+            local nodes = FarmMapDB[id]
+            if type(nodes) == "table" then
+                for _, node in ipairs(nodes) do
+                    if type(node) == "table" and node.type then
+                        local t = node.type:gsub("R$", "")
+                        known.byType[t] = (known.byType[t] or 0) + 1
+                        known.total     = known.total + 1
+                    end
+                end
+            end
+        end
+    end
+
+    return gathered, known
+end
+
+-- Row descriptors, not a formatted string. The icon must NOT be baked into the
+-- text: an inline |T escape is laid out by the font engine, so the very same
+-- texture came out a different size depending on the words next to it. A real
+-- Texture on its own row is immune to that.
+local function BuildZoneSummaryRows(mapID)
+    local gathered, known = BuildZoneSummary(mapID)
+    local rows = {}
+    local function add(text, tier, indent)
+        rows[#rows + 1] = { text = text, tier = tier, indent = indent }
+    end
+    local function typeLines(src)
+        for _, t in ipairs(SUMMARY_TYPES) do
+            local n = src.byType[t] or 0
+            if n > 0 then
+                add(string.format("|cff%s%s|r : |cffffffff%d|r", TypeHex(t), L["TYPE_" .. t] or t, n), 0, true)
+            end
+        end
+        add(string.format("%s : |cffffffff%d|r", L.ZONE_TOTAL, src.total), 0, true)
+    end
+
+    add("|cffffd100" .. L.ZONE_GATHERED .. "|r", 0, false)
+    if gathered.total == 0 then
+        add("|cff888888" .. L.ZONE_EMPTY .. "|r", 0, true)
+    else
+        typeLines(gathered)
+        add(" ", 0, false)
+        add("|cffffd100" .. L.ZONE_RESOURCES .. "|r", 0, false)
+        for _, it in ipairs(SortedItemList(gathered.items)) do
+            add(string.format("%s |cffffffffx%d|r", StatItemName(it.id), it.qty), it.tier, true)
+        end
+    end
+
+    add(" ", 0, false)
+    add("|cffffd100" .. L.ZONE_KNOWN .. "|r", 0, false)
+    typeLines(known)
+
+    return rows
+end
+
+local zoneFrame
+local FONT_WIDTH = 330
+
+local ROW_HEIGHT = 18
+local ROW_INDENT = 10
+local ICON_GAP   = 4
+
+-- Rows are pooled and reused: the player can flip through maps quickly, and a
+-- fresh frame per resource on every pass would pile up frames, which WoW never
+-- reclaims.
+local function AcquireRow(index)
+    local pool = zoneFrame.rows
+    local r    = pool[index]
+    if r then return r end
+
+    r = CreateFrame("Frame", nil, zoneFrame.content)
+    r:SetSize(FONT_WIDTH, ROW_HEIGHT)
+
+    r.icon = r:CreateTexture(nil, "ARTWORK")
+    r.icon:SetSize(TIER_ICON_SIZE, TIER_ICON_SIZE)
+    r.icon:SetTexCoord(unpack(TIER_TEXCOORD))
+    r.icon:SetPoint("LEFT", r, "LEFT", ROW_INDENT, 0)
+
+    r.text = r:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    r.text:SetJustifyH("LEFT")
+    -- Height set explicitly, then centred inside it - the same pairing the
+    -- floating harvest text uses. Left to size itself, a FontString is only as
+    -- tall as its glyphs, and its box includes the descender space, so its
+    -- middle sits below the visual middle of the line and the text rides above
+    -- the icon anchored beside it.
+    r.text:SetHeight(ROW_HEIGHT)
+    r.text:SetJustifyV("MIDDLE")
+    -- Three points up from the template, as asked. Derived from the font the
+    -- template resolved rather than hardcoded, so the CJK and Cyrillic faces
+    -- keep theirs, raised by the same amount.
+    local fp, fs, ff = r.text:GetFont()
+    if fp then r.text:SetFont(fp, (fs or 10) + 3, ff) end
+
+    pool[index] = r
+    return r
+end
+
+local function RefreshZoneSummary()
+    if not (zoneFrame and zoneFrame:IsShown()) then return end
+    local mapID = WorldMapFrame and WorldMapFrame:GetMapID()
+    if not mapID then return end
+    local info = C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(mapID)
+    zoneFrame.title:SetText((info and info.name) or L.ZONE_SUMMARY_TITLE)
+
+    local rows = BuildZoneSummaryRows(mapID)
+    for i, data in ipairs(rows) do
+        local r   = AcquireRow(i)
+        local tex = data.tier and data.tier > 0 and TIER_TEXTURES[data.tier]
+        r:ClearAllPoints()
+        r:SetPoint("TOPLEFT", zoneFrame.content, "TOPLEFT", 0, -(i - 1) * ROW_HEIGHT)
+
+        r.icon:SetShown(tex and true or false)
+        if tex then r.icon:SetTexture(tex) end
+
+        r.text:ClearAllPoints()
+        local x = tex and (ROW_INDENT + TIER_ICON_SIZE + ICON_GAP) or (data.indent and ROW_INDENT or 0)
+        r.text:SetPoint("LEFT", r, "LEFT", x, 0)
+        r.text:SetText(data.text)
+        r:Show()
+    end
+    for i = #rows + 1, #zoneFrame.rows do zoneFrame.rows[i]:Hide() end
+
+    zoneFrame.content:SetSize(FONT_WIDTH, math.max(#rows * ROW_HEIGHT + 8, 10))
+end
+
+local function ToggleZoneSummary()
+    if zoneFrame then
+        if zoneFrame:IsShown() then zoneFrame:Hide() else zoneFrame:Show() ; RefreshZoneSummary() end
+        return
+    end
+
+    local f = CreateFrame("Frame", "FarmMapZoneSummary", UIParent, "BackdropTemplate")
+    f:SetSize(380, 440)
+    f:SetPoint("CENTER")
+    f:SetFrameStrata("DIALOG")
+    f:SetBackdrop({
+        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 },
+    })
+    f:SetMovable(true)
+    f:SetClampedToScreen(true)
+    f:EnableMouse(true)
+
+    local titleBar = CreateFrame("Frame", nil, f)
+    titleBar:SetPoint("TOPLEFT", 4, -4)
+    titleBar:SetPoint("TOPRIGHT", -4, -4)
+    titleBar:SetHeight(24)
+    titleBar:EnableMouse(true)
+    titleBar:RegisterForDrag("LeftButton")
+    titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
+    titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
+
+    f.title = f:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    f.title:SetPoint("TOP", 0, -12)
+
+    local sub = f:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    sub:SetPoint("TOP", f.title, "BOTTOM", 0, -4)
+    sub:SetText("|cffaaaaaa" .. L.ZONE_SUMMARY_TITLE .. "|r")
+
+    local sf = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
+    sf:SetPoint("TOPLEFT", 14, -62)
+    sf:SetPoint("BOTTOMRIGHT", -32, 42)
+
+    local content = CreateFrame("Frame", nil, sf)
+    content:SetSize(FONT_WIDTH, 10)
+    sf:SetScrollChild(content)
+
+    f.content = content
+    f.rows    = {}
+
+    local close = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    close:SetSize(90, 22)
+    close:SetPoint("BOTTOM", 0, 12)
+    close:SetText(L.CLOSE or "Fermer")
+    FitButton(close)
+    close:SetScript("OnClick", function() f:Hide() end)
+
+    zoneFrame = f
+    RefreshZoneSummary()
+
+    -- Follows the map the player is looking at. OnMapChanged is the modern hook;
+    -- the guard keeps an older client from erroring out instead of just not
+    -- auto-refreshing.
+    if WorldMapFrame and WorldMapFrame.OnMapChanged then
+        hooksecurefunc(WorldMapFrame, "OnMapChanged", RefreshZoneSummary)
+    end
+    WorldMapFrame:HookScript("OnHide", function() if zoneFrame then zoneFrame:Hide() end end)
+end
+
 local function CreateFilterButtons()
     local DEFAULT_INSET = { l=3, r=-3, t=-3, b=3 }
     local ICON_INSETS = {
@@ -1706,11 +2196,13 @@ local function CreateFilterButtons()
         Bois   = { l=3, r=-3, t=-1, b=5 },
     }
 
-    -- The four buttons live inside a container: it is what the player drags and
+    -- The buttons live inside a container: it is what the player drags and
     -- what fades out. Its default anchor reproduces the historical layout to the
     -- pixel (first button centred 20px above the map's left edge midpoint).
-    -- 4 buttons of 32 + 3 gaps of 4 = 140.
-    local BAR_THICK, BAR_LONG  = 32, 140
+    -- 5 buttons of 32 + 4 gaps of 4 = 176. The strip grows from its LEFT anchor,
+    -- which is the point saved positions are expressed against, so adding the
+    -- summary button leaves every already-saved bar exactly where it was.
+    local BAR_THICK, BAR_LONG  = 32, 176
     local BAR_DEF_X, BAR_DEF_Y = 8, -34
 
     local bar = CreateFrame("Frame", "FarmMapFilterBar", UIParent)
@@ -1810,6 +2302,23 @@ local function CreateFilterButtons()
     local btnPeche  = MakeButton("FarmMapBtnPeche",  "Peche")
     local btnBois   = MakeButton("FarmMapBtnBois",   "Bois")
 
+    -- Zone summary. Built by hand rather than through MakeButton: that helper
+    -- reads its texture from the node style packs, and this button stands for no
+    -- node type. It joins orderedBtns so LayoutBar places it like the others and
+    -- the horizontal/vertical flip keeps working, but stays out of allBtns, whose
+    -- entries are all filter toggles.
+    local btnStats = CreateFrame("Button", "FarmMapBtnStats", bar, "BackdropTemplate")
+    btnStats:SetSize(32, 32)
+    btnStats:SetBackdrop({bgFile="Interface\\ChatFrame\\ChatFrameBackground", edgeFile="Interface\\Tooltips\\UI-Tooltip-Border", tile=true, tileSize=16, edgeSize=16, insets={left=2,right=2,top=2,bottom=2}})
+    btnStats:SetBackdropColor(0, 0, 0, 0.8)
+    btnStats:SetBackdropBorderColor(0.8, 0.7, 0.2, 1)
+    local statsTex = btnStats:CreateTexture(nil, "ARTWORK")
+    statsTex:SetPoint("TOPLEFT",     btnStats, "TOPLEFT",      4, -4)
+    statsTex:SetPoint("BOTTOMRIGHT", btnStats, "BOTTOMRIGHT", -4,  4)
+    statsTex:SetTexture("Interface\\ICONS\\INV_Misc_Note_01")
+    btnStats.tex = statsTex
+    orderedBtns[#orderedBtns + 1] = btnStats
+
     LayoutBar()
 
     local allBtns = {
@@ -1828,7 +2337,7 @@ local function CreateFilterButtons()
     end)
     WorldMapFrame:HookScript("OnHide", function()
         bar:Hide()
-        HBDPins:RemoveAllWorldMapIcons(addonName)
+        ClearWorldMapPins()
     end)
 
     -- Fade out when the cursor is elsewhere. Alpha does not affect hit testing,
@@ -1910,6 +2419,40 @@ local function CreateFilterButtons()
             SaveBarPosition()
         end)
     end
+
+    btnStats:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:ClearLines()
+        GameTooltip:AddLine("FarmMap - " .. L.ZONE_SUMMARY_TITLE, 1, 0.82, 0)
+        GameTooltip:AddLine(L.ZONE_BUTTON_HINT, 1, 1, 1)
+        GameTooltip:AddLine(L.FILTERBAR_DRAG_HINT, 0.7, 0.7, 0.7)
+        GameTooltip:AddLine(L.FILTERBAR_FLIP_HINT, 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    btnStats:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    btnStats:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    btnStats:SetScript("OnClick", function(self, button)
+        if button == "RightButton" then
+            if IsShiftKeyDown() then
+                FarmMapDB.filterBarHorizontal = not FarmMapDB.filterBarHorizontal
+                LayoutBar()
+            end
+            return
+        end
+        ToggleZoneSummary()
+    end)
+    btnStats:RegisterForDrag("LeftButton")
+    btnStats:SetScript("OnDragStart", function()
+        if not IsShiftKeyDown() then return end
+        bar.moving = true
+        bar:StartMoving()
+    end)
+    btnStats:SetScript("OnDragStop", function()
+        if not bar.moving then return end
+        bar.moving = nil
+        bar:StopMovingOrSizing()
+        SaveBarPosition()
+    end)
 
     FarmMap_UpdateFilterButtons = UpdateButtons
     FarmMap_ResetFilterBar = function()
@@ -2145,18 +2688,21 @@ local function CreateOptions()
             language         = FarmMapDB.language,
             showFloatingText = FarmMapDB.showFloatingText,
             showProfit       = FarmMapDB.showProfit,
+            showFloatTier    = FarmMapDB.showFloatTier,
+            showNodeItemStats = FarmMapDB.showNodeItemStats,
             -- Same reasoning for the filter bar: emptying the nodes must not
             -- send it back to its default corner.
             filterBarPos     = FarmMapDB.filterBarPos,
             filterBarAlpha   = FarmMapDB.filterBarAlpha,
             filterBarHorizontal = FarmMapDB.filterBarHorizontal,
             filterBarScale   = FarmMapDB.filterBarScale,
+            worldPinScale    = FarmMapDB.worldPinScale,
             -- Position and visibility of the minimap button: clearing the node
             -- database must not move the button back.
             minimapIcon      = FarmMapDB.minimapIcon,
         }
         HBDPins:RemoveAllMinimapIcons(addonName)
-        HBDPins:RemoveAllWorldMapIcons(addonName)
+        ClearWorldMapPins()
         print("|cffffd100FarmMap :|r " .. L.DB_CLEARED)
     end)
 
@@ -2292,7 +2838,6 @@ local function CreateOptions()
         FarmMapDB.showFloatingText = self:GetChecked()
         UpdateFloatDependents()
     end)
-    displayPanel:SetScript("OnShow", UpdateFloatDependents)
     UpdateFloatDependents()
 
     -- World map filter bar. Its own section: these settings have nothing to do
@@ -2313,6 +2858,41 @@ local function CreateOptions()
     btnResetBar:SetScript("OnClick", function()
         if FarmMap_ResetFilterBar then FarmMap_ResetFilterBar() end
     end)
+
+    -- Node icons on the world map. Second column on purpose: the left one already
+    -- runs the full height of the settings canvas, and this is the size of the
+    -- pins themselves, not of the filter bar buttons above.
+    local pinTitle = displayPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    pinTitle:SetPoint("TOPLEFT", displayTitle, "TOPLEFT", 304, -34)
+    pinTitle:SetText(L.WORLDPIN_SECTION)
+
+    local sliderPin = MakeSlider(displayPanel, pinTitle, L.WORLDPIN_SIZE, 0.5, 2.0, 0.1, "worldPinScale", "%.1f",
+        function() if FarmMap_ApplyWorldPinScale then FarmMap_ApplyWorldPinScale() end end)
+
+    local checkNodeItems = CreateFrame("CheckButton", "FarmMapNodeItemsCheck", displayPanel, "InterfaceOptionsCheckButtonTemplate")
+    checkNodeItems:SetPoint("TOPLEFT", sliderPin, "BOTTOMLEFT", 0, -4)
+    _G[checkNodeItems:GetName() .. "Text"]:SetText(L.DISPLAY_NODE_ITEMS)
+    checkNodeItems:SetChecked(FarmMapDB and FarmMapDB.showNodeItemStats or false)
+    checkNodeItems:SetScript("OnClick", function(self) FarmMapDB.showNodeItemStats = self:GetChecked() end)
+
+    -- The panel is built once and kept for the session, so a stored value can
+    -- change underneath a widget that never hears about it - a database wipe
+    -- does exactly that. Every box re-reads its setting on show; without this
+    -- one stayed ticked while the setting behind it was gone, and only a double
+    -- toggle put the two back in agreement.
+    displayPanel:SetScript("OnShow", function()
+        checkFloat:SetChecked(FarmMapDB.showFloatingText and true or false)
+        checkTier:SetChecked(FarmMapDB.showFloatTier ~= false)
+        checkProfit:SetChecked(FarmMapDB.showProfit ~= false)
+        checkNodeItems:SetChecked(FarmMapDB.showNodeItemStats and true or false)
+        UpdateFloatDependents()
+    end)
+
+    local nodeItemsHint = displayPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    nodeItemsHint:SetPoint("TOPLEFT", checkNodeItems, "BOTTOMLEFT", 4, 0)
+    nodeItemsHint:SetWidth(270)
+    nodeItemsHint:SetJustifyH("LEFT")
+    nodeItemsHint:SetText("|cffaaaaaa" .. L.DISPLAY_NODE_ITEMS_HINT .. "|r")
 
     Settings.RegisterCanvasLayoutSubcategory(category, displayPanel, L.DISPLAY_SECTION)
 
@@ -2864,6 +3444,10 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         -- 100 = the pre-1.7.0 behaviour, so an existing install sees no change.
         if FarmMapDB.filterBarAlpha == nil then FarmMapDB.filterBarAlpha = 100 end
         if FarmMapDB.filterBarScale == nil then FarmMapDB.filterBarScale = 1.0 end
+        if FarmMapDB.worldPinScale  == nil then FarmMapDB.worldPinScale  = 1.0 end
+        -- Off by default, unlike every other display toggle: it is extra noise
+        -- on a tooltip that is already dense, and only a minority will want it.
+        if FarmMapDB.showNodeItemStats == nil then FarmMapDB.showNodeItemStats = false end
         if FarmMapDB.showHerbo    == nil then FarmMapDB.showHerbo    = true end
         if FarmMapDB.showMinage   == nil then FarmMapDB.showMinage   = true end
         if FarmMapDB.showPeche    == nil then FarmMapDB.showPeche    = true end
@@ -3442,19 +4026,22 @@ SlashCmdList["FARMMAP"] = function(msg)
             language         = FarmMapDB.language,
             showFloatingText = FarmMapDB.showFloatingText,
             showProfit       = FarmMapDB.showProfit,
+            showFloatTier    = FarmMapDB.showFloatTier,
+            showNodeItemStats = FarmMapDB.showNodeItemStats,
             -- Same reasoning for the filter bar: emptying the nodes must not
             -- send it back to its default corner.
             filterBarPos     = FarmMapDB.filterBarPos,
             filterBarAlpha   = FarmMapDB.filterBarAlpha,
             filterBarHorizontal = FarmMapDB.filterBarHorizontal,
             filterBarScale   = FarmMapDB.filterBarScale,
+            worldPinScale    = FarmMapDB.worldPinScale,
             -- Position and visibility of the minimap button: clearing the node
             -- database must not move the button back.
             minimapIcon      = FarmMapDB.minimapIcon,
         }
         FarmMapDB = saved
         HBDPins:RemoveAllMinimapIcons(addonName)
-        HBDPins:RemoveAllWorldMapIcons(addonName)
+        ClearWorldMapPins()
         print("|cffffd100FarmMap :|r " .. L.SLASH_CLEAR_CONFIRM)
 
     elseif cmd == "stats" then

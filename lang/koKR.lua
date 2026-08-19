@@ -90,6 +90,17 @@ ns.locales.koKR = {
         FILTERBAR_RESET        = "위치 초기화",
         FILTERBAR_DRAG_HINT    = "Shift+드래그하여 바 이동",
         FILTERBAR_FLIP_HINT    = "Shift+우클릭하여 가로/세로 전환",
+        WORLDPIN_SECTION       = "World map node icons", -- [TRANSLATE]
+        WORLDPIN_SIZE          = "Icon size", -- [TRANSLATE]
+        DISPLAY_NODE_ITEMS     = "Show gathered items per node", -- [TRANSLATE]
+        DISPLAY_NODE_ITEMS_HINT = "Adds the per-tier breakdown to each node tooltip. What a single node rolls is random; the zone summary is where the numbers mean something.", -- [TRANSLATE]
+        ZONE_SUMMARY_TITLE     = "Zone summary", -- [TRANSLATE]
+        ZONE_BUTTON_HINT       = "Click to open the zone summary", -- [TRANSLATE]
+        ZONE_GATHERED          = "Harvests made here", -- [TRANSLATE]
+        ZONE_RESOURCES         = "Resources gathered", -- [TRANSLATE]
+        ZONE_KNOWN             = "Nodes known here", -- [TRANSLATE]
+        ZONE_TOTAL             = "Total", -- [TRANSLATE]
+        ZONE_EMPTY             = "Nothing gathered here yet.", -- [TRANSLATE]
         DELETE_NODE            = "이 노드 삭제",
         DEBUG_SECTION          = "디버그",
 
