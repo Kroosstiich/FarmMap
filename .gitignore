@@ -1,6 +1,7 @@
 # Private working folder — NEVER published.
 # Holds the working notes, the incoming contributions and the packaged builds.
 Claude/
+.codex/
 
 # OS and editor noise
 Thumbs.db

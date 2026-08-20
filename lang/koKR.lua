@@ -31,9 +31,19 @@ ns.locales.koKR = {
     translator = "Crazyyoungs",
     order      = 30,
 
-    -- 선택 사항: 번역 크레딧 아래에 표시될 링크입니다.
-    -- 라벨은 자유 텍스트이며 절대 번역되지 않습니다. enUS.lua 파일을 참조하세요.
-    -- (기계 번역되지 않도록 의도적으로 영어로 남겨두었습니다.)
+    -- 선택사항: 번역가 크레디트 바로 아래 옵션에 표시되는
+    -- 개인 링크입니다. 연락 수단이나 채널 홍보용 등
+    -- 원하시는 용도로 자유롭게 사용하세요.
+    --
+    -- 라벨은 자유 텍스트이며 절대 번역되지 않습니다. "Twitch" 같은
+    -- 브랜드 이름은 어느 언어에서나 동일하게 읽힙니다.
+    --
+    --   contactLabel = "Twitch",  contactValue = "twitch.tv/yourname"
+    --   contactLabel = "Discord", contactValue = "yourname"
+    --   contactLabel = "GitHub",  contactValue = "github.com/yourname"
+    --
+    -- 아무것도 표시하지 않으려면 둘 다 주석 처리해 두세요(기본값). 
+    -- 둘 중 하나만 입력해도 줄이 표시되지 않습니다.
     -- contactLabel = "Twitch",
     -- contactValue = "twitch.tv/yourname",
 
@@ -63,14 +73,19 @@ ns.locales.koKR = {
         CREDITS_TRANSLATOR     = "번역",
         CREDITS_VERSION        = "버전",
         CREDITS_UPDATE         = "최신 업데이트",
+		
+        -- 복사 가능한 크레디트 행(Discord 초대 링크 및 번역가가 
+        -- 직접 입력한 경우 개인 링크). 와우에는 클립보드 API가 없으므로 
+        -- 클릭하면 텍스트만 선택됩니다. 플레이어가 직접 Ctrl+C를 
+        -- 눌러야 하며, CREDITS_COPIED는 복사가 완료되었음을 확인해 줍니다.
         CREDITS_COPY_CLICK     = "클릭하여 복사",
         CREDITS_COPY_KEY       = "Ctrl+C를 눌러 복사",
         CREDITS_COPIED         = "복사되었습니다!",
 
-        DB_SECTION             = "데이터베이스",
-        DB_CLEAR               = "데이터베이스 초기화",
-        DB_CLEARED             = "데이터베이스가 초기화되었습니다.",
-        DB_MIGRATE             = "DB 데이터 최신화",
+        DB_SECTION             = "DB",
+        DB_CLEAR               = "DB 초기화",
+        DB_CLEARED             = "DB 초기화되었습니다.",
+        DB_MIGRATE           = "DB 업데이트",
         DB_MIGRATE_DESC        = "\"최신화\"를 진행하면 데이터를 삭제하지 않고 이전 버전의 데이터를 최신 구조로 수정합니다.",
         DB_EXPORT              = "내보내기",
         DB_IMPORT              = "가져오기",
@@ -90,17 +105,17 @@ ns.locales.koKR = {
         FILTERBAR_RESET        = "위치 초기화",
         FILTERBAR_DRAG_HINT    = "Shift+드래그하여 바 이동",
         FILTERBAR_FLIP_HINT    = "Shift+우클릭하여 가로/세로 전환",
-        WORLDPIN_SECTION       = "World map node icons", -- [TRANSLATE]
-        WORLDPIN_SIZE          = "Icon size", -- [TRANSLATE]
-        DISPLAY_NODE_ITEMS     = "Show gathered items per node", -- [TRANSLATE]
-        DISPLAY_NODE_ITEMS_HINT = "Adds the per-tier breakdown to each node tooltip. What a single node rolls is random; the zone summary is where the numbers mean something.", -- [TRANSLATE]
-        ZONE_SUMMARY_TITLE     = "Zone summary", -- [TRANSLATE]
-        ZONE_BUTTON_HINT       = "Click to open the zone summary", -- [TRANSLATE]
-        ZONE_GATHERED          = "Harvests made here", -- [TRANSLATE]
-        ZONE_RESOURCES         = "Resources gathered", -- [TRANSLATE]
-        ZONE_KNOWN             = "Nodes known here", -- [TRANSLATE]
-        ZONE_TOTAL             = "Total", -- [TRANSLATE]
-        ZONE_EMPTY             = "Nothing gathered here yet.", -- [TRANSLATE]
+        WORLDPIN_SECTION       = "세계 지도 노드 아이콘",
+        WORLDPIN_SIZE          = "아이콘 크기",
+        DISPLAY_NODE_ITEMS     = "노드별 획득 아이템 표시",
+        DISPLAY_NODE_ITEMS_HINT = "각 노드 툴팁에 등급별 세부 내역을 추가합니다. 개별 노드에서 나오는 품목은 무작위이며, 지역 요약에서 수치의 진정한 의미를 확인할 수 있습니다.",
+        ZONE_SUMMARY_TITLE     = "지역 요약",
+        ZONE_BUTTON_HINT       = "클릭하여 지역 요약 열기",
+        ZONE_GATHERED          = "이 지역 채집 횟수",
+        ZONE_RESOURCES         = "획득한 자원",
+        ZONE_KNOWN             = "이 지역의 알려진 노드",
+        ZONE_TOTAL             = "총계",
+        ZONE_EMPTY             = "아직 이 지역에서 채집한 항목이 없습니다.",
         DELETE_NODE            = "이 노드 삭제",
         DEBUG_SECTION          = "디버그",
 
@@ -141,9 +156,9 @@ ns.locales.koKR = {
         TOGGLE_HINT            = "클릭하여 활성화/비활성화",
         EXPANSION              = "확장팩",
 
-        EXPORT_TITLE           = "데이터베이스 내보내기",
+        EXPORT_TITLE           = "DB 내보내기",
         EXPORT_HINT            = " Ctrl+A로 전체 선택 후 Ctrl+C로 복사하세요.",
-        IMPORT_TITLE           = "데이터베이스 가져오기",
+        IMPORT_TITLE           = "DB 가져오기",
         IMPORT_WARN            = "|cffff8800\226\154\160 가져오는 노드는 기존 DB에 병합됩니다.|r",
         IMPORT_BTN             = "가져오기",
         IMPORT_SUCCESS         = "개의 노드를 성공적으로 가져왔습니다.",
@@ -158,45 +173,69 @@ ns.locales.koKR = {
         DEBUG_CLEAR            = "초기화",
         DEBUG_COPY             = "복사",
         DEBUG_COPY_TITLE       = "디버그 로그 복사 (Ctrl+A, Ctrl+C)",
+		
+		-- 명령어당 하나의 키: 나중에 추가된 명령어는 
+        -- 아직 업데이트되지 않은 언어의 경우 목록에서 사라지는 대신 
+        -- 영어로 표시됩니다.
+        SLASH_HELP_TITLE     = "|cffffd100=== FarmMap — 명령어 ===|r",
+        SLASH_CMD_HELP       = "이 도움말 표시",
+        SLASH_CMD_DEBUG      = "디버그 창 표시/숨기기",
+        SLASH_CMD_EXPORT     = "DB 내보내기 창 열기",
+        SLASH_CMD_IMPORT     = "DB 가져오기 창 열기",
+        SLASH_CMD_CLEAR      = "DB 초기화",
+        SLASH_CMD_STATS      = "대화창에 통계 표시",
+        SLASH_CMD_MIGRATE    = "강제 DB 갱신",
+        SLASH_CMD_ATLAS      = "아이콘 아틀라스 보정기 (개발자 도구)",
+        SLASH_CMD_DEFAULT    = "게임 클라이언트 언어로 되돌리기",
+        SLASH_CMD_VERSION    = "애드온 버전 표시",
 
-        SLASH_HELP_TITLE       = "|cffffd100=== FarmMap - 명령어 ===|r",
-        SLASH_CMD_HELP         = "이 도움말 표시",
-        SLASH_CMD_DEBUG        = "디버그 창 표시/숨기기",
-        SLASH_CMD_EXPORT       = "DB 내보내기 창 열기",
-        SLASH_CMD_IMPORT       = "DB 가져오기 창 열기",
-        SLASH_CMD_CLEAR        = "데이터베이스 초기화",
-        SLASH_CMD_STATS        = "채팅창에 채집 통계 출력",
-        SLASH_CMD_MIGRATE      = "DB 데이터 최신화",
-        SLASH_CMD_ATLAS        = "아이콘 아틀라스 보정기 (개발자 도구)",
-        SLASH_CMD_DEFAULT      = "게임 클라이언트 언어로 돌아가기",
-        SLASH_CMD_VERSION      = "애드온 버전 확인",
+        SLASH_VERSION        = "버전",
+        SLASH_CLEAR_CONFIRM  = "명령어를 통해 DB가 초기화되었습니다.",
+        SLASH_UNKNOWN        = "알 수 없는 명령어입니다. /fm help를 입력하세요.",
+        SLASH_CONFLICT       = "|cffff8800%s님도 /fm 명령어를 사용 중입니다|r - 대신 FarmMap이 |cffffffff%s|r의 응답을 처리합니다.",
+        SLASH_DEFAULT_DONE   = "게임 클라이언트 언어로 재설정되었습니다. 적용하려면 /reload를 입력하세요.",
 
-        SLASH_VERSION          = "버전",
-        SLASH_CLEAR_CONFIRM    = "명령어로 데이터베이스를 초기화했습니다.",
-        SLASH_UNKNOWN          = "알 수 없는 명령어입니다. /fm help 를 입력하세요.",
-        SLASH_CONFLICT         = "|cffff8800%s also uses /fm|r - FarmMap answers to |cffffffff%s|r instead.", -- [TRANSLATE]
+        MIGR_PREFIX          = "FarmMap DB 갱신:",
+        MIGR_DONE            = "DB가 최신 상태입니다.",
+        MIGR_TOTAL           = "DB 갱신 완료 —",
+        MIGR_ENTRIES         = "개의 항목이 수정되었습니다.",
+        UNKNOWN              = "알 수 없음",
+        UNKNOWN_EXP          = "알 수 없음",
 
-        SLASH_DEFAULT_DONE     = "FarmMap 애드온 언어가 한국어로 변경되려면 /reload를 입력하세요.",
+        LANG_SECTION         = "언어",
+        LANG_DESC            = " 강제 언어 설정 (게임 언어보다 우선 적용됩니다). 새로고침이 필요합니다.",
+        LANG_AUTO            = "자동 (시스템)",
+        LANG_RELOAD          = "|cffff8800언어가 변경되었습니다. 적용하려면 /reload를 입력하세요.|r",
+        LANG_THANKS          = "애드온 번역에 기여해 주신 분들께 감사드립니다",
 
-        MIGR_PREFIX            = "FarmMap 업데이트:",
-        MIGR_DONE              = "데이터베이스가 최신 상태입니다.",
-        MIGR_TOTAL             = "DB 업데이트 완료 -",
-        MIGR_ENTRIES           = "개의 항목이 수정되었습니다.",
-        UNKNOWN                = "알 수 없음",
-        UNKNOWN_EXP            = "알 수 없음",
+        PANEL_COLORS         = "색상",
+        PANEL_PACKS          = "팩",
+        PANEL_STATS          = "통계",
+        PACKS_TITLE          = "아이콘 팩",
+        PACKS_DESC           = " 설치된 하위 애드온의 스타일입니다.\n 팩을 선택하면 색상 설정의 활성 프리셋이 비활성화됩니다(그 반대의 경우도 마찬가지).",
+        PACKS_EMPTY          = "|cffaaaaaa 설치된 팩이 없습니다.\n 여기에 팩을 표시하려면 FarmMap_* 하위 애드온을 설치하세요.|r",
 
-        LANG_SECTION           = "언어",
-        LANG_DESC              = " 언어 강제 지정 (게임 클라이언트 언어 무시). 변경 사항을 적용하려면 UI를 다시 불러와야 합니다 (/reload).",
-        LANG_AUTO              = "자동 (기본값)",
-        LANG_RELOAD            = "|cffff8800언어가 변경되었습니다. 적용하려면 /reload 를 입력하세요.|r",
-        LANG_THANKS            = "애드온 번역에 기여해 주신 모든 분께 감사드립니다.",
-
-        PANEL_COLORS           = "색상",
-        PANEL_PACKS            = "팩",
-        PANEL_STATS            = "통계",
-        PACKS_TITLE            = "아이콘 팩",
-        PACKS_DESC             = " 설치된 하위 애드온의 아이콘 스타일입니다.\n 팩을 선택하면 '색상' 탭의 프리셋이 비활성화됩니다 (반대도 마찬가지).",
-        PACKS_EMPTY            = "|cffaaaaaa 설치된 팩이 없습니다.\n 여기에 팩을 표시하려면 FarmMap_* 하위 애드온을 설치하세요.|r",
+        -- 노드 툴팁에 표시되는 확장팩 이름입니다.
+        --
+        -- 의도적으로 주석 처리된 상태로 둡니다. FarmMap은 블리자드가 제공하는
+        -- EXPANSION_NAME<id> 전역 변수를 읽어오며, 이는 모든 게임 클라이언트에
+        -- 이미 번역되어 있습니다. 따라서 한국어 플레이어는 누군가 따로 번역하지 않아도
+        -- 공식 한국어 명칭을 볼 수 있습니다. 여기에 주석을 해제하면 이 언어에서만
+        -- 블리자드의 명칭을 덮어쓰게 되므로, 마음에 들지 않는 표현이 있을 때만
+        -- 해당 줄만 수정하고 나머지는 그대로 두세요.
+        --
+        -- EXP_0  = "클래식",
+        -- EXP_1  = "불타는 성전",
+        -- EXP_2  = "리치 왕의 분노",
+        -- EXP_3  = "대격변",
+        -- EXP_4  = "판다리아의 안개",
+        -- EXP_5  = "드레노어의 전쟁군주",
+        -- EXP_6  = "군단",
+        -- EXP_7  = "격전의 아제로스",
+        -- EXP_8  = "어둠땅",
+        -- EXP_9  = "용군단",
+        -- EXP_10 = "내부 전쟁",
+        -- EXP_11 = "미드나이트",
 
         -- /fm atlas — 아이콘 아틀라스 보정기. 우선순위 낮음: 자체 아이콘
         -- 팩을 제작하는 사용자를 위한 개발자 도구입니다.
