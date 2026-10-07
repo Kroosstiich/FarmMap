@@ -1,11 +1,16 @@
-## Interface: 120100, 120007
+## Interface: 120100, 120007, 16001, 50504, 20506, 11509
+# 16001 = WoW: Forever, 50504 = MoP Classic, 20506 = TBC Anniversary,
+# 11509 = Classic Era (also Season of Discovery and Hardcore).
+# One manifest for every client, as Auctionator does:
+# a separate FarmMap_Camelot.toc would have to repeat the version and the
+# file list below, and drift from this one sooner or later.
 ## Title: FarmMap
 ## Notes: Records the positions of ores, herbs, fish and wood nodes.
 ## Notes-frFR: Enregistre la position des minerais, plantes, poissons et bois.
 ## Notes-zhCN: 记录矿石、草药、鱼和树木节点的位置。
 ## Author: Kroosstii
-## Version: v1.8.3
-## X-Date: 01/09/2026
+## Version: v2.0.0
+## X-Date: 07/10/2026
 ## IconTexture: Interface\AddOns\FarmMap\Textures\icon
 ## SavedVariables: FarmMapDB FarmMapStatsDB
 ## OptionalDeps: Auctionator
@@ -29,5 +34,9 @@ lang\frFR.lua
 lang\koKR.lua
 lang\zhCN.lua
 lang\ruRU.lua
+
+# Expansion of TBC-MoP gathering items, for the Classic clients (generated
+# by tools\make_classic_expansions.py).
+data\ClassicItemExpansion.lua
 
 FarmMap.lua

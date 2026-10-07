@@ -49,8 +49,18 @@ ns.locales.enUS = {
         CREDITS_CREATOR        = "Creator",
         CREDITS_DISCORD        = "Discord",
         CREDITS_TRANSLATOR     = "Translation",
+        -- Game client line. The value is built by the addon: on Retail it is
+        -- the current expansion's name, which Blizzard already translates.
+        -- CLIENT_FOREVER is only there for a language that writes the name of
+        -- WoW: Forever differently.
+        CREDITS_GAME           = "World of Warcraft",
+        CLIENT_FOREVER         = "Forever",
         CREDITS_VERSION        = "Version",
         CREDITS_UPDATE         = "Updated",
+        -- New version notice. FarmMap only learns about an update from another
+        -- player's FarmMap (guild or group): addons have no internet access.
+        VERSION_NOTICE         = "Tell me when a newer version is spotted (guild or group)",
+        UPDATE_AVAILABLE       = "a newer version is available: %s (you have %s). Please update the addon as soon as possible.",
 
         -- Copyable credit rows (the Discord invite, and the translator's
         -- own link if they filled one in). WoW has no clipboard API, so
@@ -86,7 +96,16 @@ ns.locales.enUS = {
         WORLDPIN_SECTION       = "World map node icons",
         WORLDPIN_SIZE          = "Icon size",
         DISPLAY_NODE_ITEMS     = "Show gathered items per node",
-        DISPLAY_NODE_ITEMS_HINT = "Adds the per-tier breakdown to each node tooltip. What a single node rolls is random; the zone summary is where the numbers mean something.",
+        DISPLAY_NODE_ITEMS_HINT = "Adds to each node's tooltip what it has yielded you. The node's own ore or herb is guaranteed; extras (stone, gems...) drop at random.",
+
+        -- Integrations panel: other addons FarmMap works with. Addon names
+        -- themselves (Auctionator) are brands and are never translated.
+        INTEG_SECTION          = "Integrations",
+        INTEG_DESC             = "Other addons FarmMap works with when they are installed. None of them is required.",
+        INTEG_DETECTED         = "detected",
+        INTEG_MISSING          = "not installed",
+        INTEG_AUCTIONATOR_DESC = "Shows what your harvests are worth in the floating text. Prices come from Auctionator's own database: scan the auction house at least once.",
+        INTEG_NEEDS_FLOAT      = "(turn the floating text on in Display)",
         ZONE_SUMMARY_TITLE     = "Zone summary",
         ZONE_BUTTON_HINT       = "Click to open the zone summary",
         ZONE_GATHERED          = "Harvests made here",
@@ -101,7 +120,7 @@ ns.locales.enUS = {
         COLORS_DESC            = " Choose an icon style for the minimap and world map.\n Click a row to select it (golden border = active).",
         MINIMAP_SECTION        = "Minimap",
         REPLACE_BLIP           = "Replace Blizzard atlas",
-        REPLACE_BLIP_DESC      = " Following a recent update, it is no longer possible to\n replace the Blizzard atlas on the minimap. Only the world\n map keeps the custom pins.",
+        REPLACE_BLIP_DESC      = " Since patch 12.0.7, Blizzard no longer lets addons replace\n its atlas on the minimap. FarmMap's pins are drawn on top\n of it instead (option below).",
         SHOW_MINIMAP_PINS      = "Show pins on the minimap",
         SHOW_MINIMAP_BUTTON    = "Show the FarmMap minimap button",
         MINIMAP_BTN_LEFT       = "Left click: open the options",
@@ -109,7 +128,10 @@ ns.locales.enUS = {
         WORLDMAP_SECTION       = "World Map",
         PRESET_BLANK           = "White outline",
         PRESET_VIVID           = "Vivid colors",
-        PRESET_ATLAS           = "Blizzard Atlas",
+        -- Blizzard's own gathering icons, as Retail draws them. A new key
+        -- rather than PRESET_ATLAS: the style no longer reads the game's atlas,
+        -- and the old translations named it after that atlas.
+        PRESET_BLIZZARD        = "WoW Retail",
         PRESET_DEUT            = "Deuteranopia",
         PRESET_PROT            = "Protanopia",
         PRESET_TRIT            = "Tritanopia",
@@ -192,6 +214,13 @@ ns.locales.enUS = {
         PACKS_TITLE            = "Icon Packs",
         PACKS_DESC             = " Styles from installed sub-addons.\n Selecting a pack disables the active preset in Colors (and vice versa).",
         PACKS_EMPTY            = "|cffaaaaaa No packs installed.\n Install a FarmMap_* sub-addon to see packs here.|r",
+        -- Minimap ring styles (Forever and Classic only): a hollow ring around
+        -- the game's own tracking blip.
+        PRESET_RING            = "Classic ring",
+        PRESET_RING_COLOR      = "Classic ring, colors",
+        PACKS_MORE             = "More icon packs are available on CurseForge:",
+        PACKS_COPY_HINT        = "click an address, then Ctrl+C",
+        PACKS_OWN              = "You can also make your own: any addon can add a style with FarmMapStyles.Register.\nSee the README on GitHub.",
 
         -- Expansion names shown in node tooltips.
         --
@@ -202,7 +231,7 @@ ns.locales.enUS = {
         -- Blizzard for this language only, so do it just for the wording you
         -- disagree with, and leave the rest alone.
         --
-        -- EXP_0  = "Classic",
+        -- EXP_0  = "Vanilla",
         -- EXP_1  = "The Burning Crusade",
         -- EXP_2  = "Wrath of the Lich King",
         -- EXP_3  = "Cataclysm",

@@ -19,6 +19,34 @@ local GetMeta      = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
 local addonVersion = GetMeta(addonName, "Version") or "?"
 local lastUpdate   = GetMeta(addonName, "X-Date")  or "?"
 
+-- WoW: Forever (internal name Camelot) runs the Mainline API on vanilla
+-- content. Two signals, because the project ID moved during the beta: builds
+-- before 1.60.1.70205 reported WOW_PROJECT_MAINLINE, later ones report
+-- WOW_PROJECT_CAMELOT (18). The interface band (16xxx) covers both.
+local INTERFACE_VERSION = select(4, GetBuildInfo()) or 0
+local IS_FOREVER = (WOW_PROJECT_CAMELOT ~= nil and WOW_PROJECT_ID == WOW_PROJECT_CAMELOT)
+                   or (INTERFACE_VERSION >= 16000 and INTERFACE_VERSION < 17000)
+
+-- Retail is the only client with Logging, reagent tiers and the 12.0.7 note
+-- about the blip atlas; most "not Retail" differences test IS_RETAIL. Forever
+-- is excluded explicitly because its early builds reported MAINLINE.
+-- Classic covers Era (with Season of Discovery and Hardcore, same client),
+-- TBC Anniversary and MoP Classic: one UI family, one API for what FarmMap
+-- uses (checked in their UI sources on 07/10/2026).
+local IS_RETAIL      = (WOW_PROJECT_ID == WOW_PROJECT_MAINLINE) and not IS_FOREVER
+local IS_CLASSIC     = not IS_RETAIL and not IS_FOREVER
+local IS_CLASSIC_ERA = IS_CLASSIC and WOW_PROJECT_CLASSIC ~= nil and WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
+
+-- C_Item.GetItemInfo is the modern entry point and returns the same values in
+-- the same order. Retail only keeps the bare global through a deprecation shim
+-- (Blizzard_DeprecatedItemScript) that Forever does not ship - checked in its
+-- UI source. Shadowing it here covers every call site in this file at once.
+local GetItemInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
+-- Same story, same shim (Blizzard_DeprecatedItemScript): the bag count in the
+-- floating harvest text. These two are the only globals of that shim FarmMap
+-- uses - checked against the list, keep it that way or alias the newcomer.
+local GetItemCount = (C_Item and C_Item.GetItemCount) or GetItemCount
+
 -- Libs
 local HBD     = LibStub("HereBeDragons-2.0")
 local HBDPins = LibStub("HereBeDragons-Pins-2.0")
@@ -106,7 +134,7 @@ end
 -- Last resort only: resolution goes through the active language file first,
 -- then through Blizzard's global, which is already localized.
 local EXP_FALLBACK = {
-    [0]  = "Classic",       [1]  = "TBC",
+    [0]  = "Vanilla",       [1]  = "TBC",
     [2]  = "WotLK",         [3]  = "Cata",
     [4]  = "MoP",           [5]  = "WoD",
     [6]  = "Legion",        [7]  = "BfA",
@@ -137,10 +165,27 @@ local function ExpansionName(expID)
     local own = loc and loc.strings and rawget(loc.strings, "EXP_" .. expID)
     if type(own) == "string" and own ~= "" then return own end
 
+    -- The base game reads "Vanilla", the name players use for it, on every
+    -- client: Blizzard's own name changes per client ("World of Warcraft" on
+    -- MoP Classic, "Classic" elsewhere). A translator's EXP_0 still wins.
+    if expID == 0 then return EXP_FALLBACK[0] end
+
     local blizzard = _G["EXPANSION_NAME" .. expID]
     if type(blizzard) == "string" and blizzard ~= "" then return blizzard end
 
     return EXP_FALLBACK[expID]
+end
+
+-- Expansion of a gathered item. On Retail, the one GetItemInfo returns. On the
+-- Classic clients that value is unusable - MoP Classic gives 254 ("unknown")
+-- to vanilla herbs and 0 to Pandaria ores - so it comes from our own table,
+-- built from Retail's data (data/ClassicItemExpansion.lua). Not in the table
+-- = vanilla.
+local function ItemExpansionID(itemID, gameExpID)
+    if IS_CLASSIC then
+        return (ns.classicItemExpansion and ns.classicItemExpansion[itemID]) or 0
+    end
+    return gameExpID
 end
 
 -- Skill line IDs used for profession detection
@@ -151,27 +196,47 @@ local PROFESSION_SKILL_IDS = {
 }
 
 -- Harvest spellIDs -> node type
--- Add here the IDs discovered through the [SPELL_RAW] debug output
+-- Add here the IDs reported by the debug window: [SPELL_LEARNED] on Forever,
+-- or the "last spell" of a "[LOOT] no harvest spell" line anywhere.
 local HARVEST_SPELLS = {
     -- Herbo
+        -- Forever and Classic Era (vanilla "Herbalism", confirmed in game 07/10/2026)
+    [2366]   = "Herbo",
+        -- MoP Classic ("Herb Gathering", confirmed in game 07/10/2026)
+    [50300]  = "Herbo",
         -- Midnight
     [471009] = "Herbo",
         -- Classic
     [265819] = "Herbo",
 
     -- Minage
+        -- Forever and Classic Era (vanilla "Mining", confirmed in game 07/10/2026)
+    [2575]   = "Minage",
         -- Midnight
     [471013] = "Minage",
         -- Classic
     [265837] = "Minage",
 
     -- Fishing
+        -- Classic Era (vanilla "Fishing" rank 1, confirmed in game 07/10/2026)
+    [7620]    = "Peche",
     [131474]  = "Peche",
     [131476]  = "Peche",
     [1225292] = "Peche",
 
     -- Logging
     [1239682] = "Bois",
+}
+
+-- Forever only: its gathering spells are vanilla's, whose IDs are not the ones
+-- above and are not known yet. Unknown casts are matched on their NAME instead,
+-- read from these reference spells, the way GatherMate2 does on Classic. The
+-- names come from the client, so they are already localized, and a vanilla
+-- rank change keeps the same name. See ResolveHarvestType.
+local HARVEST_NAME_SOURCES = {
+    [2366] = "Herbo",   -- Herb Gathering
+    [2575] = "Minage",  -- Mining
+    [7620] = "Peche",   -- Fishing
 }
 
 -- RGB colors per type (used for pins and for the UI)
@@ -251,6 +316,60 @@ for presetKey, texPath in pairs(BLIP_TEXTURES) do
         MinageR = { tex = texPath, coords = WORLD_MAP_TEXCOORDS.MinageR },
         HerboR  = { tex = texPath, coords = WORLD_MAP_TEXCOORDS.HerboR  },
         PecheR  = { tex = texPath, coords = WORLD_MAP_TEXCOORDS.PecheR  },
+    }
+end
+
+-- Hollow rings for the minimap, offered on Forever (and later Classic), where
+-- Blizzard's own blips cannot be replaced. A ring sits around the spot where
+-- the game draws its tracking blip: the blip stays visible in its middle, and
+-- the ring alone says "you have harvested here before". Two variants: plain
+-- white, and tinted per resource with TYPE_COLORS.
+--
+-- No added asset: this is the ring a minimap ping expands with, a texture
+-- every client ships. Desaturated, then tinted through the vertex colour.
+-- The extra fields (desaturate, color, size) are read by ApplyPinTexture and
+-- CreatePoint; packs never set them, so nothing changes for them.
+local RING_TEXTURE = "Interface\\Minimap\\UI-Minimap-Ping-Expand"
+-- Just wider than the game's tracking dot, so the ring frames it without
+-- crowding the minimap. 20 was tried first: in game it dwarfed the dots.
+-- 2 px more on MoP Classic, whose tracking dots are bigger: 12 looked too
+-- small around them. Classic Era's dots are much smaller, 12 fits there.
+-- TBC Anniversary follows MoP until someone checks it in game.
+local RING_SIZE    = (IS_CLASSIC and not IS_CLASSIC_ERA) and 14 or 12
+local FULL_COORDS  = { 0, 1, 0, 1 }
+-- Ring tints that differ from TYPE_COLORS. Wood's own orange sits too close
+-- to ore's once reduced to a thin 12 px ring: tested in game, the two read
+-- as the same colour. A pale tan keeps "wood" and stays visible on terrain.
+local RING_TINT_OVERRIDE = {
+    Bois = { 0.95, 0.85, 0.60 },
+}
+BUILTIN_PINS.ring      = {}
+BUILTIN_PINS.ringcolor = {}
+for nodeType, typeColor in pairs(TYPE_COLORS) do
+    local color = RING_TINT_OVERRIDE[nodeType] or typeColor
+    BUILTIN_PINS.ring[nodeType] = {
+        tex = RING_TEXTURE, coords = FULL_COORDS, desaturate = true,
+        color = { 1, 1, 1 }, size = RING_SIZE, centered = true,
+    }
+    BUILTIN_PINS.ringcolor[nodeType] = {
+        tex = RING_TEXTURE, coords = FULL_COORDS, desaturate = true,
+        color = color, size = RING_SIZE, centered = true,
+    }
+end
+
+-- Blizzard's own gathering icons, shipped with FarmMap. The style used to
+-- point at the game's ObjectIconsAtlas, which Blizzard reshuffles: Retail
+-- 12.1.0 moved it again and Forever never matched it. The four icons were cut
+-- out once (Kroosstii's framing, 07/10/2026) into a 128x32 strip, one 32x32
+-- cell each, icon centred - our file never moves.
+local BLIZZARD_ICONS = TEX_PATH .. "atlas-blip-farmmap-blizzard"
+local BLIZZARD_CELL  = { Minage = 0, Herbo = 1, Peche = 2, Bois = 3 }
+BUILTIN_PINS.blizzard = {}
+for nodeType in pairs(TYPE_COLORS) do
+    local cell = BLIZZARD_CELL[(nodeType:gsub("R$", ""))]
+    BUILTIN_PINS.blizzard[nodeType] = {
+        tex = BLIZZARD_ICONS, coords = { cell / 4, (cell + 1) / 4, 0, 1 },
+        centered = true,
     }
 end
 
@@ -393,6 +512,18 @@ end
 
 ApplyLanguage(gameLocale)
 
+-- Name of the game client, for the options panel and the debug window:
+-- "Forever", "Midnight" (Retail: the current expansion, already translated by
+-- Blizzard), "Classic" (Era, SoD, Hardcore) or "Classic: Mists of Pandaria".
+-- "Classic" is Blizzard's product name and is left untranslated.
+local function ClientLabel()
+    if IS_FOREVER then return L.CLIENT_FOREVER end
+    local expansion = LE_EXPANSION_LEVEL_CURRENT and ExpansionName(LE_EXPANSION_LEVEL_CURRENT)
+    if IS_RETAIL then return expansion or "Retail" end
+    if IS_CLASSIC_ERA or not expansion then return "Classic" end
+    return "Classic: " .. expansion
+end
+
 -- ============================================================
 -- DATABASE MIGRATIONS
 -- ============================================================
@@ -495,6 +626,9 @@ migrations[3] = BackfillItemIDs
 migrations[4] = function()
     local byName = {}
     for id, name in pairs(EXP_FALLBACK) do byName[name] = id end
+    -- Old nodes stored expansion 0 as "Classic", its name in the table before
+    -- v2.0.0 renamed it "Vanilla".
+    byName["Classic"] = 0
 
     local fixed = 0
     for _, nodes in pairs(FarmMapDB) do
@@ -558,34 +692,80 @@ end
 
 local playerProfessions = {}
 
+-- Off Retail, a profession is also recognised by a spell it always teaches.
+-- Classic Era's GetProfessions exists but returns nothing for its old-style
+-- skill lines (seen in game on 07/10/2026: herbalism learned, still "skill
+-- missing", even after a reload). The tracking spells are in every
+-- herbalist's and miner's spellbook whatever their skill level; fishing has
+-- no tracking spell, so every rank of Fishing itself is listed.
+local PROFESSION_SPELLS = {
+    Herbo  = { 2383 },                                   -- Find Herbs
+    Minage = { 2580 },                                   -- Find Minerals
+    Peche  = { 7620, 7731, 7732, 18248, 33095, 51294,    -- Fishing, by rank
+               88868, 110410, 131474 },
+}
+
+local function DetectProfessionsBySpell()
+    local IsKnown = (C_SpellBook and C_SpellBook.IsSpellKnown) or IsSpellKnown or IsPlayerSpell
+    if not IsKnown then return end
+    for profType, spells in pairs(PROFESSION_SPELLS) do
+        for _, spellID in ipairs(spells) do
+            if IsKnown(spellID) then playerProfessions[profType] = true ; break end
+        end
+    end
+end
+
 local function CheckProfessions()
     playerProfessions = {}
     -- GetProfessions(): prof1, prof2, archaeology, fishing, cooking
     -- ipairs stops at the first nil -> fishing never detected without this fix
-    local p1, p2, p3, p4, p5 = GetProfessions()
-    for _, index in ipairs({ p1 or false, p2 or false, p3 or false, p4 or false, p5 or false }) do
-        if index then
-            local _, _, _, _, _, _, skillLine = GetProfessionInfo(index)
-            for profType, id in pairs(PROFESSION_SKILL_IDS) do
-                if skillLine == id then playerProfessions[profType] = true end
+    if GetProfessions and GetProfessionInfo then
+        local p1, p2, p3, p4, p5 = GetProfessions()
+        for _, index in ipairs({ p1 or false, p2 or false, p3 or false, p4 or false, p5 or false }) do
+            if index then
+                local _, _, _, _, _, _, skillLine = GetProfessionInfo(index)
+                for profType, id in pairs(PROFESSION_SKILL_IDS) do
+                    if skillLine == id then playerProfessions[profType] = true end
+                end
             end
         end
     end
+    -- Retail keeps its detection exactly as it was; elsewhere the spellbook
+    -- completes it (see PROFESSION_SPELLS).
+    if not IS_RETAIL then DetectProfessionsBySpell() end
     -- If no profession was detected, the data is not ready yet:
     -- leave the persisted states alone rather than wrongly overwriting them.
     local anyProfFound = next(playerProfessions) ~= nil
     if not anyProfFound then return end
+    local changed = false
     local checks = {
         { key = "showHerbo",  prof = "Herbo",  label = L.TYPE_Herbo  },
         { key = "showMinage", prof = "Minage", label = L.TYPE_Minage },
         { key = "showPeche",  prof = "Peche",  label = L.TYPE_Peche  },
     }
+    -- profAutoOff remembers which filters were switched off HERE rather than by
+    -- the player, so that learning the profession later switches them back on.
+    -- Without it a filter turned off before the profession was learned stayed
+    -- off, and the first harvests were recorded but never shown. A filter the
+    -- player turned off by hand is never in it, so it is never turned back on.
+    FarmMapDB.profAutoOff = FarmMapDB.profAutoOff or {}
+    local autoOff = FarmMapDB.profAutoOff
     for _, c in ipairs(checks) do
-        if FarmMapDB[c.key] and not playerProfessions[c.prof] then
+        if playerProfessions[c.prof] then
+            if autoOff[c.key] then
+                autoOff[c.key] = nil
+                FarmMapDB[c.key] = true
+                changed = true
+            end
+        elseif FarmMapDB[c.key] then
             FarmMapDB[c.key] = false
+            autoOff[c.key] = true
+            changed = true
             print("|cffffd100FarmMap :|r " .. c.label .. L.PROF_DISABLED)
         end
     end
+    -- Tells the caller whether the pins need rebuilding.
+    return changed
 end
 
 -- ============================================================
@@ -651,6 +831,18 @@ local function GetStylePins(styleKey)
     return BUILTIN_PINS[styleKey]
 end
 
+-- Puts one style entry on a texture: the minimap pins and the previews of the
+-- Colors panel go through here, so a ring looks the same in both. Desaturation
+-- and colour are always set, never left over: textures are not reused, but a
+-- pack entry without them must still come out plain.
+local function ApplyPinTexture(tex, pin)
+    tex:SetTexture(pin.tex)
+    tex:SetTexCoord(unpack(pin.coords))
+    tex:SetDesaturated(pin.desaturate and true or false)
+    local c = pin.color
+    if c then tex:SetVertexColor(c[1], c[2], c[3]) else tex:SetVertexColor(1, 1, 1) end
+end
+
 local function ApplyMinimapStyle(style)
     local extStyle = FarmMapStyles.Get(style)
     local blipTex  = (extStyle and extStyle.blip) or BLIP_TEXTURES[style]
@@ -672,85 +864,117 @@ end
 local debugHistory = {}
 local debugActive  = false
 
-local debugFrame = CreateFrame("Frame", "FarmMapDebug", UIParent, "BackdropTemplate")
-debugFrame:SetSize(300, 200)
+-- Built on Blizzard's own templates rather than hand-drawn backdrops: the
+-- former version borrowed textures meant for something else (the minimize
+-- button as a close cross, the main menu micro button as a resize grip, a
+-- minimap atlas cut-out as its icon) and they came out squashed or wrong.
+-- BasicFrameTemplateWithInset, PanelResizeButtonTemplate and
+-- UIPanelScrollFrameTemplate exist on Retail, Forever, MoP Classic and
+-- Classic Era alike, so the same window serves every client.
+local DEBUG_PAD    = 10   -- inner margin inside the inset
+local DEBUG_FOOTER = 34   -- height kept for the bottom row of controls
+
+local debugFrame = CreateFrame("Frame", "FarmMapDebug", UIParent, "BasicFrameTemplateWithInset")
+debugFrame:SetSize(360, 260)
 debugFrame:SetPoint("CENTER", UIParent, "CENTER", 0, -120)
-debugFrame:SetBackdrop({
-    bgFile   = "Interface\\ChatFrame\\ChatFrameBackground",
-    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-    tile = true, tileSize = 16, edgeSize = 12,
-    insets = {left=3, right=3, top=3, bottom=3}
-})
-debugFrame:SetBackdropColor(0, 0, 0.15, 0.92)
-debugFrame:SetBackdropBorderColor(0.4, 0.4, 0.6, 1)
+debugFrame:SetFrameStrata("DIALOG")
 debugFrame:SetMovable(true)
 debugFrame:SetResizable(true)
-debugFrame:SetResizeBounds(220, 120)
+debugFrame:SetClampedToScreen(true)
 debugFrame:EnableMouse(true)
+debugFrame:RegisterForDrag("LeftButton")
+debugFrame:SetScript("OnDragStart", debugFrame.StartMoving)
+debugFrame:SetScript("OnDragStop",  debugFrame.StopMovingOrSizing)
 debugFrame:Hide()
 
-local debugTitleBar = CreateFrame("Frame", nil, debugFrame, "BackdropTemplate")
-debugTitleBar:SetHeight(20)
-debugTitleBar:SetPoint("TOPLEFT",  debugFrame, "TOPLEFT",  3, -3)
-debugTitleBar:SetPoint("TOPRIGHT", debugFrame, "TOPRIGHT", -3, -3)
-debugTitleBar:SetBackdrop({bgFile="Interface\\ChatFrame\\ChatFrameBackground"})
-debugTitleBar:SetBackdropColor(0, 0.05, 0.2, 0.95)
-debugTitleBar:EnableMouse(true)
-debugTitleBar:RegisterForDrag("LeftButton")
-debugTitleBar:SetScript("OnDragStart", function() debugFrame:StartMoving() end)
-debugTitleBar:SetScript("OnDragStop",  function() debugFrame:StopMovingOrSizing() end)
+debugFrame.TitleText:SetText(L.DEBUG_TITLE)
 
-local debugIcon = debugTitleBar:CreateTexture(nil, "OVERLAY")
+-- The template places its top-left corner art 6 px OUTSIDE the frame, but
+-- starts the title bar background 2 px INSIDE it: the strip between the two is
+-- covered by nothing, and the game world shows through as a small notch.
+-- Starting the title background at the frame's own edge closes it. Not
+-- further left: at -4 it stuck out past the border, visible in game.
+if debugFrame.TitleBg then
+    -- Same vertical offset as the template's own: -1 on Retail and Forever,
+    -- -3 in Classic's copy of the template. Only the horizontal start moves.
+    debugFrame.TitleBg:SetPoint("TOPLEFT", debugFrame, "TOPLEFT", 0, IS_CLASSIC and -3 or -1)
+end
+-- The template's inset starts at -24 while the title bar ends at -21: the
+-- 3 px band between them showed the frame's own background, read in game as
+-- a gap under the title. Raised to meet the title bar; the inset's border
+-- textures are anchored to InsetBg and follow it.
+if debugFrame.InsetBg then
+    debugFrame.InsetBg:SetPoint("TOPLEFT", debugFrame, "TOPLEFT", 4, -21)
+end
+
+-- The addon's own icon, beside the title: the same file the minimap button
+-- and the AddOns list use. Anchored to the centred title text rather than to
+-- the frame's corner: the template's corner art has a cut-out there, and the
+-- icon sitting on it left a see-through notch at its left edge.
+local debugIcon = debugFrame:CreateTexture(nil, "OVERLAY")
 debugIcon:SetSize(14, 14)
-debugIcon:SetPoint("LEFT", debugTitleBar, "LEFT", 4, 0)
-debugIcon:SetTexture("Interface\\Minimap\\ObjectIconsAtlas")
-debugIcon:SetTexCoord(0.444, 0.475, 0.805, 0.837)
+debugIcon:SetPoint("RIGHT", debugFrame.TitleText, "LEFT", -4, 0)
+debugIcon:SetTexture(TEX_PATH .. "icon")
 
-local debugTitleText = debugTitleBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-debugTitleText:SetPoint("LEFT", debugTitleBar, "LEFT", 22, 0)
-debugTitleText:SetText(L.DEBUG_TITLE)
-debugTitleText:SetTextColor(0.7, 0.8, 1, 1)
-
-local debugCloseBtn = CreateFrame("Button", nil, debugTitleBar)
-debugCloseBtn:SetSize(16, 16)
-debugCloseBtn:SetPoint("RIGHT", debugTitleBar, "RIGHT", -4, 0)
-local debugCloseTex = debugCloseBtn:CreateTexture(nil, "OVERLAY")
-debugCloseTex:SetAllPoints()
-debugCloseTex:SetTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Up")
-debugCloseBtn:SetScript("OnClick", function()
+-- The template's close button only hides the frame. Hooked rather than
+-- replaced, and on the button rather than OnHide: hiding the whole UI
+-- (Alt+Z) also fires OnHide, and must not switch the window off for good.
+debugFrame.CloseButton:HookScript("OnClick", function()
     FarmMapDB.showDebug = false
-    debugFrame:Hide()
     if FarmMapShowDebugCheck then FarmMapShowDebugCheck:SetChecked(false) end
 end)
 
-local debugText = debugFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-debugText:SetPoint("TOPLEFT",     debugFrame, "TOPLEFT",     8, -28)
-debugText:SetPoint("BOTTOMRIGHT", debugFrame, "BOTTOMRIGHT", -8, 34)
+-- Scrolling log. The previous one was a bare FontString: past the height of
+-- the window the oldest lines were simply cut off.
+local debugScroll = CreateFrame("ScrollFrame", nil, debugFrame, "UIPanelScrollFrameTemplate")
+debugScroll:SetPoint("TOPLEFT",     debugFrame, "TOPLEFT",     DEBUG_PAD, -30)
+-- 30 on the right leaves room for the template's scroll bar, drawn outside
+-- the scroll frame itself.
+debugScroll:SetPoint("BOTTOMRIGHT", debugFrame, "BOTTOMRIGHT", -30, DEBUG_FOOTER)
+
+local debugContent = CreateFrame("Frame", nil, debugScroll)
+debugContent:SetSize(1, 1)
+debugScroll:SetScrollChild(debugContent)
+
+local debugText = debugContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+debugText:SetPoint("TOPLEFT", debugContent, "TOPLEFT", 0, 0)
 debugText:SetJustifyH("LEFT")
 debugText:SetJustifyV("TOP")
 debugText:SetWordWrap(true)
+debugText:SetSpacing(2)
 
-local debugBottomBar = CreateFrame("Frame", nil, debugFrame, "BackdropTemplate")
-debugBottomBar:SetHeight(26)
-debugBottomBar:SetPoint("BOTTOMLEFT",  debugFrame, "BOTTOMLEFT",  3, 3)
-debugBottomBar:SetPoint("BOTTOMRIGHT", debugFrame, "BOTTOMRIGHT", -3, 3)
-debugBottomBar:SetBackdrop({bgFile="Interface\\ChatFrame\\ChatFrameBackground"})
-debugBottomBar:SetBackdropColor(0, 0, 0.1, 0.8)
+-- The text wraps to the visible width and the scroll child grows to the
+-- wrapped height, so the scroll bar always matches what there is to read.
+local function LayoutDebugText()
+    local w = debugScroll:GetWidth()
+    if not w or w <= 0 then return end
+    debugContent:SetWidth(w)
+    debugText:SetWidth(w)
+    debugContent:SetHeight(math.max(debugText:GetStringHeight() + 4, 1))
+end
 
-local debugCheckCapture = CreateFrame("CheckButton", nil, debugBottomBar, "UICheckButtonTemplate")
-debugCheckCapture:SetSize(20, 20)
-debugCheckCapture:SetPoint("LEFT", debugBottomBar, "LEFT", 2, 0)
-local debugCheckLabel = debugBottomBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-debugCheckLabel:SetPoint("LEFT", debugCheckCapture, "RIGHT", 0, 0)
-debugCheckLabel:SetText("|cffaaaaaa" .. L.DEBUG_CAPTURE .. "|r")
+local debugCheckCapture = CreateFrame("CheckButton", nil, debugFrame, "UICheckButtonTemplate")
+debugCheckCapture:SetSize(24, 24)
+debugCheckCapture:SetPoint("BOTTOMLEFT", debugFrame, "BOTTOMLEFT", DEBUG_PAD - 2, 7)
+local debugCheckLabel = debugFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+debugCheckLabel:SetPoint("LEFT", debugCheckCapture, "RIGHT", 0, 1)
+debugCheckLabel:SetText(L.DEBUG_CAPTURE)
 debugCheckCapture:SetScript("OnClick", function(self)
     debugActive = self:GetChecked()
     FarmMapDB.debugCapture = debugActive
 end)
 
-local debugClearBtn = CreateFrame("Button", nil, debugBottomBar, "UIPanelButtonTemplate")
-debugClearBtn:SetSize(55, 18)
-debugClearBtn:SetPoint("LEFT", debugCheckLabel, "RIGHT", 8, 0)
+-- Right-aligned, clear of the resize grip in the corner.
+local debugCopyBtn = CreateFrame("Button", nil, debugFrame, "UIPanelButtonTemplate")
+debugCopyBtn:SetSize(70, 22)
+debugCopyBtn:SetPoint("BOTTOMRIGHT", debugFrame, "BOTTOMRIGHT", -22, 8)
+debugCopyBtn:SetText(L.DEBUG_COPY)
+FitButton(debugCopyBtn)
+debugCopyBtn:SetScript("OnClick", function() OpenDebugCopyPopup() end)
+
+local debugClearBtn = CreateFrame("Button", nil, debugFrame, "UIPanelButtonTemplate")
+debugClearBtn:SetSize(70, 22)
+debugClearBtn:SetPoint("RIGHT", debugCopyBtn, "LEFT", -4, 0)
 debugClearBtn:SetText(L.DEBUG_CLEAR)
 FitButton(debugClearBtn)
 debugClearBtn:SetScript("OnClick", function()
@@ -758,30 +982,20 @@ debugClearBtn:SetScript("OnClick", function()
     debugFrame:SetContent("")
 end)
 
-local debugCopyBtn = CreateFrame("Button", nil, debugBottomBar, "UIPanelButtonTemplate")
-debugCopyBtn:SetSize(55, 18)
-debugCopyBtn:SetPoint("LEFT", debugClearBtn, "RIGHT", 4, 0)
-debugCopyBtn:SetText(L.DEBUG_COPY)
-FitButton(debugCopyBtn)
-debugCopyBtn:SetScript("OnClick", function() OpenDebugCopyPopup() end)
+-- Set BEFORE the grip's Init: Init wraps whatever OnSizeChanged the frame
+-- already has to enforce its bounds, and a script set afterwards would
+-- replace that wrapper and lift the limits.
+debugFrame:SetScript("OnSizeChanged", LayoutDebugText)
 
-local debugGrip = CreateFrame("Button", nil, debugFrame)
-debugGrip:SetSize(14, 14)
-debugGrip:SetPoint("BOTTOMRIGHT", debugFrame, "BOTTOMRIGHT", -2, 26)
-local debugGripTex = debugGrip:CreateTexture(nil, "OVERLAY")
-debugGripTex:SetAllPoints()
-debugGripTex:SetTexture("Interface\\Buttons\\UI-MicroButton-MainMenu-Up")
-debugGripTex:SetTexCoord(0, 1, 0, 1)
-debugGrip:SetScript("OnMouseDown", function() debugFrame:StartSizing("BOTTOMRIGHT") end)
-debugGrip:SetScript("OnMouseUp",   function() debugFrame:StopMovingOrSizing() end)
-
-debugFrame:SetScript("OnSizeChanged", function(self)
-    debugText:SetPoint("TOPLEFT",     self, "TOPLEFT",     8, -28)
-    debugText:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -8, 34)
-end)
+local debugGrip = CreateFrame("Button", nil, debugFrame, "PanelResizeButtonTemplate")
+debugGrip:SetPoint("BOTTOMRIGHT", debugFrame, "BOTTOMRIGHT", -4, 4)
+-- The minimum keeps the bottom row (checkbox, two buttons, grip) from
+-- overlapping, whatever the translated button labels.
+debugGrip:Init(debugFrame, 300, 160, 900, 700)
 
 debugFrame.SetContent = function(self, txt)
     debugText:SetText(txt or "")
+    LayoutDebugText()
 end
 
 local function RenderDebug()
@@ -827,13 +1041,20 @@ OpenDebugCopyPopup = function()
     popupTitle:SetText(L.DEBUG_COPY_TITLE)
     popupTitle:SetTextColor(1, 0.82, 0, 1)
 
-    local editBox = CreateFrame("EditBox", nil, popup)
+    -- Scrolled, like the other copy popups: a bare multi-line EditBox grows
+    -- with its text and spilled past the bottom of the popup (seen on Era).
+    local scroll = CreateFrame("ScrollFrame", nil, popup, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT",     popup, "TOPLEFT",     10, -30)
+    scroll:SetPoint("BOTTOMRIGHT", popup, "BOTTOMRIGHT", -30, 34)
+
+    local editBox = CreateFrame("EditBox", nil, scroll)
     editBox:SetMultiLine(true)
     editBox:SetMaxLetters(0)
     editBox:SetFontObject(GameFontNormalSmall)
-    editBox:SetPoint("TOPLEFT",     popup, "TOPLEFT",     10, -30)
-    editBox:SetPoint("BOTTOMRIGHT", popup, "BOTTOMRIGHT", -10, 30)
+    editBox:SetWidth(360)  -- popup 400, minus the 10 + 30 scroll insets
     editBox:SetAutoFocus(true)
+    editBox:SetScript("OnEscapePressed", function() popup:Hide() end)
+    scroll:SetScrollChild(editBox)
     popup.editBox = editBox
 
     local closePopup = CreateFrame("Button", nil, popup, "UIPanelButtonTemplate")
@@ -977,6 +1198,9 @@ end
 
 -- Base edge of a pin, in pixels, before the player's size setting is applied.
 local PIN_BASE_SIZE = 16
+-- World map pins only. Classic's windowed world map is smaller, so 16 px
+-- read too big there (Kroosstii, on Era): 2 px less.
+local WORLD_PIN_BASE_SIZE = IS_CLASSIC and 14 or PIN_BASE_SIZE
 
 -- Every world map pin currently handed to HBDPins. The size slider walks this
 -- list to resize the pins in place: HBDPins anchors our icon CENTER-on-CENTER
@@ -1000,7 +1224,7 @@ local function CreatePoint(nodeData, isMinimap, mapID)
     else
         -- World map only: the minimap keeps its native size, which is what the
         -- request asked for.
-        local size = PIN_BASE_SIZE * (FarmMapDB and FarmMapDB.worldPinScale or 1.0)
+        local size = WORLD_PIN_BASE_SIZE * (FarmMapDB and FarmMapDB.worldPinScale or 1.0)
         f:SetSize(size, size)
         activeWorldPins[#activeWorldPins + 1] = f
     end
@@ -1016,8 +1240,9 @@ local function CreatePoint(nodeData, isMinimap, mapID)
         local pins  = GetStylePins(style)
         local pin   = pins and pins[nodeData.type]
         if pin then
-            f.tex:SetTexture(pin.tex)
-            f.tex:SetTexCoord(unpack(pin.coords))
+            ApplyPinTexture(f.tex, pin)
+            -- Rings are drawn wider than an icon, to frame the game's blip.
+            if pin.size then f:SetSize(pin.size, pin.size) end
         else
             local coords = WORLD_MAP_TEXCOORDS[nodeData.type]
             if coords then
@@ -1029,12 +1254,11 @@ local function CreatePoint(nodeData, isMinimap, mapID)
             end
         end
     else
-        local style = FarmMapDB and FarmMapDB.worldmapStyle or "atlas"
+        local style = FarmMapDB and FarmMapDB.worldmapStyle or "blizzard"
         local pins  = GetStylePins(style)
         local pin   = pins and pins[nodeData.type]
         if pin then
-            f.tex:SetTexture(pin.tex)
-            f.tex:SetTexCoord(unpack(pin.coords))
+            ApplyPinTexture(f.tex, pin)
         else
             local coords = WORLD_MAP_TEXCOORDS[nodeData.type]
             if coords then
@@ -1065,8 +1289,24 @@ local function CreatePoint(nodeData, isMinimap, mapID)
         -- expID first: it resolves in the client language. expName is only a
         -- fallback for nodes recorded before the id was stored, and stays
         -- frozen in the language of whoever harvested them.
-        local expText = ExpansionName(nodeData.expID) or nodeData.expName
-        if expText and nodeData.type ~= "Bois" then
+        -- Hidden on Forever: it has a single expansion, and its new ores and
+        -- herbs carry whatever expansion ID they were created under, so the line
+        -- would only ever say "Classic" or something misleading.
+        -- On Classic the stored expID may be the client's wrong one (nodes
+        -- recorded before the table existed): resolved again from the item.
+        local expID = nodeData.expID
+        if IS_CLASSIC and nodeData.nameID and nodeData.nameID > 0 then
+            expID = ItemExpansionID(nodeData.nameID, expID)
+        end
+        local expText = ExpansionName(expID) or nodeData.expName
+        -- Off Retail an unresolved ID is no expansion at all: MoP Classic
+        -- gives 254 ("not set") for vanilla items such as Oily Blackmouth, and
+        -- the line read "Expansion : ID: 254". Retail keeps the raw ID, which
+        -- flags an expansion too recent for the table.
+        if not IS_RETAIL and expText and expText:match("^ID:") then expText = nil end
+        -- Also hidden on Classic Era, which has a single expansion too. TBC
+        -- and MoP keep it: their herbs and ores do span expansions.
+        if expText and nodeData.type ~= "Bois" and not IS_FOREVER and not IS_CLASSIC_ERA then
             GameTooltip:AddLine(L.EXPANSION .. " : " .. expText, 0.4, 0.6, 1)
         end
         -- The loot list, in one of two forms - never both, or the same item
@@ -1246,7 +1486,7 @@ end
 -- over a whole drag, and the player sees the new size while still dragging.
 -- Exposed as a global for the options panel, like FarmMap_ApplyFilterBarScale.
 function FarmMap_ApplyWorldPinScale()
-    local size = PIN_BASE_SIZE * (FarmMapDB and FarmMapDB.worldPinScale or 1.0)
+    local size = WORLD_PIN_BASE_SIZE * (FarmMapDB and FarmMapDB.worldPinScale or 1.0)
     for _, pin in ipairs(activeWorldPins) do
         pin:SetSize(size, size)
     end
@@ -1286,9 +1526,16 @@ local function IsAuctionatorLoaded()
 end
 
 
+-- Unit price in copper, and where it came from: "auction" (Auctionator's
+-- scanned price), "vendor" (what a merchant pays, the fallback) or "none".
+-- The source is only for the debug window.
 local function GetPrice(itemID)
-    if not IsAuctionatorLoaded() then return 0 end
-    return Auctionator.API.v1.GetAuctionPriceByItemID("FarmMap", itemID) or Auctionator.API.v1.GetVendorPriceByItemID("FarmMap", itemID) or 0
+    if not IsAuctionatorLoaded() then return 0, "none" end
+    local auction = Auctionator.API.v1.GetAuctionPriceByItemID("FarmMap", itemID)
+    if auction then return auction, "auction" end
+    local vendor = Auctionator.API.v1.GetVendorPriceByItemID("FarmMap", itemID)
+    if vendor then return vendor, "vendor" end
+    return 0, "none"
 end
 
 -- Coin icon texture paths (MoneyFrame built-in textures)
@@ -1362,7 +1609,16 @@ local function ShowFloatingLoot(items, itemIDs, quantities)
                       C_TradeSkillUI.GetItemReagentQualityByItemInfo(iid)
             if r and r > 0 then craftRank = r end
             totalInBag = (GetItemCount(iid, false) or 0) + qty
-            profit = (GetPrice(iid) * qty or 0) + qty
+            -- Unit price times quantity, nothing more. It used to add qty on
+            -- top, copied from the bag count above where it belongs (the
+            -- loot is not in the bags yet): 3 herbs at 20c read as 63c.
+            local unitPrice, priceSource = GetPrice(iid)
+            profit = unitPrice * qty
+            -- Without Auctionator every price reads 0 (none): no line, it is noise.
+            if showProfit and IsAuctionatorLoaded() then
+                AddDebug("PRICE", string.format("%s x%d @ %dc (%s) = %dc",
+                    name, qty, unitPrice, priceSource, profit))
+            end
         end
 
         local lineY   = (i - 1) * (lineH + padding)
@@ -1523,7 +1779,8 @@ local function GetFishingPosition(mapID)
     local nx, ny = HBD:GetZoneCoordinatesFromWorld(wx + dx, wy + dy, mapID)
     if not nx or not ny then return pos end
 
-    AddDebug("FISH_OFFSET", string.format("%.4f,%.4f → %.4f,%.4f (facing %.2f°)", pos.x, pos.y, nx, ny, math.deg(facing)))
+    -- Computed for every loot, before the harvest type is known: logged by
+    -- ProcessHarvestLoot only when the harvest really is fishing.
     return { x = nx, y = ny }
 end
 
@@ -1555,18 +1812,20 @@ local ITEM_BLACKLIST = {
 local function CaptureLootData()
     -- Check that the source is a GameObject (a harvest node, not a mob)
     local sourceGUID = GetLootSourceInfo(1)
+    -- Shown on the LOOT_CAPTURE line: tells a fishing pool from open water
+    -- (the bobber), which the Classic fishing filter will rely on.
+    local sourceDesc = "none"
     if sourceGUID then
         local sourceType = sourceGUID:match("^([^%-]+)")
-        if sourceType ~= "GameObject" then
-            AddDebug("LOOT_SKIP", "source non-GameObject : " .. sourceType)
-            return
-        end
+        -- Mobs, mostly: skipped without a debug line, they are no gathering.
+        if sourceType ~= "GameObject" then return end
         -- Extrait l'entryID du GUID (format : Type-0-X-X-X-EntryID-X)
         local entryID = tonumber(sourceGUID:match("%-(%d+)%-%x+$"))
         if entryID and GAMEOBJECT_BLACKLIST[entryID] then
             AddDebug("LOOT_SKIP", "GameObject blacklisté (entryID:" .. entryID .. ")")
             return
         end
+        sourceDesc = sourceType .. " " .. tostring(entryID or "?")
     end
 
     local mapID  = C_Map.GetBestMapForUnit("player")
@@ -1580,6 +1839,11 @@ local function CaptureLootData()
     local lootItems, lootItemIDs, lootQuantities, lootQualities = {}, {}, {}, {}
     local nodeName, nodeNameID, extensionName = L.UNKNOWN, 0, L.UNKNOWN_EXP
     local nodeExpID
+    -- Debug lines held back until the loot proves to be a harvest: any
+    -- GameObject lands here (quest objects, chests), and so does the second
+    -- LOOT_READY Blizzard fires per loot window. ProcessHarvestLoot prints
+    -- them; loot that is never processed leaves no trace in the window.
+    local debugSlots = {}
 
     for i = 1, GetNumLootItems() do
         local link = GetLootSlotLink(i)
@@ -1596,7 +1860,7 @@ local function CaptureLootData()
                     -- We keep the identifier, not the name: it is the id that
                     -- gets stored and exported. A resolved string would freeze
                     -- the node in the language of whoever harvested it.
-                    nodeExpID     = tonumber(expID)
+                    nodeExpID     = ItemExpansionID(itemID, tonumber(expID))
                     extensionName = ExpansionName(nodeExpID)
                                     or ("ID: " .. (expID or "?"))
                 end
@@ -1604,7 +1868,7 @@ local function CaptureLootData()
                 table.insert(lootItemIDs,    itemID)
                 table.insert(lootQuantities, quantity)
                 table.insert(lootQualities,  quality or 1)
-                AddDebug("LOOT_SLOT", name .. " x" .. quantity)
+                debugSlots[#debugSlots + 1] = name .. " x" .. quantity
             end
         end
     end
@@ -1621,8 +1885,9 @@ local function CaptureLootData()
         nodeNameID    = nodeNameID,
         extensionName = extensionName,
         expID         = nodeExpID,
+        debugSlots    = debugSlots,
+        source        = sourceDesc,
     }
-    AddDebug("LOOT_CAPTURE", nodeName .. " (" .. #lootItems .. " slots)")
 end
 
 local function ProcessHarvestLoot()
@@ -1640,9 +1905,18 @@ local function ProcessHarvestLoot()
     lastHarvestType  = nil
     pendingLootData  = nil
 
+    -- A confirmed harvest: now its held-back capture lines are worth showing
+    -- (see CaptureLootData). Same order as before, slots then the summary.
+    for _, line in ipairs(data.debugSlots or {}) do AddDebug("LOOT_SLOT", line) end
+    AddDebug("LOOT_CAPTURE", data.nodeName .. " (" .. #data.items .. " slots, source "
+        .. tostring(data.source) .. ")")
+
     local mapID          = data.mapID
     local pos            = ((foundType == "Peche" or foundType == "PecheR") and data.posFishing) or data.pos
     pos                  = pos or data.pos  -- fallback si GetFishingPosition a échoué
+    if pos ~= data.pos then
+        AddDebug("FISH_OFFSET", string.format("%.4f,%.4f → %.4f,%.4f", data.pos.x, data.pos.y, pos.x, pos.y))
+    end
     local lootItems      = data.items
     local lootItemIDs    = data.itemIDs
     local lootQuantities = data.quantities
@@ -2199,10 +2473,13 @@ local function CreateFilterButtons()
     -- The buttons live inside a container: it is what the player drags and
     -- what fades out. Its default anchor reproduces the historical layout to the
     -- pixel (first button centred 20px above the map's left edge midpoint).
-    -- 5 buttons of 32 + 4 gaps of 4 = 176. The strip grows from its LEFT anchor,
-    -- which is the point saved positions are expressed against, so adding the
-    -- summary button leaves every already-saved bar exactly where it was.
-    local BAR_THICK, BAR_LONG  = 32, 176
+    -- Buttons of 32 with gaps of 4: 176 for the 5 buttons of Retail. The strip
+    -- grows from its LEFT anchor, which is the point saved positions are
+    -- expressed against, so adding the summary button leaves every
+    -- already-saved bar exactly where it was. The length is derived from the
+    -- buttons actually shown, since Forever has no Logging button.
+    local BTN_SIZE, BTN_GAP    = 32, 4
+    local BAR_THICK            = BTN_SIZE
     local BAR_DEF_X, BAR_DEF_Y = 8, -34
 
     local bar = CreateFrame("Frame", "FarmMapFilterBar", UIParent)
@@ -2218,16 +2495,17 @@ local function CreateFilterButtons()
     -- anchor stays the bar's LEFT point, so flipping keeps the left edge and the
     -- vertical centre exactly where they were.
     local function LayoutBar()
-        local horiz = FarmMapDB.filterBarHorizontal
-        bar:SetSize(horiz and BAR_LONG or BAR_THICK, horiz and BAR_THICK or BAR_LONG)
+        local horiz    = FarmMapDB.filterBarHorizontal
+        local barLong  = #orderedBtns * BTN_SIZE + (#orderedBtns - 1) * BTN_GAP
+        bar:SetSize(horiz and barLong or BAR_THICK, horiz and BAR_THICK or barLong)
         for i, btn in ipairs(orderedBtns) do
             btn:ClearAllPoints()
             if i == 1 then
                 btn:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
             elseif horiz then
-                btn:SetPoint("LEFT", orderedBtns[i - 1], "RIGHT", 4, 0)
+                btn:SetPoint("LEFT", orderedBtns[i - 1], "RIGHT", BTN_GAP, 0)
             else
-                btn:SetPoint("TOP", orderedBtns[i - 1], "BOTTOM", 0, -4)
+                btn:SetPoint("TOP", orderedBtns[i - 1], "BOTTOM", 0, -BTN_GAP)
             end
         end
     end
@@ -2243,7 +2521,14 @@ local function CreateFilterButtons()
         local p = FarmMapDB.filterBarPos
         bar:ClearAllPoints()
         if not (p and p.x and p.y) then
-            bar:SetPoint("LEFT", WorldMapFrame, "LEFT", BAR_DEF_X, BAR_DEF_Y)
+            -- Classic's map is a window with a thick ornate border, so the
+            -- Retail offset from the frame's edge put the bar on that border
+            -- and half outside it. There the default hangs off the map
+            -- canvas itself (ScrollContainer, inside the border). Retail and
+            -- Forever keep their historical spot. Saved positions are not
+            -- affected: they stay relative to WorldMapFrame on every client.
+            local anchor = (IS_CLASSIC and WorldMapFrame.ScrollContainer) or WorldMapFrame
+            bar:SetPoint("LEFT", anchor, "LEFT", BAR_DEF_X, BAR_DEF_Y)
             return
         end
         local bs = bar:GetEffectiveScale()
@@ -2301,6 +2586,12 @@ local function CreateFilterButtons()
     local btnMinage = MakeButton("FarmMapBtnMinage", "Minage")
     local btnPeche  = MakeButton("FarmMapBtnPeche",  "Peche")
     local btnBois   = MakeButton("FarmMapBtnBois",   "Bois")
+    -- Logging only exists on Retail. The button is still built, so every
+    -- table that lists it keeps working, but it leaves the strip and is hidden.
+    if not IS_RETAIL then
+        orderedBtns[#orderedBtns] = nil
+        btnBois:Hide()
+    end
 
     -- Zone summary. Built by hand rather than through MakeButton: that helper
     -- reads its texture from the node style packs, and this button stands for no
@@ -2399,6 +2690,9 @@ local function CreateFilterButtons()
             end
             if data.prof and not playerProfessions[data.prof] then return end
             FarmMapDB[data.key] = not FarmMapDB[data.key]
+            -- The player's choice from now on: CheckProfessions must not
+            -- override it (see profAutoOff).
+            if FarmMapDB.profAutoOff then FarmMapDB.profAutoOff[data.key] = nil end
             UpdateButtons()
             RefreshAllPins()
             if GameTooltip:GetOwner() == self then self:GetScript("OnEnter")(self) end
@@ -2467,10 +2761,22 @@ end
 -- INTERFACE OPTIONS
 -- ============================================================
 
+-- Node types previewed on each style row. Forever has no Logging, so its
+-- rows drop the wood icon and shrink by one icon slot; Retail keeps all four
+-- and its exact historical width.
+local PRESET_ROW_TYPES = {}
+for _, nodeType in ipairs(TYPE_ORDER) do
+    if IS_RETAIL or nodeType ~= "Bois" then
+        PRESET_ROW_TYPES[#PRESET_ROW_TYPES + 1] = nodeType
+    end
+end
+
 -- Helper: clickable preset row in the Colors panel
 local function MakePresetRow(parent, anchorFrame, anchorOffsetY, presetKey, dbKey, label)
+    local iconSize  = 20
+    local iconStep  = iconSize + 6
     local row = CreateFrame("Frame", nil, parent, "BackdropTemplate")
-    row:SetSize(280, 30)
+    row:SetSize(280 - (#TYPE_ORDER - #PRESET_ROW_TYPES) * iconStep, 30)
     row:SetPoint("TOPLEFT", anchorFrame, "BOTTOMLEFT", 0, anchorOffsetY)
     row:SetBackdrop({bgFile="Interface\\ChatFrame\\ChatFrameBackground", edgeFile="Interface\\Tooltips\\UI-Tooltip-Border", tile=true, tileSize=8, edgeSize=6, insets={left=2,right=2,top=2,bottom=2}})
     row:SetBackdropColor(0.1, 0.1, 0.1, 0.8)
@@ -2485,19 +2791,21 @@ local function MakePresetRow(parent, anchorFrame, anchorOffsetY, presetKey, dbKe
     lbl:SetText(label)
     lbl:SetTextColor(0.9, 0.9, 0.9, 1)
 
-    local iconSize  = 20
     local startX    = 122
     local ICON_ROW_Y = { Herbo = -2, Peche = 2 }   -- offset vertical (pixels) pour corriger le padding UV
 
-    for i, nodeType in ipairs(TYPE_ORDER) do
+    for i, nodeType in ipairs(PRESET_ROW_TYPES) do
         local icon = row:CreateTexture(nil, "ARTWORK")
         icon:SetSize(iconSize, iconSize)
-        icon:SetPoint("LEFT", row, "LEFT", startX + (i-1) * (iconSize + 6), ICON_ROW_Y[nodeType] or 0)
         local pins = GetStylePins(presetKey)
         local pin  = pins and pins[nodeType]
+        -- ICON_ROW_Y corrects the padding of the atlas sprites. Rings and the
+        -- shipped Blizzard icons are centred in their cell already (centered):
+        -- offsetting them would misalign them.
+        local offsetY = (pin and pin.centered) and 0 or (ICON_ROW_Y[nodeType] or 0)
+        icon:SetPoint("LEFT", row, "LEFT", startX + (i-1) * iconStep, offsetY)
         if pin then
-            icon:SetTexture(pin.tex)
-            icon:SetTexCoord(unpack(pin.coords))
+            ApplyPinTexture(icon, pin)
         else
             local coords = WORLD_MAP_TEXCOORDS[nodeType]
             if coords then
@@ -2550,7 +2858,9 @@ local function CreateOptions()
     local translatorName = (activeLocale and activeLocale.translator) or "-"
 
     local creditRows = {
-        { color = "00ff00", label = L.CREDITS_CREATOR, value = "Dkroosstii-Dalaran" },
+        -- The character name only exists on Retail's Dalaran realm. Elsewhere
+        -- it points at nobody, so the plain handle is shown instead.
+        { color = "00ff00", label = L.CREDITS_CREATOR, value = IS_RETAIL and "Dkroosstii-Dalaran" or "Kroosstii" },
         -- Server invite and not the "Kroosstii" tag it used to be: a tag
         -- means a friend request, which Kroosstii turns down. The invite
         -- is the only route that actually reaches him.
@@ -2571,6 +2881,13 @@ local function CreateOptions()
             { color = "00dbff", label = contactLabel, value = contactValue, copy = true }
     end
 
+    -- Which game the player is on, and its build: "Forever 1.60.1",
+    -- "Midnight 12.1.0", "Classic 1.15.9" (see ClientLabel).
+    local gameVersion = (GetBuildInfo())
+    local gameName    = ClientLabel()
+    -- gap: opens the version block (game, addon, date) away from the people
+    -- above it - two unrelated groups that read as one when packed tight.
+    creditRows[#creditRows + 1] = { color = "ffffff", label = L.CREDITS_GAME, value = gameName .. " " .. gameVersion, gap = 10 }
     creditRows[#creditRows + 1] = { color = "ffffff", label = L.CREDITS_VERSION, value = addonVersion }
     creditRows[#creditRows + 1] = { color = "ffffff", label = L.CREDITS_UPDATE,  value = lastUpdate }
 
@@ -2610,7 +2927,8 @@ local function CreateOptions()
     for _, row in ipairs(creditRows) do
         local labelFS = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
         if lastCredit then
-            labelFS:SetPoint("TOPLEFT", lastCredit, "BOTTOMLEFT", 0, 0)
+            -- 2 px between rows so they breathe, more where a row asks for it.
+            labelFS:SetPoint("TOPLEFT", lastCredit, "BOTTOMLEFT", 0, -(row.gap or 2))
         else
             labelFS:SetPoint("TOPLEFT", 16, -45)
         end
@@ -2659,11 +2977,21 @@ local function CreateOptions()
 
     local credits = lastCredit
 
+    -- Under the version block, where a player looks when wondering whether
+    -- their copy is current. See the NEW VERSION NOTICE section.
+    local checkVersionNotice = CreateFrame("CheckButton", "FarmMapVersionNoticeCheck", panel, "InterfaceOptionsCheckButtonTemplate")
+    checkVersionNotice:SetPoint("TOPLEFT", credits, "BOTTOMLEFT", -4, -4)
+    _G[checkVersionNotice:GetName() .. "Text"]:SetText(L.VERSION_NOTICE)
+    checkVersionNotice:SetChecked(FarmMapDB.versionNotice ~= false)
+    checkVersionNotice:SetScript("OnClick", function(self)
+        FarmMapDB.versionNotice = self:GetChecked() and true or false
+    end)
+
     -- Anchored under the credits and no longer at a fixed -126: the block
     -- is 5 or 6 lines depending on whether the translator filled a contact
     -- in, and line height varies with the client font.
     local dbSep = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    dbSep:SetPoint("TOPLEFT", credits, "BOTTOMLEFT", 0, -14)
+    dbSep:SetPoint("TOPLEFT", checkVersionNotice, "BOTTOMLEFT", 4, -10)
     dbSep:SetText(L.DB_SECTION)
     dbSep:SetTextColor(1, 0.82, 0, 1)
 
@@ -2700,6 +3028,10 @@ local function CreateOptions()
             -- Position and visibility of the minimap button: clearing the node
             -- database must not move the button back.
             minimapIcon      = FarmMapDB.minimapIcon,
+            -- Filters switched off for a missing profession, so they still
+            -- come back on once it is learned.
+            profAutoOff      = FarmMapDB.profAutoOff,
+            versionNotice    = FarmMapDB.versionNotice,
         }
         HBDPins:RemoveAllMinimapIcons(addonName)
         ClearWorldMapPins()
@@ -2798,33 +3130,30 @@ local function CreateOptions()
         return container
     end
 
-    local checkTier = CreateFrame("CheckButton", "FarmMapShowTierCheck", displayPanel, "InterfaceOptionsCheckButtonTemplate")
-    checkTier:SetPoint("TOPLEFT", checkFloat, "BOTTOMLEFT", 0, -28)
-    _G[checkTier:GetName() .. "Text"]:SetText(L.DISPLAY_FLOAT_TIER)
-    checkTier:SetChecked(FarmMapDB and FarmMapDB.showFloatTier ~= false)
-    checkTier:SetScript("OnClick", function(self) FarmMapDB.showFloatTier = self:GetChecked() end)
+    -- Reagent tiers are a Retail system (Dragonflight onwards): Forever's own
+    -- professions UI carries no quality at all, and Classic predates them.
+    -- Elsewhere the box is not built.
+    local checkTier
+    if IS_RETAIL then
+        checkTier = CreateFrame("CheckButton", "FarmMapShowTierCheck", displayPanel, "InterfaceOptionsCheckButtonTemplate")
+        checkTier:SetPoint("TOPLEFT", checkFloat, "BOTTOMLEFT", 0, -28)
+        _G[checkTier:GetName() .. "Text"]:SetText(L.DISPLAY_FLOAT_TIER)
+        checkTier:SetChecked(FarmMapDB and FarmMapDB.showFloatTier ~= false)
+        checkTier:SetScript("OnClick", function(self) FarmMapDB.showFloatTier = self:GetChecked() end)
+    end
 
-    local checkProfit = CreateFrame("CheckButton", "FarmMapShowProfitCheck", displayPanel, "InterfaceOptionsCheckButtonTemplate")
-    checkProfit:SetPoint("TOPLEFT", checkTier, "BOTTOMLEFT", 0, -28)
-    _G[checkProfit:GetName() .. "Text"]:SetText(L.DISPLAY_FLOAT_PROFIT)
-    checkProfit:SetChecked(FarmMapDB and FarmMapDB.showProfit ~= false)
-    checkProfit:SetScript("OnClick", function(self) FarmMapDB.showProfit = self:GetChecked() end)
-
-    local profitHint = displayPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-        profitHint:SetPoint("LEFT", _G[checkProfit:GetName() .. "Text"], "RIGHT", 4, 0)
-    profitHint:SetText("|cffaaaaaa" .. L.DISPLAY_FLOAT_PROFIT_HINT .. "|r")
-
-    local sliderSize = MakeSlider(displayPanel, checkProfit,  L.DISPLAY_FLOAT_SIZE,     0.5, 2.0, 0.1, "floatSize",     "%.1f")
+    -- The harvest value box moved to the Integrations panel, next to the
+    -- Auctionator status it depends on.
+    local sliderSize = MakeSlider(displayPanel, checkTier or checkFloat, L.DISPLAY_FLOAT_SIZE, 0.5, 2.0, 0.1, "floatSize", "%.1f")
     local sliderDur  = MakeSlider(displayPanel, sliderSize, L.DISPLAY_FLOAT_DURATION, 1,   15,  1,   "floatDuration", "%ds")
 
     local function UpdateFloatDependents()
         local enabled = FarmMapDB.showFloatingText
         local alpha   = enabled and 1 or 0.4
-        checkTier:SetEnabled(enabled)
-        _G[checkTier:GetName() .. "Text"]:SetAlpha(alpha)
-        checkProfit:SetEnabled(enabled and IsAuctionatorLoaded())
-        _G[checkProfit:GetName() .. "Text"]:SetAlpha(alpha)
-        profitHint:SetShown(enabled and not IsAuctionatorLoaded())
+        if checkTier then
+            checkTier:SetEnabled(enabled)
+            _G[checkTier:GetName() .. "Text"]:SetAlpha(alpha)
+        end
         for _, s in ipairs({ sliderSize, sliderDur }) do
             s.slider:SetEnabled(enabled)
             s.lbl:SetAlpha(alpha)
@@ -2882,8 +3211,7 @@ local function CreateOptions()
     -- toggle put the two back in agreement.
     displayPanel:SetScript("OnShow", function()
         checkFloat:SetChecked(FarmMapDB.showFloatingText and true or false)
-        checkTier:SetChecked(FarmMapDB.showFloatTier ~= false)
-        checkProfit:SetChecked(FarmMapDB.showProfit ~= false)
+        if checkTier then checkTier:SetChecked(FarmMapDB.showFloatTier ~= false) end
         checkNodeItems:SetChecked(FarmMapDB.showNodeItemStats and true or false)
         UpdateFloatDependents()
     end)
@@ -2946,6 +3274,11 @@ local function CreateOptions()
     local langDropdown = CreateFrame("DropdownButton", nil, langPanel, "WowStyle1DropdownTemplate")
     langDropdown:SetPoint("TOPLEFT", langDesc, "BOTTOMLEFT", 0, -12)
     langDropdown:SetSize(220, 30)
+    -- Classic's copy of the template right-aligns its text (Retail's is left):
+    -- on MoP the choice sat against the arrow. Same look on every client.
+    if IS_CLASSIC and langDropdown.Text then
+        langDropdown.Text:SetJustifyH("LEFT")
+    end
 
     local function IsLangSelected(key)
         return (FarmMapDB.language or "auto") == key
@@ -2963,6 +3296,24 @@ local function CreateOptions()
     end)
 
     langReloadMsg:SetPoint("TOPLEFT", langDropdown, "BOTTOMLEFT", 0, -10)
+
+    -- The reload itself stays: every panel, and the category names in
+    -- Blizzard's settings list, are built once in the language of the moment,
+    -- and the settings list offers no way to rename a registered category.
+    -- It is one click away instead of a command to type. RELOADUI is
+    -- Blizzard's own "Reload UI" label, already translated in every client.
+    -- Shown by hooking the message rather than from SetLangSelected above,
+    -- which is defined before this button exists and could not see it.
+    local langReloadBtn = CreateFrame("Button", nil, langPanel, "UIPanelButtonTemplate")
+    langReloadBtn:SetSize(120, 22)
+    langReloadBtn:SetPoint("LEFT", langDropdown, "RIGHT", 10, 0)
+    langReloadBtn:SetText(RELOADUI)
+    FitButton(langReloadBtn)
+    langReloadBtn:SetScript("OnClick", ReloadUI)
+    langReloadBtn:Hide()
+    hooksecurefunc(langReloadMsg, "SetText", function(_, text)
+        langReloadBtn:SetShown(text ~= nil and text ~= "")
+    end)
 
     -- ---- REMERCIEMENTS TRADUCTEURS ----
     -- Built from the installed language files: a new translator
@@ -3021,23 +3372,34 @@ local function CreateOptions()
     -- the former description. Should Blizzard ever restore the native methods:
     -- put SetChecked back on FarmMapDB.replaceBlip, re-Enable(), restore the
     -- original OnClick (see history), and restore the old L.REPLACE_BLIP_DESC text.
-    local checkBlip = CreateFrame("CheckButton", "FarmMapReplaceBlipCheck", colorPanel, "InterfaceOptionsCheckButtonTemplate")
-    checkBlip:SetPoint("TOPLEFT", mmSep, "BOTTOMLEFT", 0, -4)
-    _G[checkBlip:GetName() .. "Text"]:SetText(L.REPLACE_BLIP)
-    _G[checkBlip:GetName() .. "Text"]:SetTextColor(0.5, 0.5, 0.5)
-    checkBlip:SetChecked(false)
-    checkBlip:Disable()
+    -- Retail only: its note tells of patch 12.0.7, which means nothing on
+    -- Forever or Classic. Classic still has SetBlipTexture, but FarmMap's blip
+    -- atlases follow Retail's layout and would scramble Classic's other
+    -- minimap icons, so the feature stays off there too.
+    local blipDesc
+    if IS_RETAIL then
+        local checkBlip = CreateFrame("CheckButton", "FarmMapReplaceBlipCheck", colorPanel, "InterfaceOptionsCheckButtonTemplate")
+        checkBlip:SetPoint("TOPLEFT", mmSep, "BOTTOMLEFT", 0, -4)
+        _G[checkBlip:GetName() .. "Text"]:SetText(L.REPLACE_BLIP)
+        _G[checkBlip:GetName() .. "Text"]:SetTextColor(0.5, 0.5, 0.5)
+        checkBlip:SetChecked(false)
+        checkBlip:Disable()
 
-    local blipDesc = colorPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-    blipDesc:SetPoint("TOPLEFT", checkBlip, "BOTTOMLEFT", 20, -2)
-    blipDesc:SetText("|cffaaaaaa" .. L.REPLACE_BLIP_DESC .. "|r")
-    blipDesc:SetJustifyH("LEFT")
+        blipDesc = colorPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+        blipDesc:SetPoint("TOPLEFT", checkBlip, "BOTTOMLEFT", 20, -2)
+        blipDesc:SetText("|cffaaaaaa" .. L.REPLACE_BLIP_DESC .. "|r")
+        blipDesc:SetJustifyH("LEFT")
+    end
 
     -- Functional checkbox, independent from checkBlip: shows or hides the FarmMap
     -- pins (HBDPins) on the minimap. The world map is never affected,
     -- it always keeps its custom pins.
     local checkPins = CreateFrame("CheckButton", "FarmMapShowMinimapPinsCheck", colorPanel, "InterfaceOptionsCheckButtonTemplate")
-    checkPins:SetPoint("TOPLEFT", blipDesc, "BOTTOMLEFT", -20, -8)
+    if blipDesc then
+        checkPins:SetPoint("TOPLEFT", blipDesc, "BOTTOMLEFT", -20, -8)
+    else
+        checkPins:SetPoint("TOPLEFT", mmSep, "BOTTOMLEFT", 0, -4)
+    end
     _G[checkPins:GetName() .. "Text"]:SetText(L.SHOW_MINIMAP_PINS)
     checkPins:SetChecked(FarmMapDB and FarmMapDB.showMinimapPins ~= false)
     checkPins:SetScript("OnClick", function(self)
@@ -3080,14 +3442,24 @@ local function CreateOptions()
         { key = "protanopia",   label = L.PRESET_PROT  },
         { key = "tritanopia",   label = L.PRESET_TRIT  },
     }
+    -- The rings (see RING_TEXTURE), on every client and on both maps: first
+    -- meant for Forever's tracking dots, then asked for on Retail too.
+    table.insert(MM_PRESETS_BASE, { key = "ring",      label = L.PRESET_RING       })
+    table.insert(MM_PRESETS_BASE, { key = "ringcolor", label = L.PRESET_RING_COLOR })
     local WM_PRESETS_BASE = {
-        { key = "atlas",        label = L.PRESET_ATLAS },
         { key = "blank",        label = L.PRESET_BLANK },
         { key = "vivid",        label = L.PRESET_VIVID },
         { key = "deuteranopia", label = L.PRESET_DEUT  },
         { key = "protanopia",   label = L.PRESET_PROT  },
         { key = "tritanopia",   label = L.PRESET_TRIT  },
     }
+    -- "Blizzard atlas", first in both lists: Blizzard's own icons, now from
+    -- the strip FarmMap ships (see BLIZZARD_ICONS) instead of the game's atlas,
+    -- which Retail 12.1.0 reshuffled again. Same look on every client.
+    table.insert(MM_PRESETS_BASE, 1, { key = "blizzard", label = L.PRESET_BLIZZARD })
+    table.insert(WM_PRESETS_BASE, 1, { key = "blizzard", label = L.PRESET_BLIZZARD })
+    table.insert(WM_PRESETS_BASE, { key = "ring",      label = L.PRESET_RING       })
+    table.insert(WM_PRESETS_BASE, { key = "ringcolor", label = L.PRESET_RING_COLOR })
 
     -- Rebuilds the built-in rows only (no external styles here)
     local function BuildPresetRows()
@@ -3101,11 +3473,16 @@ local function CreateOptions()
             table.insert(mmRows, row)
         end
 
-        wmSep:ClearAllPoints()
-        wmSep:SetPoint("TOPLEFT", mmRows[#mmRows], "BOTTOMLEFT", 0, -14)
-
+        -- World map in a second column: with the rings, the two lists stacked
+        -- ran past the bottom of the settings canvas. Its rows start level
+        -- with the minimap rows, so the two lists read side by side, and its
+        -- heading sits just above them. 320 clears the widest thing in the
+        -- left column (the Retail-only note under "Replace Blizzard atlas").
         wmAnchor:ClearAllPoints()
-        wmAnchor:SetPoint("TOPLEFT", wmSep, "BOTTOMLEFT", 0, -4)
+        wmAnchor:SetPoint("TOPLEFT", mmAnchor, "TOPLEFT", 320, 0)
+
+        wmSep:ClearAllPoints()
+        wmSep:SetPoint("BOTTOMLEFT", wmAnchor, "TOPLEFT", 0, 4)
 
         for i, preset in ipairs(WM_PRESETS_BASE) do
             local row = MakePresetRow(colorPanel, wmAnchor, -(i-1)*34 - 2, preset.key, "worldmapStyle", preset.label)
@@ -3118,7 +3495,7 @@ local function CreateOptions()
     -- Visual sync: clears the selection when the active style is an external pack
     local function SyncColorPanel()
         local mmStyle = FarmMapDB.minimapStyle  or "blank"
-        local wmStyle = FarmMapDB.worldmapStyle or "atlas"
+        local wmStyle = FarmMapDB.worldmapStyle or "blizzard"
         -- checkBlip is disabled and always unchecked, nothing to sync here
         for _, row in ipairs(mmRows) do
             local active = (row.presetKey == mmStyle) and not FarmMapStyles.Get(mmStyle)
@@ -3159,9 +3536,60 @@ local function CreateOptions()
     packDesc:SetText("|cffaaaaaa" .. L.PACKS_DESC .. "|r")
     packDesc:SetJustifyH("LEFT")
 
+    -- Footer: where to get more packs, and how to make one. Pinned to the
+    -- bottom of the panel, outside the scrolling list, so it shows whether
+    -- packs are installed or not.
+    local PACK_LINKS = {
+        { name = "Old Colors",                  url = "curseforge.com/wow/addons/farmmap-old-colors" },
+        { name = "The Artisan's Anthology",     url = "curseforge.com/wow/addons/farmmap-the-artisans-anthology" },
+    }
+
+    local packOwn = packPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    packOwn:SetPoint("BOTTOMLEFT", packPanel, "BOTTOMLEFT", 16, 14)
+    packOwn:SetJustifyH("LEFT")
+    packOwn:SetText("|cffaaaaaa" .. L.PACKS_OWN .. "|r")
+
+    -- One row per pack: its name, then its address in a read-only EditBox.
+    -- WoW gives addons no clipboard access, so the box only selects the
+    -- address on click and the player presses Ctrl+C - same as the Discord
+    -- row of the main panel.
+    local lastLink = packOwn
+    for i = #PACK_LINKS, 1, -1 do
+        local link = PACK_LINKS[i]
+        local nameFS = packPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+        nameFS:SetPoint("BOTTOMLEFT", lastLink, "TOPLEFT", 0, i == #PACK_LINKS and 10 or 4)
+        nameFS:SetText(link.name)
+
+        local urlBox = CreateFrame("EditBox", nil, packPanel)
+        urlBox:SetPoint("LEFT", nameFS, "LEFT", 170, 0)
+        urlBox:SetSize(320, 16)
+        urlBox:SetFontObject("GameFontHighlightSmall")
+        urlBox:SetTextInsets(0, 0, 0, 0)
+        urlBox:SetAutoFocus(false)
+        urlBox:SetText(link.url)
+        urlBox:SetCursorPosition(0)
+        urlBox:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
+        urlBox:SetScript("OnEditFocusLost",   function(self) self:HighlightText(0, 0) end)
+        urlBox:SetScript("OnEscapePressed",   function(self) self:ClearFocus() end)
+        urlBox:SetScript("OnEnterPressed",    function(self) self:ClearFocus() end)
+        -- Read-only: any typing puts the address back.
+        urlBox:SetScript("OnTextChanged", function(self, userInput)
+            if userInput then self:SetText(link.url) ; self:HighlightText() end
+        end)
+        -- No tooltip: the "click, then Ctrl+C" hint sits on the line above.
+
+        lastLink = nameFS
+    end
+
+    local packMore = packPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    packMore:SetPoint("BOTTOMLEFT", lastLink, "TOPLEFT", 0, 8)
+    packMore:SetJustifyH("LEFT")
+    packMore:SetText(L.PACKS_MORE .. " |cffaaaaaa(" .. L.PACKS_COPY_HINT .. ")|r")
+
     local packScroll = CreateFrame("ScrollFrame", "FarmMapPackScroll", packPanel, "UIPanelScrollFrameTemplate")
     packScroll:SetPoint("TOPLEFT",     packDesc,  "BOTTOMLEFT",  0,  -10)
-    packScroll:SetPoint("BOTTOMRIGHT", packPanel, "BOTTOMRIGHT", -28, 10)
+    -- Stops above the footer instead of running to the panel's bottom edge.
+    packScroll:SetPoint("BOTTOMRIGHT", packPanel, "BOTTOMRIGHT", -28, 120)
 
     local packContent = CreateFrame("Frame", nil, packScroll)
     packContent:SetWidth(320)
@@ -3241,7 +3669,7 @@ local function CreateOptions()
     -- Pack visual sync: clears the selection when the active style is a built-in preset
     local function SyncPackPanel()
         local mmStyle = FarmMapDB.minimapStyle  or "blank"
-        local wmStyle = FarmMapDB.worldmapStyle or "atlas"
+        local wmStyle = FarmMapDB.worldmapStyle or "blizzard"
         for _, row in ipairs(pkMmRows) do
             local active = (row.presetKey == mmStyle) and FarmMapStyles.Get(mmStyle) ~= nil
             if active then
@@ -3299,6 +3727,8 @@ local function CreateOptions()
         { key = "Peche",  label = L.TYPE_Peche,  color = TYPE_COLORS.Peche  },
         { key = "Bois",   label = L.TYPE_Bois,   color = TYPE_COLORS.Bois   },
     }
+    -- Logging is Retail only: elsewhere a line that can only ever read 0.
+    if not IS_RETAIL then table.remove(TYPE_LABELS) end
 
     local statLines = {}
     for i, t in ipairs(TYPE_LABELS) do
@@ -3343,7 +3773,71 @@ local function CreateOptions()
     RefreshStats()
     statsPanel:SetScript("OnShow", RefreshStats)
 
+    -- ---- PANEL INTEGRATIONS ----
+    -- Other addons FarmMap works with when they happen to be installed. One
+    -- section per addon: whether it was found, what it adds, and its options.
+    -- Auctionator only for now.
+    local integPanel = CreateFrame("Frame", "FarmMapIntegrationsPanel", UIParent)
+    integPanel.name  = L.INTEG_SECTION
+
+    local integTitle = integPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    integTitle:SetPoint("TOPLEFT", 16, -16)
+    integTitle:SetText(L.INTEG_SECTION)
+
+    local integDesc = integPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    integDesc:SetPoint("TOPLEFT", integTitle, "BOTTOMLEFT", 0, -8)
+    integDesc:SetJustifyH("LEFT")
+    integDesc:SetText("|cffaaaaaa" .. L.INTEG_DESC .. "|r")
+
+    -- Addon names are brands, never translated.
+    local aucTitle = integPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    aucTitle:SetPoint("TOPLEFT", integDesc, "BOTTOMLEFT", 0, -18)
+    aucTitle:SetText("Auctionator")
+
+    local aucStatus = integPanel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    aucStatus:SetPoint("LEFT", aucTitle, "RIGHT", 8, 0)
+
+    local aucDesc = integPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    aucDesc:SetPoint("TOPLEFT", aucTitle, "BOTTOMLEFT", 0, -6)
+    aucDesc:SetWidth(520)
+    aucDesc:SetJustifyH("LEFT")
+    aucDesc:SetText("|cffaaaaaa" .. L.INTEG_AUCTIONATOR_DESC .. "|r")
+
+    -- Moved here from Display: same setting (showProfit), same label.
+    local checkProfit = CreateFrame("CheckButton", "FarmMapShowProfitCheck", integPanel, "InterfaceOptionsCheckButtonTemplate")
+    checkProfit:SetPoint("TOPLEFT", aucDesc, "BOTTOMLEFT", -2, -6)
+    _G[checkProfit:GetName() .. "Text"]:SetText(L.DISPLAY_FLOAT_PROFIT)
+    checkProfit:SetScript("OnClick", function(self) FarmMapDB.showProfit = self:GetChecked() end)
+
+    -- Why the box is greyed out, when it is: the value rides on the floating
+    -- text, which is switched on in another panel.
+    local profitNote = integPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    profitNote:SetPoint("LEFT", _G[checkProfit:GetName() .. "Text"], "RIGHT", 6, 0)
+
+    -- Re-read on every show: Auctionator can be enabled or disabled between
+    -- two sessions, and the floating text toggled in Display meanwhile.
+    local function SyncIntegrations()
+        local hasAuc   = IsAuctionatorLoaded() and true or false
+        local hasFloat = FarmMapDB.showFloatingText and true or false
+        -- The installed version next to the status, read from Auctionator's
+        -- own .toc: lets a player see at a glance whether theirs is current.
+        local aucVersion = hasAuc and GetMeta("Auctionator", "Version")
+        local detected   = L.INTEG_DETECTED
+        if aucVersion and aucVersion ~= "" then
+            detected = detected .. " · " .. L.CREDITS_VERSION .. " " .. aucVersion
+        end
+        aucStatus:SetText(hasAuc and ("|cff33ff33" .. detected .. "|r")
+                                  or ("|cff888888" .. L.INTEG_MISSING .. "|r"))
+        checkProfit:SetChecked(FarmMapDB.showProfit ~= false)
+        checkProfit:SetEnabled(hasAuc and hasFloat)
+        _G[checkProfit:GetName() .. "Text"]:SetAlpha((hasAuc and hasFloat) and 1 or 0.4)
+        profitNote:SetText((hasAuc and not hasFloat) and ("|cffaaaaaa" .. L.INTEG_NEEDS_FLOAT .. "|r") or "")
+    end
+    integPanel:SetScript("OnShow", SyncIntegrations)
+    SyncIntegrations()
+
     Settings.RegisterCanvasLayoutSubcategory(category, statsPanel,   L.PANEL_STATS)
+    Settings.RegisterCanvasLayoutSubcategory(category, integPanel,   L.INTEG_SECTION)
     Settings.RegisterCanvasLayoutSubcategory(category, debugPanel,   L.DEBUG_SECTION)
 end
 
@@ -3391,7 +3885,15 @@ local function CreateMinimapButton()
                     FarmMapShowDebugCheck:SetChecked(FarmMapDB.showDebug)
                 end
             elseif ns.optionsCategory then
-                Settings.OpenToCategory(ns.optionsCategory:GetID())
+                -- OpenSettingsPanel is a protected function (HasRestrictions,
+                -- on Retail and Forever alike): an addon may not open the
+                -- options during combat, and trying raises ADDON_ACTION_BLOCKED.
+                -- Same refusal Blizzard's own UI shows in that situation.
+                if InCombatLockdown() then
+                    UIErrorsFrame:AddExternalErrorMessage(ERR_NOT_IN_COMBAT)
+                else
+                    Settings.OpenToCategory(ns.optionsCategory:GetID())
+                end
             end
         end,
 
@@ -3409,26 +3911,179 @@ local function CreateMinimapButton()
     -- to be persisted in the SavedVariables.
     FarmMapDB.minimapIcon = FarmMapDB.minimapIcon or { hide = false }
     LDBIcon:Register(addonName, dataObject, FarmMapDB.minimapIcon)
+
+    -- LibDBIcon lays the button out for Retail only when WOW_PROJECT_ID is
+    -- MAINLINE, and for Classic otherwise. Forever reports its own project ID
+    -- but draws Retail's minimap art, so it got the Classic offsets and an
+    -- off-centre icon. Re-applied here with the library's Retail values,
+    -- through its public setters: the library itself is shared with every
+    -- other addon and must not be patched.
+    if IS_FOREVER and LDBIcon.SetButtonIcon then
+        LDBIcon:SetButtonBorder(addonName, nil, 50)
+        LDBIcon:SetButtonBackground(addonName, nil, 24, "CENTER", 0, 0)
+        LDBIcon:SetButtonIcon(addonName, nil, 18, "CENTER", 0, 0)
+    end
 end
 
 -- ============================================================
 -- EVENT HANDLING
 -- ============================================================
 
--- Filter for AddDebug (only these events are logged)
-local farmMapEvents = {
-    ADDON_LOADED             = true,
-    LOOT_READY               = true,
-    PLAYER_LOGIN             = true,
-    UNIT_SPELLCAST_SUCCEEDED = true,
-}
+-- Node type of a spell the player just cast, or nil when it is no harvest.
+--
+-- By ID everywhere. Off Retail, an unknown ID falls back on the spell name
+-- (see HARVEST_NAME_SOURCES): Classic's gathering spells come in RANKS, one ID
+-- per rank, all sharing one name, and Forever may add new ones with its new
+-- ores. A name match is written back into HARVEST_SPELLS and logged as
+-- SPELL_LEARNED, so the real IDs can be read from the debug window and
+-- hardcoded once confirmed. Retail never takes the name path, so its
+-- detection is exactly what it was.
+local function ResolveHarvestType(spellID)
+    local known = HARVEST_SPELLS[spellID]
+    if known or IS_RETAIL then return known end
+
+    local GetSpellName = C_Spell and C_Spell.GetSpellName
+    local castName = GetSpellName and GetSpellName(spellID)
+    if not castName then return nil end
+
+    -- Read on every call rather than cached once: a name the client has not
+    -- loaded yet would otherwise stay missing for the whole session. It only
+    -- runs for the player's own unknown casts, a handful of lookups each.
+    for refID, nodeType in pairs(HARVEST_NAME_SOURCES) do
+        if GetSpellName(refID) == castName then
+            HARVEST_SPELLS[spellID] = nodeType
+            AddDebug("SPELL_LEARNED", castName .. " -> " .. nodeType .. " (spellID:" .. spellID .. ")")
+            return nodeType
+        end
+    end
+    return nil
+end
+
+-- Off Retail only: lists the APIs FarmMap relies on that this client lacks, in
+-- chat, once per login. The old C globals are not in Blizzard's generated API
+-- docs, so this is where a missing one shows up; silence means every one of
+-- them is there.
+local function ReportCompat()
+    if IS_RETAIL then return end
+    -- Pairs in a list, not a name -> function map: a missing API is nil, and a
+    -- nil value would silently drop its key from the map - the very entries
+    -- this is here to report.
+    local required = {
+        { "GetLootSourceInfo", GetLootSourceInfo }, { "GetLootSlotLink", GetLootSlotLink },
+        { "GetLootSlotInfo",   GetLootSlotInfo   }, { "GetNumLootItems", GetNumLootItems },
+        { "IsFishingLoot",     IsFishingLoot     }, { "GetPlayerFacing", GetPlayerFacing },
+        { "GetProfessions",    GetProfessions    }, { "GetProfessionInfo", GetProfessionInfo },
+        { "GetItemInfo",       GetItemInfo       }, { "loadstring",      loadstring      },
+        { "C_Spell.GetSpellName", C_Spell and C_Spell.GetSpellName },
+    }
+    local missing = {}
+    for _, entry in ipairs(required) do
+        if type(entry[2]) ~= "function" then missing[#missing + 1] = entry[1] end
+    end
+    if #missing > 0 then
+        print("|cffffd100FarmMap :|r " .. ClientLabel() .. " - missing APIs: " .. table.concat(missing, ", "))
+    end
+end
+
+-- ============================================================
+-- NEW VERSION NOTICE
+-- An addon has no network access: the only way to learn that a newer
+-- FarmMap exists is to hear it from another player's FarmMap. Same scheme as
+-- GTFO: each copy announces its version through an invisible addon message,
+-- and a copy that hears a higher number says so in chat, once per session.
+--
+-- FarmMap is mostly played solo, so the guild channel carries most of it;
+-- groups add the rest. A copy that hears an OLDER version answers, so the
+-- outdated player learns about the update too.
+-- ============================================================
+
+local VERSION_PREFIX   = "FarmMap"
+local VERSION_COOLDOWN = 60     -- seconds between two sends on one channel
+
+-- "v2.0.0" -> 20000. nil for anything else, which switches the feature off
+-- rather than comparing garbage.
+local function VersionNumber(text)
+    if type(text) ~= "string" then return nil end
+    local major, minor, patch = text:match("^v?(%d+)%.(%d+)%.?(%d*)")
+    if not major then return nil end
+    return tonumber(major) * 10000 + tonumber(minor) * 100 + (tonumber(patch) or 0)
+end
+
+local myVersionNumber = VersionNumber(addonVersion)
+local lastVersionSend = {}      -- channel -> GetTime() of the last send
+local updateNoticed   = false
+local wasInGroup      = false
+
+-- The only channels announced to. A reply to anything else (a whisper needs
+-- a target) is dropped.
+local VERSION_CHANNELS = { GUILD = true, PARTY = true, RAID = true, INSTANCE_CHAT = true }
+
+local function SendVersion(channel)
+    if not myVersionNumber or not VERSION_CHANNELS[channel] then return end
+    -- Midnight's messaging restrictions (boss encounters and the like): send
+    -- nothing rather than have the call refused.
+    if C_ChatInfo.InChatMessagingLockdown and C_ChatInfo.InChatMessagingLockdown() then return end
+    local now = GetTime()
+    if lastVersionSend[channel] and now - lastVersionSend[channel] < VERSION_COOLDOWN then return end
+    lastVersionSend[channel] = now
+    C_ChatInfo.SendAddonMessage(VERSION_PREFIX, "V:" .. addonVersion, channel)
+    AddDebug("VERSION", "sent " .. addonVersion .. " to " .. channel)
+end
+
+-- The group channel the player can currently reach, or nil when solo.
+local function GroupChannel()
+    if IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then return "INSTANCE_CHAT" end
+    if IsInRaid() then return "RAID" end
+    if IsInGroup() then return "PARTY" end
+    return nil
+end
+
+local function OnVersionMessage(prefix, message, channel, sender)
+    -- Midnight can hand addons secret values; comparing one raises an error.
+    if issecretvalue and (issecretvalue(prefix) or issecretvalue(message)) then return end
+    if prefix ~= VERSION_PREFIX or type(message) ~= "string" then return end
+    -- A guild or group message comes back to its sender too: without this the
+    -- debug window logged our own announce as "heard" from someone else.
+    if type(sender) == "string" and not (issecretvalue and issecretvalue(sender))
+       and Ambiguate(sender, "none") == UnitName("player") then
+        return
+    end
+    local theirs = message:match("^V:(.+)$")
+    local theirNumber = VersionNumber(theirs)
+    if not theirNumber or not myVersionNumber then return end
+    AddDebug("VERSION", "heard " .. theirs .. " on " .. tostring(channel))
+
+    if theirNumber > myVersionNumber then
+        if not updateNoticed and FarmMapDB and FarmMapDB.versionNotice ~= false then
+            updateNoticed = true
+            print("|cffffd100FarmMap :|r " .. string.format(L.UPDATE_AVAILABLE, theirs, addonVersion))
+        end
+    elseif theirNumber < myVersionNumber then
+        -- Answer on the channel it came from, so the outdated copy hears us.
+        SendVersion(channel)
+    end
+end
+
+-- Set while a SKILL_LINES_CHANGED re-check is queued (see the event handler).
+local professionCheckPending = false
+
+-- The debug window only shows what concerns gathering. Every spell cast and
+-- every mob looted used to land in it too, burying the harvest lines.
+-- The player's last spell is kept silently instead: it is only printed when a
+-- node's loot finds no harvest spell, which is precisely when it is needed to
+-- find an unknown gathering spell ID.
+local lastPlayerSpellID
+-- When it was cast. A gathering cast always comes seconds before its loot;
+-- a quest object or a chest is often looted with no cast at all, and must
+-- not produce a "no harvest spell" line pointing at some old combat spell.
+local lastPlayerSpellAt = 0
+-- When the last harvest was recorded. LOOT_READY fires twice per loot window,
+-- and the second one, finding the harvest spell already consumed, used to log
+-- a misleading "no spell detected" right after a successful harvest.
+local lastHarvestAt = 0
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     local arg1 = ...
-
-    if farmMapEvents[event] then
-        AddDebug(event, tostring(arg1 or ""))
-    end
 
     -- ---- Chargement de l'addon ----
     if event == "ADDON_LOADED" and arg1 == addonName then
@@ -3454,7 +4109,13 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         if FarmMapDB.showBois     == nil then FarmMapDB.showBois     = true end
         if FarmMapDB.showMinimapPins == nil then FarmMapDB.showMinimapPins = true end
         FarmMapDB.minimapStyle     = FarmMapDB.minimapStyle     ~= nil and FarmMapDB.minimapStyle     or "blank"
-        FarmMapDB.worldmapStyle    = FarmMapDB.worldmapStyle    ~= nil and FarmMapDB.worldmapStyle    or "atlas"
+        FarmMapDB.worldmapStyle    = FarmMapDB.worldmapStyle    ~= nil and FarmMapDB.worldmapStyle    or "blizzard"
+        -- "atlas" (the world map default until v2.0.0) pointed at the game's
+        -- own atlas and broke whenever Blizzard reshuffled it. "blizzard" is
+        -- the same icons from FarmMap's own file: same look, never breaks.
+        if FarmMapDB.worldmapStyle == "atlas" then
+            FarmMapDB.worldmapStyle = "blizzard"
+        end
         FarmMapDB.replaceBlip      = FarmMapDB.replaceBlip      ~= nil and FarmMapDB.replaceBlip      or false
         FarmMapDB.language         = FarmMapDB.language         or "auto"
         -- Table managed by LibDBIcon (angular position + hide).
@@ -3498,24 +4159,68 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             ApplyMinimapStyle(FarmMapDB.minimapStyle or "blank")
             -- After login, so that addons sorting after FarmMap have registered.
             ns.ResolveSlashPrefix()
+            -- One line per login or /reload, answering up front what a bug
+            -- report always needs: was the UI reloaded, which FarmMap, which
+            -- client.
+            AddDebug("SESSION", string.format("%s · %s · interface %d",
+                addonVersion, ClientLabel(), INTERFACE_VERSION))
+            ReportCompat()
         end)
+        -- Version announce. Later than the rest: the guild roster is not
+        -- always known half a second into the session.
+        C_ChatInfo.RegisterAddonMessagePrefix(VERSION_PREFIX)
+        C_Timer.After(10, function()
+            if IsInGuild() then SendVersion("GUILD") end
+            wasInGroup = GroupChannel() ~= nil
+            if wasInGroup then SendVersion(GroupChannel()) end
+        end)
+
+    -- ---- New version notice (see the NEW VERSION NOTICE section) ----
+    elseif event == "CHAT_MSG_ADDON" then
+        OnVersionMessage(...)
+
+    -- Announces on joining a group only, not on every roster change: the
+    -- members arriving later announce themselves, and get an answer if they
+    -- are behind.
+    elseif event == "GROUP_ROSTER_UPDATE" then
+        local channel = GroupChannel()
+        if channel and not wasInGroup then SendVersion(channel) end
+        wasInGroup = channel ~= nil
 
     -- ---- Harvest detection ----
     elseif event == "UNIT_SPELLCAST_SUCCEEDED" then
         local unit, _, spellID = ...
         if unit == "player" then
-            AddDebug("SPELL_RAW", "spellID:" .. tostring(spellID))
-            local harvestType = HARVEST_SPELLS[spellID]
+            lastPlayerSpellID = spellID
+            lastPlayerSpellAt = GetTime()
+            local harvestType = ResolveHarvestType(spellID)
             if harvestType then
                 lastHarvestType = harvestType
                 AddDebug("SPELL", harvestType .. " (spellID:" .. spellID .. ")")
                 if pendingLoot then
                     pendingLoot = false
+                    lastHarvestAt = GetTime()
                     ProcessHarvestLoot()
                 else
                     C_Timer.After(5, function() lastHarvestType = nil end)
                 end
             end
+        end
+
+    -- ---- Profession learned or dropped mid-session ----
+    -- Professions used to be read at login only: a profession learned during
+    -- the session stayed "missing", its filter could not even be clicked, and
+    -- its first harvests were recorded but hidden until a /reload.
+    -- Debounced, because this event also fires on every single skill-up.
+    elseif event == "SKILL_LINES_CHANGED" then
+        if FarmMapDB and not professionCheckPending then
+            professionCheckPending = true
+            C_Timer.After(1, function()
+                professionCheckPending = false
+                local changed = CheckProfessions()
+                if FarmMap_UpdateFilterButtons then FarmMap_UpdateFilterButtons() end
+                if changed then RefreshAllPins() end
+            end)
         end
 
     -- ---- Blip refresh after a zone change ----
@@ -3528,15 +4233,49 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "LOOT_READY" then
         CaptureLootData()
         pendingLoot = true
+        -- Off Retail: vanilla-style fishing is a channel. Its cast is reported
+        -- when the line goes out, and the catch can come long after the 5 s
+        -- window that keeps lastHarvestType alive. The loot window itself says
+        -- it is fishing. Blizzard fires LOOT_READY twice per window and
+        -- IsFishingLoot answers yes to both: the catch just recorded must not
+        -- count again (double floating text and stat, seen on Era).
+        if not IS_RETAIL and not lastHarvestType and IsFishingLoot and IsFishingLoot()
+           and GetTime() - lastHarvestAt > 2 then
+            lastHarvestType = "Peche"
+            AddDebug("SPELL", "Peche (IsFishingLoot)")
+        end
         if lastHarvestType then
             pendingLoot = false
+            lastHarvestAt = GetTime()
             ProcessHarvestLoot()
         else
+            -- An unknown gathering spell succeeds right before its loot window
+            -- opens. A spell cast seconds earlier (a paladin seal before the
+            -- fight, then a quest object opened without any cast) is not one.
+            local spellAge = GetTime() - lastPlayerSpellAt
             C_Timer.After(5, function()
                 if pendingLoot then
+                    -- pendingLootData is only set for a GameObject (a node or a
+                    -- chest): mob loot times out silently. So does the echo of
+                    -- a harvest just recorded (see lastHarvestAt).
+                    if pendingLootData and GetTime() - lastHarvestAt > 6
+                       and spellAge < 3 then
+                        local GetSpellName = C_Spell and C_Spell.GetSpellName
+                        local spellName = lastPlayerSpellID and GetSpellName and GetSpellName(lastPlayerSpellID)
+                        -- Quest objects and chests are opened with an "Opening"
+                        -- spell (3365, and variants such as 22810 "Opening - No
+                        -- Text"): never a harvest. Matched on the start of the
+                        -- localized name, so it holds in every client language.
+                        local openingName = GetSpellName and GetSpellName(3365)
+                        local isOpening = spellName and openingName
+                                          and spellName:sub(1, #openingName) == openingName
+                        if not isOpening then
+                            AddDebug("LOOT", "no harvest spell, ignored - last spell: "
+                                .. tostring(spellName or "?") .. " (spellID:" .. tostring(lastPlayerSpellID or "?") .. ")")
+                        end
+                    end
                     pendingLoot     = false
                     pendingLootData = nil
-                    AddDebug("LOOT", "timeout - no spell detected, ignored")
                 end
             end)
         end
@@ -4038,6 +4777,10 @@ SlashCmdList["FARMMAP"] = function(msg)
             -- Position and visibility of the minimap button: clearing the node
             -- database must not move the button back.
             minimapIcon      = FarmMapDB.minimapIcon,
+            -- Filters switched off for a missing profession, so they still
+            -- come back on once it is learned.
+            profAutoOff      = FarmMapDB.profAutoOff,
+            versionNotice    = FarmMapDB.versionNotice,
         }
         FarmMapDB = saved
         HBDPins:RemoveAllMinimapIcons(addonName)
@@ -4053,6 +4796,7 @@ SlashCmdList["FARMMAP"] = function(msg)
             { k = "Peche",  label = L.TYPE_Peche  },
             { k = "Bois",   label = L.TYPE_Bois   },
         }
+        if not IS_RETAIL then table.remove(types) end  -- Logging is Retail only
         print("|cffffd100FarmMap - " .. L.STATS_TITLE .. "|r")
         for _, t in ipairs(types) do
             local n   = counts[t.k] or 0

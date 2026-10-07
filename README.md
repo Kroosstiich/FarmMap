@@ -28,6 +28,15 @@ routes over time.
   game client with a manual override in the options — Korean by Crazyyoungs,
   Simplified Chinese by buseQ, Russian by ZamestoTV
 
+## Known limitations
+
+- **Fishing records every catch, pool or open water.** The game reports the
+  same loot source for both — the fishing bobber, not the pool — so an addon
+  cannot tell whether the fish came from a school. On Retail you nearly always
+  fish in pools, so it rarely shows; on Classic, where open water is common,
+  expect fishing pins wherever you cast. Catches at the same spot merge into
+  one pin, and the fish button on the filter bar hides them all.
+
 ## Installation
 
 Copy the `FarmMap` folder into `World of Warcraft\_retail_\Interface\AddOns\`,
@@ -119,6 +128,49 @@ styles. Existing packs:
 The in-game `/fm atlas` calibrator helps find the correct icon coordinates
 after a game patch shifts Blizzard's atlas layout.
 
+### Making your own icon pack
+
+A pack is a small separate addon that ships its textures and registers them
+with `FarmMapStyles.Register`. Its styles then appear in FarmMap's
+*Colors → Packs* options panel.
+
+`FarmMap_MyPack.toc` — `Dependencies` makes sure FarmMap is loaded first; list
+the interface number of every client the pack should run on:
+
+```
+## Interface: 120100, 16001
+## Title: FarmMap - My Pack
+## Dependencies: FarmMap
+
+FarmMap_MyPack.lua
+```
+
+`FarmMap_MyPack.lua`:
+
+```lua
+local f = CreateFrame("Frame")
+f:RegisterEvent("ADDON_LOADED")
+f:SetScript("OnEvent", function(self, event, addon)
+    if addon ~= "FarmMap_MyPack" then return end
+    local tex = "Interface\\AddOns\\FarmMap_MyPack\\Textures\\my-icons"
+    FarmMapStyles.Register("mypack", {
+        label = "My Pack",   -- name shown in the options
+        pins  = {            -- one entry per node type
+            -- coords = { left, right, top, bottom }, as fractions (0-1) of the texture
+            Herbo  = { tex = tex, coords = { 0.00, 0.25, 0.00, 0.25 } },  -- herbs
+            Minage = { tex = tex, coords = { 0.25, 0.50, 0.00, 0.25 } },  -- ore
+            Peche  = { tex = tex, coords = { 0.50, 0.75, 0.00, 0.25 } },  -- fishing
+            Bois   = { tex = tex, coords = { 0.75, 1.00, 0.00, 0.25 } },  -- logging (Retail only)
+        },
+    })
+    self:UnregisterAllEvents()
+end)
+```
+
+Textures must be `.tga` or `.blp` with power-of-two dimensions. The
+[Old Colors](https://www.curseforge.com/wow/addons/farmmap-old-colors) pack is
+a complete working example.
+
 ## Development
 
 FarmMap's Lua code is written with AI assistance (Claude Opus 5, by Anthropic).
@@ -141,11 +193,22 @@ The GPLv3 does **not** extend to everything shipped in this repository:
   property of Blizzard Entertainment and is not the author's to relicense; only
   the author's own additions and modifications are his. They are bundled so the
   addon can display icons consistent with the game.
+- **Blizzard gathering icons** (`Textures/atlas-blip-farmmap-blizzard.tga`) are
+  four icons cropped, unmodified, from that same Blizzard atlas. They are
+  shipped so the "Blizzard atlas" style keeps working when Blizzard reshuffles
+  its own file. They remain Blizzard Entertainment's property.
 - **Bundled libraries** in `Libs/` keep their own licenses — see
   [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
 
-**No AI-generated assets are used in this addon.** Every asset added by the
-author was made by hand.
+**No AI-generated artwork is used in this addon.** Every image asset added by
+the author was made by hand.
+
+The one exception is not artwork: the UI frame textures in `Textures/ui/` are
+plain rounded rectangles computed by a small script,
+[`tools/make_frame_textures.py`](tools/make_frame_textures.py) — each pixel's
+opacity comes from geometry alone, not from an image generator, and anyone can
+run the script to rebuild them. Like the rest of FarmMap's code, the script
+itself was written with AI assistance.
 
 World of Warcraft and Blizzard Entertainment are trademarks or registered
 trademarks of Blizzard Entertainment, Inc. This addon is not affiliated with

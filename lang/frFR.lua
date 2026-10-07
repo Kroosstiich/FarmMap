@@ -42,8 +42,12 @@ ns.locales.frFR = {
         CREDITS_CREATOR        = "Créateur",
         CREDITS_DISCORD        = "Discord",
         CREDITS_TRANSLATOR     = "Traduction",
+        CREDITS_GAME           = "World of Warcraft",
+        CLIENT_FOREVER         = "Forever",
         CREDITS_VERSION        = "Version",
         CREDITS_UPDATE         = "MàJ",
+        VERSION_NOTICE         = "Me prévenir si une version plus récente est repérée (guilde ou groupe)",
+        UPDATE_AVAILABLE       = "une version plus récente est disponible : %s (vous avez %s). Veuillez mettre l'addon à jour dès que possible.",
         CREDITS_COPY_CLICK     = "Cliquez pour copier",
         CREDITS_COPY_KEY       = "Ctrl+C pour copier",
         CREDITS_COPIED         = "Copié !",
@@ -74,7 +78,14 @@ ns.locales.frFR = {
         WORLDPIN_SECTION       = "Icônes des nœuds (carte du monde)",
         WORLDPIN_SIZE          = "Taille des icônes",
         DISPLAY_NODE_ITEMS     = "Afficher les objets récoltés par nœud",
-        DISPLAY_NODE_ITEMS_HINT = "Ajoute le détail par rang au tooltip de chaque nœud. Ce qu'un nœud donne est aléatoire ; c'est dans le résumé de zone que les chiffres ont du sens.",
+        DISPLAY_NODE_ITEMS_HINT = "Ajoute à l'infobulle de chaque nœud ce qu'il vous a rapporté. Le minerai ou la plante du nœud est garanti ; les objets en plus (pierre brute, gemmes…) tombent au hasard.",
+
+        INTEG_SECTION          = "Intégrations",
+        INTEG_DESC             = "Les autres addons avec lesquels FarmMap fonctionne lorsqu'ils sont installés. Aucun n'est obligatoire.",
+        INTEG_DETECTED         = "détecté",
+        INTEG_MISSING          = "non installé",
+        INTEG_AUCTIONATOR_DESC = "Affiche la valeur de vos récoltes dans le texte flottant. Les prix viennent de la base d'Auctionator : scannez l'hôtel des ventes au moins une fois.",
+        INTEG_NEEDS_FLOAT      = "(activez le texte flottant dans Affichage)",
         ZONE_SUMMARY_TITLE     = "Résumé de la zone",
         ZONE_BUTTON_HINT       = "Cliquer pour ouvrir le résumé de la zone",
         ZONE_GATHERED          = "Récoltes effectuées ici",
@@ -89,7 +100,7 @@ ns.locales.frFR = {
         COLORS_DESC            = " Choisissez un style d'icône pour la minimap et la carte du monde.\n Cliquez sur une ligne pour la sélectionner (bordure dorée = actif).",
         MINIMAP_SECTION        = "Minimap",
         REPLACE_BLIP           = "Remplacer l'atlas Blizzard",
-        REPLACE_BLIP_DESC      = " Suite à une mise à jour récente, il n'est plus possible de\n remplacer l'atlas de Blizzard sur la minimap. Seule la carte\n du monde garde les pins personnalisés.",
+        REPLACE_BLIP_DESC      = " Depuis le patch 12.0.7, Blizzard ne permet plus aux addons\n de remplacer son atlas sur la minimap. Les pins de FarmMap\n s'affichent par-dessus (option ci-dessous).",
         SHOW_MINIMAP_PINS      = "Afficher les pins sur la minimap",
         SHOW_MINIMAP_BUTTON    = "Afficher le bouton FarmMap sur la minimap",
         MINIMAP_BTN_LEFT       = "Clic gauche : ouvrir les options",
@@ -97,7 +108,7 @@ ns.locales.frFR = {
         WORLDMAP_SECTION       = "Carte du monde",
         PRESET_BLANK           = "Outline blanc",
         PRESET_VIVID           = "Couleurs vives",
-        PRESET_ATLAS           = "Atlas Blizzard",
+        PRESET_BLIZZARD        = "WoW Retail",
         PRESET_DEUT            = "Deuteranopia",
         PRESET_PROT            = "Protanopia",
         PRESET_TRIT            = "Tritanopia",
@@ -180,6 +191,11 @@ ns.locales.frFR = {
         PACKS_TITLE            = "Packs d'icônes",
         PACKS_DESC             = " Styles issus de sous-addons installés.\n Sélectionner un pack désactive le preset actif dans Couleurs (et inversement).",
         PACKS_EMPTY            = "|cffaaaaaa Aucun pack installé.\n Installez un sous-addon FarmMap_* pour voir les packs ici.|r",
+        PRESET_RING            = "Anneau classique",
+        PRESET_RING_COLOR      = "Anneau classique, couleurs",
+        PACKS_MORE             = "D'autres packs d'icônes sont disponibles sur CurseForge :",
+        PACKS_COPY_HINT        = "cliquez sur une adresse, puis Ctrl+C",
+        PACKS_OWN              = "Vous pouvez aussi créer le vôtre : tout addon peut ajouter un style avec FarmMapStyles.Register.\nVoir le README sur GitHub.",
 
         -- Noms d'extension affichés dans les infobulles de nœuds.
         --
@@ -190,7 +206,7 @@ ns.locales.frFR = {
         -- pour cette langue uniquement : à ne faire que pour la formulation
         -- avec laquelle on n'est pas d'accord.
         --
-        -- EXP_0  = "Classic",
+        -- EXP_0  = "Vanilla",
         -- EXP_1  = "Burning Crusade",
         -- EXP_2  = "Wrath of the Lich King",
         -- EXP_3  = "Cataclysm",
