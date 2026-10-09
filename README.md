@@ -77,13 +77,8 @@ the quotes, and the language appears in the addon options on its own. Any key
 left untranslated falls back to English, so a partial translation never breaks
 anything.
 
-**The easiest route needs no file at all:** phrases can be translated directly
-in the browser at
-[legacy.curseforge.com/wow/addons/farmmap/localization](https://legacy.curseforge.com/wow/addons/farmmap/localization)
-— use the website, not the CurseForge desktop app, which does not offer that
-page.
-
-The full step-by-step guide for the file route is in
+Send the file on the [Discord](https://discord.gg/4BEGpmktK7), or open a pull
+request here if you are comfortable with git. The full step-by-step guide is in
 [lang/README.md](lang/README.md).
 
 | Locale | Language | Translator |

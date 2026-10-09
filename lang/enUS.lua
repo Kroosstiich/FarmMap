@@ -348,7 +348,7 @@ ns.locales.enUS = {
         UI_VERSION_NOTICE_DESC = "When someone in your guild or group runs a newer FarmMap, a line in the chat tells you, once per session.",
         UI_SEC_FLOAT           = "Floating text",
         UI_FLOAT               = "Floating text on harvest",
-        UI_FLOAT_DESC          = "Above your character after each harvest: what you gathered, how many you now carry and, with Auctionator, what it is worth.",
+        UI_FLOAT_DESC          = "Above your character after each harvest: what you gathered, how many you now carry and, with Auctionator or TSM, what it is worth.",
         UI_FLOAT_TIER          = "Quality rank icon",
         UI_FLOAT_TIER_DESC     = "Shows the reagent's quality rank next to its name.",
         UI_FLOAT_SIZE          = "Text size",
@@ -468,7 +468,7 @@ ns.locales.enUS = {
         UI_DB_CLEAR_CONFIRM    = "Click again to confirm",
 
         UI_LANG_HELP_TITLE     = "Your language is missing?",
-        UI_LANG_HELP           = "FarmMap is translated by its players, and a partial translation already works: untranslated texts stay in English. Translate in the browser on FarmMap's CurseForge localization page, or send a file on the Discord.",
+        UI_LANG_HELP           = "FarmMap is translated by its players, and a partial translation already works: untranslated texts stay in English. Copy lang/enUS.lua, translate the texts between the quotes, then send the file on the Discord or on GitHub.",
         UI_ROLE_AUTHOR         = "Author",
         UI_CONTRIB_BUSEQ       = "harvest value display",
         UI_CONTRIB_CRAZY       = "ideas: movable filter bar and its size, translated expansion names",

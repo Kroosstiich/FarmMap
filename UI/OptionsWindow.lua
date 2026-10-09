@@ -2680,7 +2680,9 @@ local function LanguageChanged()
     return (FarmMapDB.language or "auto") ~= (ns.languageAtLogin or "auto")
 end
 
-local LOCALIZATION_URL = "https://legacy.curseforge.com/wow/addons/farmmap/localization"
+-- Translations come as files, on the Discord or on GitHub: the CurseForge
+-- localization page is no longer used (Kroosstii, 2026-10-09).
+local GITHUB_URL = "https://github.com/Kroosstiich/FarmMap"
 
 OptionsWindow:AddPage({
     id = "lang", group = "settings", titleKey = "UI_LANG", descKey = "UI_LANG_DESC",
@@ -2695,8 +2697,8 @@ OptionsWindow:AddPage({
         frame.choice.dropdown.minWidth = 300
         frame.notice = ReloadNotice(frame)
         frame.help = OptionsWindow.Card(frame)
-        frame.helpCurse = Theme.ActionButton(frame.help, "CurseForge")
-        frame.helpCurse:SetScript("OnClick", function() ShowLink(LOCALIZATION_URL) end)
+        frame.helpCurse = Theme.ActionButton(frame.help, "GitHub")
+        frame.helpCurse:SetScript("OnClick", function() ShowLink(GITHUB_URL) end)
         frame.helpDiscord = Theme.ActionButton(frame.help, "Discord")
         frame.helpDiscord:SetScript("OnClick", function() ShowLink(LINKS[1].url) end)
     end,

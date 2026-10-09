@@ -323,7 +323,7 @@ ns.locales.frFR = {
         UI_VERSION_NOTICE_DESC = "Quand quelqu'un de votre guilde ou de votre groupe utilise une version plus récente de FarmMap, une ligne dans le chat vous le signale, une fois par session.",
         UI_SEC_FLOAT           = "Texte flottant",
         UI_FLOAT               = "Texte flottant à la récolte",
-        UI_FLOAT_DESC          = "Au-dessus de votre personnage après chaque récolte : ce que vous avez ramassé, combien vous en portez et, avec Auctionator, ce que ça vaut.",
+        UI_FLOAT_DESC          = "Au-dessus de votre personnage après chaque récolte : ce que vous avez ramassé, combien vous en portez et, avec Auctionator ou TSM, ce que ça vaut.",
         UI_FLOAT_TIER          = "Icône de rang de qualité",
         UI_FLOAT_TIER_DESC     = "Affiche le rang de qualité du composant à côté de son nom.",
         UI_FLOAT_SIZE          = "Taille du texte",
@@ -443,7 +443,7 @@ ns.locales.frFR = {
         UI_DB_CLEAR_CONFIRM    = "Cliquez à nouveau pour confirmer",
 
         UI_LANG_HELP_TITLE     = "Votre langue manque ?",
-        UI_LANG_HELP           = "FarmMap est traduit par ses joueurs, et une traduction partielle fonctionne déjà : les textes non traduits restent en anglais. Traduisez dans le navigateur sur la page de localisation CurseForge de FarmMap, ou envoyez un fichier sur le Discord.",
+        UI_LANG_HELP           = "FarmMap est traduit par ses joueurs, et une traduction partielle fonctionne déjà : les textes non traduits restent en anglais. Copiez lang/enUS.lua, traduisez les textes entre guillemets, puis envoyez le fichier sur le Discord ou sur GitHub.",
         UI_ROLE_AUTHOR         = "Auteur",
         UI_CONTRIB_BUSEQ       = "affichage de la valeur des récoltes",
         UI_CONTRIB_CRAZY       = "idées : barre de filtres déplaçable et sa taille, noms d'extension traduits",
