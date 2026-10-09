@@ -284,8 +284,10 @@ The GPLv3 does **not** extend to everything shipped in this repository:
   shipped so the "WoW Retail" style keeps working when Blizzard reshuffles its
   own file. They remain Blizzard Entertainment's property.
 - **The KROO logo** (`Media/logo.png`, and `Media/logo-white.png`, the same
-  shape in white so the window can tint it) is the author's own mark. The
-  Discord and PayPal icons in `Media/` belong to their respective owners.
+  shape in white so the window can tint it) belongs to the author, Kroosstii,
+  who keeps all rights to it. It is not covered by the GPL: it may not be used
+  anywhere else, in any form, without his permission. The Discord and PayPal
+  icons in `Media/` belong to their respective owners.
 - **Bundled libraries** in `Libs/` keep their own licenses — see
   [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
 
