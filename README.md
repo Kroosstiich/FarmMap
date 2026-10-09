@@ -286,8 +286,10 @@ The GPLv3 does **not** extend to everything shipped in this repository:
 - **The KROO logo** (`Media/logo.png`, and `Media/logo-white.png`, the same
   shape in white so the window can tint it) belongs to the author, Kroosstii,
   who keeps all rights to it. It is not covered by the GPL: it may not be used
-  anywhere else, in any form, without his permission. The Discord and PayPal
-  icons in `Media/` belong to their respective owners.
+  anywhere else, in any form, without his permission.
+- **The Discord and PayPal icons** (`Media/discord.png`, `Media/paypal.png`) are
+  those companies' own logos, not the author's: he claims no rights over them.
+  Their use follows Discord's and PayPal's brand guidelines.
 - **Bundled libraries** in `Libs/` keep their own licenses — see
   [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
 
