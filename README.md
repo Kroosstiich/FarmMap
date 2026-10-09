@@ -36,6 +36,12 @@ routes over time.
   fish in pools, so it rarely shows; on Classic, where open water is common,
   expect fishing pins wherever you cast. Catches at the same spot merge into
   one pin, and the fish button on the filter bar hides them all.
+- **Blizzard's own minimap tracking dots cannot be restyled.** FarmMap draws
+  its own pins instead. Retail lost the only way to do it in patch 12.0.7
+  (`Minimap:SetBlipTexture` was removed) and WoW: Forever never had it. The
+  Classic clients still have it, but it only swaps one whole image whose
+  layout is fixed by the game engine: an addon cannot choose which part of it
+  stands for herbs or ores, so FarmMap does not offer it there either.
 
 ## Installation
 

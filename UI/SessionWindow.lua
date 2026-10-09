@@ -1,0 +1,145 @@
+-- ============================================================
+--  FarmMap — small session window
+--
+--  The dashboard's four numbers (duration, nodes, value, gold per hour) in
+--  a small movable window, to keep an eye on a farm without opening the
+--  options. Switched on from the dashboard page; remembered with its
+--  position in FarmMapDB.sessionWindow. Kroosstii's idea (2026-10-08).
+--
+--  Same theme as the options window, and the same numbers: both read
+--  ns.OptionsWindow.SessionNumbers().
+-- ============================================================
+
+local _, ns = ...
+
+local Theme = ns.Theme
+local SessionWindow = {}
+ns.SessionWindow = SessionWindow
+
+local W, ROW_H = 250, 24
+local LINES = {
+    { key = "UI_DASH_TIME"  },
+    { key = "UI_DASH_NODES" },
+    { key = "UI_DASH_VALUE" },
+    { key = "UI_DASH_GPH"   },
+}
+
+local frame
+
+local function L(key) return ns.L[key] or key end
+
+local function Saved()
+    FarmMapDB.sessionWindow = FarmMapDB.sessionWindow or {}
+    return FarmMapDB.sessionWindow
+end
+
+local function SavePosition()
+    local point, _, relPoint, x, y = frame:GetPoint(1)
+    Saved().pos = { point, relPoint, math.floor(x + 0.5), math.floor(y + 0.5) }
+end
+
+local function Create()
+    if frame then return frame end
+    frame = CreateFrame("Frame", "FarmMapSessionWindow", UIParent)
+    frame:SetSize(W, 38 + #LINES * ROW_H + 8)
+    frame:SetFrameStrata("MEDIUM")
+    frame:SetClampedToScreen(true)
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    frame:RegisterForDrag("LeftButton")
+    frame:SetScript("OnDragStart", function(self) self:StartMoving() end)
+    frame:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        SavePosition()
+    end)
+    Theme.Plate(frame, "bg", "line")
+
+    frame.title = Theme.Font(frame:CreateFontString(nil, "OVERLAY"), 13, "accent")
+    frame.title:SetPoint("TOPLEFT", 12, -10)
+    frame.title:SetText("FarmMap · " .. L("UI_DASH_SESSION"))
+
+    -- Closing it is the same as unticking it in the dashboard.
+    local close = Theme.GlyphButton(frame, "\195\151", 20)
+    close:SetPoint("TOPRIGHT", -6, -6)
+    close:SetScript("OnClick", function() SessionWindow:SetEnabled(false) end)
+
+    local rule = Theme.Rule(frame, false, "line")
+    rule:SetPoint("TOPLEFT", 10, -32)
+    rule:SetPoint("TOPRIGHT", -10, -32)
+
+    frame.rows = {}
+    for i, line in ipairs(LINES) do
+        local label = Theme.Font(frame:CreateFontString(nil, "OVERLAY"), 12.5, "dim")
+        label:SetPoint("TOPLEFT", 12, -(38 + (i - 1) * ROW_H))
+        label:SetText(L(line.key))
+        local value = Theme.Font(frame:CreateFontString(nil, "OVERLAY"), 13.5, i == 4 and "accent" or "text")
+        value:SetPoint("TOPRIGHT", -12, -(38 + (i - 1) * ROW_H))
+        value:SetJustifyH("RIGHT")
+        frame.rows[i] = value
+    end
+
+    local pos = Saved().pos
+    if pos then
+        frame:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
+    else
+        frame:SetPoint("RIGHT", UIParent, "RIGHT", -60, 120)
+    end
+
+    -- Duration and rates move with time: re-read every 5 seconds.
+    local since = 0
+    frame:SetScript("OnUpdate", function(_, elapsed)
+        since = since + elapsed
+        if since >= 5 then
+            since = 0
+            SessionWindow:Update()
+        end
+    end)
+    return frame
+end
+
+function SessionWindow:Update()
+    if not (frame and frame:IsShown() and ns.OptionsWindow) then return end
+    local OW = ns.OptionsWindow
+    local n = OW.SessionNumbers()
+    local nodes = tostring(n.nodes)
+    if n.perHour then nodes = nodes .. "  (" .. L("UI_DASH_PER_HOUR"):format(n.perHour) .. ")" end
+    frame.rows[1]:SetText(OW.Duration(n.elapsed))
+    frame.rows[2]:SetText(nodes)
+    frame.rows[3]:SetText(n.value and OW.Money(n.value) or "—")
+    frame.rows[4]:SetText(n.gph and OW.Money(n.gph) or "—")
+end
+
+function SessionWindow:IsEnabled()
+    return FarmMapDB and FarmMapDB.sessionWindow and FarmMapDB.sessionWindow.shown == true or false
+end
+
+function SessionWindow:SetEnabled(on)
+    Saved().shown = on and true or nil
+    if on then
+        Theme.Reload()
+        Create():Show()
+        self:Update()
+    elseif frame then
+        frame:Hide()
+    end
+    -- The dashboard's switch follows a close from the window itself.
+    if ns.OptionsWindow then ns.OptionsWindow:Refresh() end
+end
+
+-- After a harvest, alongside the options window's own refresh.
+local previous = ns.OnDataChanged
+ns.OnDataChanged = function()
+    if previous then previous() end
+    SessionWindow:Update()
+end
+
+-- Shown again at login when it was left open.
+local loader = CreateFrame("Frame")
+loader:RegisterEvent("PLAYER_LOGIN")
+loader:SetScript("OnEvent", function()
+    if SessionWindow:IsEnabled() then
+        Theme.Reload()
+        Create():Show()
+        SessionWindow:Update()
+    end
+end)

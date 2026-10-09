@@ -77,7 +77,10 @@ local LOCALE_FONTS = {
     zhCN = "Fonts\\ARKai_T.ttf",
     koKR = "Fonts\\2002.TTF",
     zhTW = "Fonts\\blei00d.TTF",
-    ruRU = "Fonts\\FRIZQT___CYRILLIC.TTF",
+    -- FRIZQT___CYR, the file Blizzard's own font families use on every
+    -- client. The "CYRILLIC" name this line used to carry exists nowhere:
+    -- SetFont failed with "file not found" (seen in the v2 credits page).
+    ruRU = "Fonts\\FRIZQT___CYR.TTF",
 }
 local FLOATING_FONT = LOCALE_FONTS[GetLocale()] or STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
 
@@ -90,6 +93,7 @@ local RefreshAllPins
 local RefreshWorldMapPins
 local OpenDebugCopyPopup
 local RecordStat
+local RecordSession
 local RecordNodeStat
 local GetNodeStat
 local OpenExportPopup
@@ -405,6 +409,7 @@ local TIER_TEXTURES = {
 --           Peche  = { tex = "...", coords = {...} },
 --           Bois   = { tex = "...", coords = {...} },
 --       },
+--       -- In a pin, optional: grow = 2 draws it 2 px bigger on both maps.
 --       blip = "Interface\\AddOns\\MonPack\\atlas-blip",  -- optionnel
 --   })
 -- ============================================================
@@ -438,6 +443,33 @@ function FarmMapStyles.GetAll()
         table.insert(list, { key = k, label = v.label, hasBlip = v.blip ~= nil })
     end
     return list
+end
+
+-- Sakura: icons drawn for FarmMap by SorelDesign (https://soreldesign.fr),
+-- shipped inside FarmMap since 2.0 (Kroosstii's call: no separate addon).
+-- Registered through the packs' own API, so it lists as a pack everywhere.
+-- Textures\sakura.tga: 256x256, 128 px cells - herb, ore / fish, wood -
+-- made by .codex\make_sakura_textures.py from the artist's files.
+-- centered: the drawings sit mid-cell (no per-type nudge in previews and
+-- in the filter bar); grow: 2 px more, they are detailed and read small.
+-- Rich nodes reuse the drawing, tinted gold by CreatePoint. In a do block:
+-- the main chunk is close to Lua's 200-locals limit.
+do
+    local tex = TEX_PATH .. "sakura"
+    local function Cell(l, r, t, b)
+        return { tex = tex, coords = { l, r, t, b }, centered = true, grow = 2 }
+    end
+    local herb, ore = Cell(0, 0.5, 0, 0.5), Cell(0.5, 1, 0, 0.5)
+    local fish, wood = Cell(0, 0.5, 0.5, 1), Cell(0.5, 1, 0.5, 1)
+    FarmMapStyles.Register("sakura", {
+        label = "Sakura",
+        pins  = {
+            Herbo  = herb, HerboR  = herb,
+            Minage = ore,  MinageR = ore,
+            Peche  = fish, PecheR  = fish,
+            Bois   = wood,
+        },
+    })
 end
 
 -- ============================================================
@@ -523,6 +555,23 @@ local function ClientLabel()
     if IS_CLASSIC_ERA or not expansion then return "Classic" end
     return "Classic: " .. expansion
 end
+
+-- Shared with the new interface (UI\*.lua, loaded after this file). Read at
+-- run time, never copied: L is rebuilt in place when the language changes.
+ns.L              = L
+ns.version        = addonVersion
+ns.lastUpdate     = lastUpdate
+ns.IS_RETAIL      = IS_RETAIL
+ns.IS_FOREVER     = IS_FOREVER
+ns.IS_CLASSIC     = IS_CLASSIC
+ns.IS_CLASSIC_ERA = IS_CLASSIC_ERA
+ns.LOCALE_FONTS   = LOCALE_FONTS
+ns.ClientLabel    = ClientLabel
+ns.GetAvailableLocales = GetAvailableLocales
+ns.GetLocaleLabel = GetLocaleLabel
+-- The language FarmMap speaks, which the options can force away from the
+-- client's: the interface font has to follow it.
+ns.ActiveLocale   = function() return gameLocale end
 
 -- ============================================================
 -- DATABASE MIGRATIONS
@@ -782,8 +831,25 @@ end
 -- items and itemIDs must stay aligned index by index: the tooltip reads
 -- itemIDs[idx] for item idx. Old nodes without itemIDs therefore emit 0,
 -- a value the display already treats as "no id".
+-- Which game a database comes from. Map IDs differ between Retail and the
+-- Classic clients (Elwynn Forest is not the same uiMapID), so a database
+-- moved from one to the other puts its nodes on maps that do not exist
+-- there. The export names its client in a first comment line, which any
+-- version's import skips like any Lua comment, and the new import preview
+-- reads it to warn.
+local function ClientKey()
+    if IS_RETAIL then return "retail" end
+    if IS_FOREVER then return "forever" end
+    if IS_CLASSIC_ERA then return "era" end
+    return "classic" .. (LE_EXPANSION_LEVEL_CURRENT or "")
+end
+ns.ClientKey = ClientKey
+
 local function SerializeDB()
-    local lines = { "return {" }
+    local lines = {
+        ("-- FarmMap %s export, client=%s (%s)"):format(addonVersion, ClientKey(), ClientLabel()),
+        "return {",
+    }
     for mapID, nodes in pairs(FarmMapDB) do
         if type(nodes) == "table" and #nodes > 0 then
             table.insert(lines, "  [" .. mapID .. "]={")
@@ -814,6 +880,11 @@ end
 local function DeserializeDB(str)
     local fn, err = loadstring(str)
     if not fn then return nil, "Syntaxe invalide : " .. (err or "") end
+    -- An export is a plain table and needs nothing from the game. Running the
+    -- pasted text with no environment at all means a string shared by
+    -- someone else cannot call anything (chat, settings, other addons): it
+    -- can only build a table.
+    setfenv(fn, {})
     local ok, data = pcall(fn)
     if not ok then return nil, "Erreur d'exécution : " .. (data or "") end
     if type(data) ~= "table" then return nil, "Format non reconnu (table attendue)" end
@@ -963,6 +1034,19 @@ debugCheckCapture:SetScript("OnClick", function(self)
     debugActive = self:GetChecked()
     FarmMapDB.debugCapture = debugActive
 end)
+
+-- For the new options window: the same two switches, kept in step with
+-- the debug window's own box and the legacy panel's.
+function ns.SetDebugCapture(on)
+    debugActive = on and true or false
+    FarmMapDB.debugCapture = debugActive
+    debugCheckCapture:SetChecked(debugActive)
+end
+function ns.SetDebugShown(on)
+    FarmMapDB.showDebug = on and true or false
+    if FarmMapDB.showDebug then FarmMapDebug:Show() else FarmMapDebug:Hide() end
+    if FarmMapShowDebugCheck then FarmMapShowDebugCheck:SetChecked(FarmMapDB.showDebug) end
+end
 
 -- Right-aligned, clear of the resize grip in the corner.
 local debugCopyBtn = CreateFrame("Button", nil, debugFrame, "UIPanelButtonTemplate")
@@ -1217,6 +1301,76 @@ local function ClearWorldMapPins()
     wipe(activeWorldPins)
 end
 
+-- Everything the other addons' integrations need (TomTom here, the price
+-- addons further down), in ONE table: Lua allows at most 200 locals in the
+-- file's main chunk, and FarmMap.lua sits close to that limit. Over it, the
+-- whole file fails to load ("main function has more than 200 local
+-- variables"). New top-level helpers belong in a table like this one.
+local Integ = {}
+
+-- The node's name in the client's language when its item is known.
+function Integ.NodeName(nodeData)
+    if nodeData.nameID and nodeData.nameID > 0 then
+        local localName = GetItemInfo(nodeData.nameID)
+        if localName then return localName end
+    end
+    return nodeData.name or nodeData.type
+end
+
+-- Waypoint on click: a left click on a pin sets a waypoint there, a second
+-- click on the same pin takes it away. On unless switched off in the
+-- Integrations page (FarmMapDB.waypointClick). Waypoints are not saved:
+-- they are for the trip at hand, not a second copy of the node database.
+-- TomTom first (several waypoints, an arrow; WaypointUI can show TomTom's
+-- waypoints too), else WaypointUI's own navigation (one at a time).
+Integ.waypoints = {}
+
+-- With both installed, the player picks (FarmMapDB.waypointAddon, asked
+-- by Kroosstii: WaypointUI showing TomTom's waypoint read as WaypointUI
+-- taking over); TomTom unless told otherwise.
+function Integ.WaypointAddon()
+    if not (FarmMapDB and FarmMapDB.waypointClick ~= false) then return nil end
+    local hasTomTom = TomTom and TomTom.AddWaypoint and TomTom.RemoveWaypoint
+    local nav = WaypointUIAPI and WaypointUIAPI.Navigation
+    local hasWUI = nav and nav.NewUserNavigation and nav.ClearUserNavigation
+    if FarmMapDB.waypointAddon == "WaypointUI" and hasWUI then return "WaypointUI" end
+    if hasTomTom then return "TomTom" end
+    if hasWUI then return "WaypointUI" end
+    return nil
+end
+
+function Integ.ToggleWaypoint(mapID, nodeData)
+    local key = mapID .. ":" .. nodeData.x .. ":" .. nodeData.y
+    if Integ.WaypointAddon() == "WaypointUI" then
+        local nav = WaypointUIAPI.Navigation
+        -- Its one navigation may have been replaced (another addon, the
+        -- player, the arrival): only clear it while it is still this pin's.
+        local current = nav.GetUserNavigation and nav.GetUserNavigation()
+        if Integ.wuiKey == key and current and current.name == Integ.NodeName(nodeData) then
+            nav.ClearUserNavigation()
+            Integ.wuiKey = nil
+            return
+        end
+        -- WaypointUI takes coordinates in percent, FarmMap stores 0-1.
+        nav.NewUserNavigation({ name = Integ.NodeName(nodeData), mapID = mapID,
+                                x = nodeData.x * 100, y = nodeData.y * 100 })
+        Integ.wuiKey = key
+        return
+    end
+    local uid = Integ.waypoints[key]
+    -- Another addon's call or TomTom's own clearing on arrival may already
+    -- have removed it: then this click sets it again.
+    if uid and TomTom.IsValidWaypoint and TomTom:IsValidWaypoint(uid) then
+        TomTom:RemoveWaypoint(uid)
+        Integ.waypoints[key] = nil
+        return
+    end
+    Integ.waypoints[key] = TomTom:AddWaypoint(mapID, nodeData.x, nodeData.y, {
+        title = Integ.NodeName(nodeData), from = "FarmMap",
+        persistent = false, crazy = true,
+    })
+end
+
 local function CreatePoint(nodeData, isMinimap, mapID)
     local f = CreateFrame("Frame", nil, nil)
     if isMinimap then
@@ -1243,6 +1397,9 @@ local function CreatePoint(nodeData, isMinimap, mapID)
             ApplyPinTexture(f.tex, pin)
             -- Rings are drawn wider than an icon, to frame the game's blip.
             if pin.size then f:SetSize(pin.size, pin.size) end
+            -- A pack whose drawings read small asks for a few pixels more
+            -- (FarmMap_Sakura: +2, Kroosstii 2026-10-09). Both maps.
+            if pin.grow then f:SetSize(f:GetWidth() + pin.grow, f:GetHeight() + pin.grow) end
         else
             local coords = WORLD_MAP_TEXCOORDS[nodeData.type]
             if coords then
@@ -1259,6 +1416,10 @@ local function CreatePoint(nodeData, isMinimap, mapID)
         local pin   = pins and pins[nodeData.type]
         if pin then
             ApplyPinTexture(f.tex, pin)
+            if pin.grow then
+                f.grow = pin.grow   -- kept for FarmMap_ApplyWorldPinScale
+                f:SetSize(f:GetWidth() + pin.grow, f:GetHeight() + pin.grow)
+            end
         else
             local coords = WORLD_MAP_TEXCOORDS[nodeData.type]
             if coords then
@@ -1280,12 +1441,7 @@ local function CreatePoint(nodeData, isMinimap, mapID)
     f:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:ClearLines()
-        local displayName = nodeData.name
-        if nodeData.nameID and nodeData.nameID > 0 then
-            local localName = GetItemInfo(nodeData.nameID)
-            if localName then displayName = localName end
-        end
-        GameTooltip:AddLine(displayName or nodeData.type, 1, 0.82, 0)
+        GameTooltip:AddLine(Integ.NodeName(nodeData), 1, 0.82, 0)
         -- expID first: it resolves in the client language. expName is only a
         -- fallback for nodes recorded before the id was stored, and stays
         -- frozen in the language of whoever harvested them.
@@ -1347,12 +1503,60 @@ local function CreatePoint(nodeData, isMinimap, mapID)
             end
         end
 
+        -- The click does nothing visible on the pin itself: say it exists.
+        local waypointAddon = Integ.WaypointAddon()
+        if waypointAddon then
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine(L.WAYPOINT_CLICK_TIP:format(waypointAddon), 0.6, 0.6, 0.6)
+        end
+
         GameTooltip:Show()
+
+        -- The pin's own icon at the top right, beside the name and the
+        -- expansion (FarmMapDB.tooltipIcon, on by default; asked by
+        -- Kroosstii 2026-10-09). Copied from the pin itself, so it is the
+        -- style on screen, a pack's or a ring included, with the gold of a
+        -- rich node. One texture kept on GameTooltip, hidden with it.
+        local icon = GameTooltip.farmMapIcon
+        if not icon then
+            icon = GameTooltip:CreateTexture(nil, "ARTWORK")
+            icon:SetPoint("TOPRIGHT", GameTooltip, "TOPRIGHT", -10, -10)
+            GameTooltip.farmMapIcon = icon
+            GameTooltip:HookScript("OnHide", function(tip) tip.farmMapIcon:Hide() end)
+        end
+        -- Twice as big over the world map, where the tooltip has room
+        -- (Kroosstii: 28 px filled a third of the corner); the minimap's
+        -- tooltip stays compact.
+        local iconSize = isMinimap and 28 or 56
+        if FarmMapDB and FarmMapDB.tooltipIcon ~= false and self.tex:GetTexture() then
+            icon:SetSize(iconSize, iconSize)
+            icon:SetTexture(self.tex:GetTexture())
+            icon:SetTexCoord(self.tex:GetTexCoord())
+            icon:SetVertexColor(self.tex:GetVertexColor())
+            if self.tex.IsDesaturated then icon:SetDesaturated(self.tex:IsDesaturated()) end
+            -- Room for it: wider than the two top lines plus the icon, and
+            -- tall enough when the tooltip has a single line.
+            local l1, l2 = _G.GameTooltipTextLeft1, _G.GameTooltipTextLeft2
+            local text = math.max(l1 and l1:GetStringWidth() or 0,
+                                  (l2 and l2:IsShown()) and l2:GetStringWidth() or 0)
+            local need = text + 20 + iconSize + 12
+            if GameTooltip:GetWidth() < need then GameTooltip:SetWidth(need) end
+            if GameTooltip:GetHeight() < iconSize + 20 then GameTooltip:SetHeight(iconSize + 20) end
+            icon:Show()
+        else
+            icon:Hide()
+        end
     end)
     f:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    -- Clic droit : menu contextuel de suppression
+    -- Clic gauche : point TomTom ou WaypointUI ; clic droit : menu contextuel de suppression
     f:SetScript("OnMouseUp", function(self, button)
+        if button == "LeftButton" and Integ.WaypointAddon() then
+            -- Another addon's error must not reach the map's click handling.
+            local ok, err = pcall(Integ.ToggleWaypoint, mapID, nodeData)
+            if not ok then AddDebug("WAYPOINT", tostring(err)) end
+            return
+        end
         if button ~= "RightButton" then return end
         GameTooltip:Hide()
 
@@ -1481,14 +1685,17 @@ RefreshWorldMapPins = function()
     if #list > 0 then BatchAddWorldMapPins(list, 1) end
 end
 
--- Node icon size, asked for by Crazyyoungs. Resizes the live pins instead of
+-- Node icon size, asked for by r0s0j on CurseForge (with the zone summary).
+-- Resizes the live pins instead of
 -- rebuilding them: the slider steps by 0.1, so this runs a handful of times
 -- over a whole drag, and the player sees the new size while still dragging.
 -- Exposed as a global for the options panel, like FarmMap_ApplyFilterBarScale.
 function FarmMap_ApplyWorldPinScale()
     local size = WORLD_PIN_BASE_SIZE * (FarmMapDB and FarmMapDB.worldPinScale or 1.0)
     for _, pin in ipairs(activeWorldPins) do
-        pin:SetSize(size, size)
+        -- A pack's extra pixels (grow) stay on top of the scaled size.
+        local s = size + (pin.grow or 0)
+        pin:SetSize(s, s)
     end
 end
 
@@ -1496,6 +1703,8 @@ local function DoRefresh()
     refreshPending = false
     HBDPins:RemoveAllMinimapIcons(addonName)
     RefreshWorldMapPins()
+    -- The filter bar may wear the world map style's icons (an option).
+    if FarmMap_ApplyFilterBarIcons and FarmMapDB then FarmMap_ApplyFilterBarIcons() end
     if not FarmMapDB then return end
     -- Skips the HBDPins minimap pins only when a native blip is active
     local mmStyle = FarmMapDB.minimapStyle
@@ -1525,16 +1734,50 @@ local function IsAuctionatorLoaded()
     return Auctionator and Auctionator.API.v1 and Auctionator.API.v1.GetAuctionPriceByItemID and Auctionator.API.v1.GetVendorPriceByItemID
 end
 
+-- TradeSkillMaster's public API (same TSM 4 build on every client). Its
+-- prices come from the TSM desktop application, not from a scan.
+-- (Integ: see the 200-locals note above CreatePoint.)
+function Integ.IsTSMLoaded()
+    return TSM_API and TSM_API.GetCustomPriceValue and true or false
+end
+
+-- The TSM prices a player can pick, all from TSM's AuctionDB.
+Integ.TSM_PRICE_KEYS = { "DBMarket", "DBMinBuyout", "DBRegionMarketAvg" }
+
+-- Which addon prices the harvests: the player's choice (FarmMapDB.priceSource)
+-- when that addon is loaded, else whichever is. Auctionator first: it was the
+-- only source before 2.0, so nothing changes for its users. nil = no price.
+function Integ.PriceSource()
+    local auc, tsm = IsAuctionatorLoaded(), Integ.IsTSMLoaded()
+    local want = FarmMapDB and FarmMapDB.priceSource
+    if want == "tsm" and tsm then return "tsm" end
+    if want == "auctionator" and auc then return "auctionator" end
+    if auc then return "auctionator" end
+    if tsm then return "tsm" end
+    return nil
+end
+
+function Integ.HasPriceSource() return Integ.PriceSource() ~= nil end
 
 -- Unit price in copper, and where it came from: "auction" (Auctionator's
--- scanned price), "vendor" (what a merchant pays, the fallback) or "none".
--- The source is only for the debug window.
+-- scanned price), "vendor" (what a merchant pays, the fallback), the TSM
+-- price key, or "none". The source is only for the debug window.
 local function GetPrice(itemID)
-    if not IsAuctionatorLoaded() then return 0, "none" end
-    local auction = Auctionator.API.v1.GetAuctionPriceByItemID("FarmMap", itemID)
-    if auction then return auction, "auction" end
-    local vendor = Auctionator.API.v1.GetVendorPriceByItemID("FarmMap", itemID)
-    if vendor then return vendor, "vendor" end
+    local source = Integ.PriceSource()
+    if source == "tsm" then
+        local key = FarmMapDB and FarmMapDB.tsmPrice or Integ.TSM_PRICE_KEYS[1]
+        -- TSM raises errors on bad arguments: one must never break a harvest.
+        local ok, value = pcall(TSM_API.GetCustomPriceValue, key, "i:" .. itemID)
+        if ok and type(value) == "number" and value > 0 then
+            return math.floor(value), "TSM " .. key
+        end
+        return 0, "none"
+    elseif source == "auctionator" then
+        local auction = Auctionator.API.v1.GetAuctionPriceByItemID("FarmMap", itemID)
+        if auction then return auction, "auction" end
+        local vendor = Auctionator.API.v1.GetVendorPriceByItemID("FarmMap", itemID)
+        if vendor then return vendor, "vendor" end
+    end
     return 0, "none"
 end
 
@@ -1576,7 +1819,7 @@ local function ShowFloatingLoot(items, itemIDs, quantities)
     local duration = FarmMapDB.floatDuration or 5
     local fscale   = FarmMapDB.floatSize     or 1.0
     local showTier = FarmMapDB.showFloatTier ~= false
-    local showProfit = FarmMapDB.showProfit ~= false and IsAuctionatorLoaded()
+    local showProfit = FarmMapDB.showProfit ~= false and Integ.HasPriceSource()
     local lineH    = math.floor(20 * fscale)
     local padding  = math.floor(4  * fscale)
     local blockW   = math.floor(320 * fscale)
@@ -1614,8 +1857,8 @@ local function ShowFloatingLoot(items, itemIDs, quantities)
             -- loot is not in the bags yet): 3 herbs at 20c read as 63c.
             local unitPrice, priceSource = GetPrice(iid)
             profit = unitPrice * qty
-            -- Without Auctionator every price reads 0 (none): no line, it is noise.
-            if showProfit and IsAuctionatorLoaded() then
+            -- Without a price addon every price reads 0 (none): no line, it is noise.
+            if showProfit then
                 AddDebug("PRICE", string.format("%s x%d @ %dc (%s) = %dc",
                     name, qty, unitPrice, priceSource, profit))
             end
@@ -1994,6 +2237,7 @@ local function ProcessHarvestLoot()
 
     RecordStat(foundType)
     RecordNodeStat(mapID, targetNode, lootItemIDs, lootItems, lootQuantities)
+    RecordSession(foundType, mapID, nodeName, nodeNameID, lootItemIDs, lootQuantities)
     ShowFloatingLoot(lootItems, lootItemIDs, lootQuantities)
 end
 
@@ -2058,6 +2302,127 @@ GetNodeStat = function(mapID, node)
     if not (mapID and node) then return nil end
     local zone = FarmMapStatsDB and FarmMapStatsDB.byNode and FarmMapStatsDB.byNode[mapID]
     return zone and zone[NodeStatKey(node)] or nil
+end
+
+-- ============================================================
+-- FARMING SESSION (dashboard of the new options window)
+-- ============================================================
+
+-- One session runs from login to logout. Kept in FarmMapStatsDB so a
+-- /reload, or a short disconnect, does not cut it: a new session only
+-- starts after more than SESSION_GAP seconds logged out.
+local SESSION_GAP    = 15 * 60
+local SESSION_RECENT = 10
+
+local function NewSession()
+    return { start = time(), nodes = 0, value = 0, byType = {}, recent = {} }
+end
+
+local function StartOrResumeSession()
+    FarmMapStatsDB = FarmMapStatsDB or { counts = {} }
+    local s = FarmMapStatsDB.session
+    if type(s) ~= "table" or not s.start or time() - (s.lastSeen or 0) > SESSION_GAP then
+        FarmMapStatsDB.session = NewSession()
+    end
+end
+
+RecordSession = function(foundType, mapID, nodeName, nodeNameID, itemIDs, quantities)
+    if not (FarmMapStatsDB and FarmMapStatsDB.session) then StartOrResumeSession() end
+    local s = FarmMapStatsDB.session
+    local baseType = (foundType or ""):gsub("R$", "")
+    s.nodes = s.nodes + 1
+    s.byType[baseType] = (s.byType[baseType] or 0) + 1
+    -- Worth of the harvest at Auctionator's or TSM's prices, counted whether
+    -- or not the floating text shows it.
+    if Integ.HasPriceSource() then
+        for i, id in ipairs(itemIDs or {}) do
+            if id and id > 0 then
+                s.value = s.value + GetPrice(id) * ((quantities and quantities[i]) or 1)
+            end
+        end
+    end
+    table.insert(s.recent, 1, { type = baseType, name = nodeName, id = nodeNameID,
+                                mapID = mapID, at = time() })
+    while #s.recent > SESSION_RECENT do table.remove(s.recent) end
+    if ns.OnDataChanged then ns.OnDataChanged() end
+end
+
+function ns.GetSession()
+    if not (FarmMapStatsDB and FarmMapStatsDB.session) then StartOrResumeSession() end
+    return FarmMapStatsDB.session
+end
+
+-- Every harvest statistic: lifetime totals, per-node history (zone summary,
+-- harvest counts of the nodes page) and the session. What the legacy Stats
+-- panel's button always did; the new window's dashboard calls the same.
+function ns.ResetStats()
+    FarmMapStatsDB = { counts = {} }
+    if FarmMap_RefreshStats then FarmMap_RefreshStats() end
+    if ns.OnDataChanged then ns.OnDataChanged() end
+end
+
+function ns.ResetSession()
+    FarmMapStatsDB = FarmMapStatsDB or { counts = {} }
+    FarmMapStatsDB.session = NewSession()
+    if ns.OnDataChanged then ns.OnDataChanged() end
+end
+
+-- ============================================================
+-- NODE GROUPS (nodes page of the new options window)
+-- ============================================================
+
+-- Every recorded node, grouped by zone, type and item: one line per "Peacebloom
+-- in Elwynn Forest" instead of one per spot. Harvest counts come from the
+-- per-node statistics. Names re-localize through the item id when cached.
+function ns.CollectNodeGroups()
+    local groups, byKey = {}, {}
+    for mapID, nodes in pairs(FarmMapDB) do
+        if type(mapID) == "number" and type(nodes) == "table" then
+            local info = C_Map.GetMapInfo(mapID)
+            local zoneName = info and info.name or ("#" .. mapID)
+            for _, node in ipairs(nodes) do
+                if type(node) == "table" and node.type then
+                    local item = node.nameID and node.nameID > 0 and GetItemInfo(node.nameID)
+                    local name = item or node.name or "?"
+                    local key = mapID .. "|" .. node.type .. "|" .. (node.nameID or 0) .. "|" .. (node.name or "")
+                    local g = byKey[key]
+                    if not g then
+                        g = { key = key, mapID = mapID, zone = zoneName, type = node.type,
+                              baseType = node.type:gsub("R$", ""), name = name,
+                              nameID = node.nameID, rawName = node.name, nodes = 0, harvests = 0 }
+                        byKey[key] = g
+                        groups[#groups + 1] = g
+                    end
+                    g.nodes = g.nodes + 1
+                    local stat = GetNodeStat(mapID, node)
+                    g.harvests = g.harvests + (stat and stat.n or 0)
+                end
+            end
+        end
+    end
+    return groups
+end
+
+-- Deletes every node of the given groups (as returned above). Statistics
+-- stay: they are the player's history, not the map.
+function ns.DeleteNodeGroups(selected)
+    local removed = 0
+    for _, g in ipairs(selected) do
+        local nodes = FarmMapDB[g.mapID]
+        if type(nodes) == "table" then
+            for i = #nodes, 1, -1 do
+                local node = nodes[i]
+                if type(node) == "table" and node.type == g.type
+                   and (node.nameID or 0) == (g.nameID or 0) and node.name == g.rawName then
+                    table.remove(nodes, i)
+                    removed = removed + 1
+                end
+            end
+            if #nodes == 0 then FarmMapDB[g.mapID] = nil end
+        end
+    end
+    RefreshAllPins()
+    return removed
 end
 
 -- ============================================================
@@ -2126,6 +2491,89 @@ OpenExportPopup = function()
     pop:Show()
 end
 
+-- Import in two steps, so the new window can show what an import will do
+-- before doing it. ParseImport reads the text and sorts every node into new,
+-- already known (same type within the merge radius of an existing node, the
+-- rule the import always used) or invalid - and changes nothing. ApplyImport
+-- then adds the new ones. The legacy popup goes through the same two.
+local IMPORT_RADIUS = 0.003
+
+local function ValidImportNode(node)
+    return type(node) == "table" and type(node.x) == "number" and type(node.y) == "number"
+       and node.x >= 0 and node.x <= 1 and node.y >= 0 and node.y <= 1
+       and type(node.type) == "string" and TYPE_COLORS[node.type] ~= nil
+end
+
+function ns.ParseImport(str)
+    local data, err = DeserializeDB(str or "")
+    if not data then return nil, err end
+    local plan = { zones = {}, added = 0, known = 0, invalid = 0 }
+    -- The client the export was made on, when it says (v2.0.0 and later).
+    local key, label = (str or ""):match("^%s*%-%- FarmMap %S+ export, client=(%S+) %(([^)\n]*)%)")
+    if key then
+        plan.sourceKey, plan.sourceLabel = key, label
+        plan.otherClient = key ~= ClientKey()
+    end
+    for mapID, nodes in pairs(data) do
+        if type(mapID) == "number" and type(nodes) == "table" then
+            local zone = { mapID = mapID, nodes = {}, added = 0, known = 0 }
+            local existing = FarmMapDB[mapID] or {}
+            for _, node in ipairs(nodes) do
+                if not ValidImportNode(node) then
+                    plan.invalid = plan.invalid + 1
+                else
+                    -- Against the database and against the nodes of this
+                    -- import already accepted: the import always merged a
+                    -- string's own duplicates too.
+                    local dup = false
+                    for _, list in ipairs({ existing, zone.nodes }) do
+                        for _, ex in ipairs(list) do
+                            if math.abs(ex.x - node.x) + math.abs(ex.y - node.y) < IMPORT_RADIUS then
+                                dup = true
+                                break
+                            end
+                        end
+                        if dup then break end
+                    end
+                    if dup then
+                        zone.known = zone.known + 1
+                    else
+                        zone.added = zone.added + 1
+                        zone.nodes[#zone.nodes + 1] = node
+                    end
+                end
+            end
+            if zone.added + zone.known > 0 then
+                local info = C_Map.GetMapInfo(mapID)
+                zone.name = info and info.name or ("#" .. mapID)
+                plan.zones[#plan.zones + 1] = zone
+                plan.added = plan.added + zone.added
+                plan.known = plan.known + zone.known
+            end
+        else
+            plan.invalid = plan.invalid + (type(nodes) == "table" and #nodes or 1)
+        end
+    end
+    table.sort(plan.zones, function(a, b) return a.added > b.added end)
+    return plan
+end
+
+function ns.ApplyImport(plan)
+    -- A preview is applied once: a second click must not add it again.
+    if plan.applied then return 0 end
+    plan.applied = true
+    local added = 0
+    for _, zone in ipairs(plan.zones) do
+        FarmMapDB[zone.mapID] = FarmMapDB[zone.mapID] or {}
+        for _, node in ipairs(zone.nodes) do
+            table.insert(FarmMapDB[zone.mapID], node)
+            added = added + 1
+        end
+    end
+    RefreshAllPins()
+    return added
+end
+
 OpenImportPopup = function()
     if FarmMapImportPopup then FarmMapImportPopup:Show() return end
     local pop = CreateFrame("Frame", "FarmMapImportPopup", UIParent, "BackdropTemplate")
@@ -2179,30 +2627,12 @@ OpenImportPopup = function()
     FitButton(btnImport)
     btnImport:SetScript("OnClick", function()
         local str = eb:GetText()
-        local data, err = DeserializeDB(str)
-        if not data then
+        local plan, err = ns.ParseImport(str)
+        if not plan then
             status:SetText("|cffff4444" .. L.IMPORT_ERROR .. " : " .. (err or "?") .. "|r")
             return
         end
-        local added = 0
-        for mapID, nodes in pairs(data) do
-            if type(nodes) == "table" then
-                FarmMapDB[mapID] = FarmMapDB[mapID] or {}
-                for _, node in ipairs(nodes) do
-                    local dup = false
-                    for _, ex in ipairs(FarmMapDB[mapID]) do
-                        if math.abs(ex.x - node.x) + math.abs(ex.y - node.y) < 0.003 then
-                            dup = true ; break
-                        end
-                    end
-                    if not dup then
-                        table.insert(FarmMapDB[mapID], node)
-                        added = added + 1
-                    end
-                end
-            end
-        end
-        RefreshAllPins()
+        local added = ns.ApplyImport(plan)
         status:SetText("|cff00ff00" .. added .. L.IMPORT_SUCCESS .. "|r")
         print("|cffffd100FarmMap :|r " .. L.IMPORT_DONE .. added .. L.IMPORT_DONE2)
     end)
@@ -2468,6 +2898,14 @@ local function CreateFilterButtons()
         Minage = { l=2, r=-4, t=-2, b=4 },
         Peche  = { l=4, r=-2, t=-1, b=5 },
         Bois   = { l=3, r=-3, t=-1, b=5 },
+    }
+    -- Fish and wood are nudged 2 px up above to suit the vivid sprites; a
+    -- pack whose drawings are centred in their cell (pin.centered, Sakura)
+    -- came out 2 px too high there (Kroosstii, 2026-10-09). Only these two:
+    -- herb and ore looked right as they are.
+    local CENTERED_INSETS = {
+        Peche = { l=4, r=-2, t=-3, b=3 },
+        Bois  = DEFAULT_INSET,
     }
 
     -- The buttons live inside a container: it is what the player drags and
@@ -2754,7 +3192,33 @@ local function CreateFilterButtons()
         ApplyBarPosition()
     end
     FarmMap_ApplyFilterBarScale = ApplyBarScale
-    UpdateButtons()
+
+    -- The buttons show the world map style's icons, a pack's included, so
+    -- the bar matches the map (FarmMapDB.filterBarStyleIcons: ON by
+    -- default, nil = on - Kroosstii, 2026-10-09: players would wonder what
+    -- other icons stand for). Off, or with a ring style (a hollow ring
+    -- drawn wider than an icon, pin.size), the vivid icons stay.
+    -- Re-run on every pin refresh, which a style change triggers. The
+    -- active/greyed look is re-applied after: ApplyPinTexture resets it.
+    FarmMap_ApplyFilterBarIcons = function()
+        local pins = FarmMapDB.filterBarStyleIcons ~= false
+                     and GetStylePins(FarmMapDB.worldmapStyle or "blizzard")
+        for _, btn in ipairs({ btnHerbo, btnMinage, btnPeche, btnBois }) do
+            local pin = pins and pins[btn.nodeType]
+            if pin and pin.size then pin = nil end
+            pin = pin or (BUILTIN_PINS.vivid and BUILTIN_PINS.vivid[btn.nodeType])
+            if pin then
+                ApplyPinTexture(btn.tex, pin)
+                local ins = (pin.centered and CENTERED_INSETS[btn.nodeType])
+                            or ICON_INSETS[btn.nodeType] or DEFAULT_INSET
+                btn.tex:ClearAllPoints()
+                btn.tex:SetPoint("TOPLEFT",     btn, "TOPLEFT",     ins.l, ins.t)
+                btn.tex:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", ins.r, ins.b)
+            end
+        end
+        UpdateButtons()
+    end
+    FarmMap_ApplyFilterBarIcons()
 end
 
 -- ============================================================
@@ -2841,6 +3305,156 @@ local function MakePresetRow(parent, anchorFrame, anchorOffsetY, presetKey, dbKe
     end)
 
     return row
+end
+
+-- Empties the node database and keeps every setting. One function for the
+-- legacy panel's button, /fm clear and the new window: the list of kept
+-- keys used to be written out twice, and a third copy would drift.
+local function ClearNodeDatabase()
+    FarmMapDB = {
+        version          = DB_VERSION,
+        showDebug        = FarmMapDB.showDebug,
+        debugCapture     = FarmMapDB.debugCapture,
+        showHerbo        = FarmMapDB.showHerbo,
+        showMinage       = FarmMapDB.showMinage,
+        showPeche        = FarmMapDB.showPeche,
+        showBois         = FarmMapDB.showBois,
+        minimapStyle     = FarmMapDB.minimapStyle,
+        worldmapStyle    = FarmMapDB.worldmapStyle,
+        replaceBlip      = FarmMapDB.replaceBlip,
+        showMinimapPins  = FarmMapDB.showMinimapPins,
+        language         = FarmMapDB.language,
+        showFloatingText = FarmMapDB.showFloatingText,
+        showProfit       = FarmMapDB.showProfit,
+        showFloatTier    = FarmMapDB.showFloatTier,
+        showNodeItemStats = FarmMapDB.showNodeItemStats,
+        -- The floating text's size and duration are settings too; both
+        -- earlier copies of this list forgot them.
+        floatSize        = FarmMapDB.floatSize,
+        floatDuration    = FarmMapDB.floatDuration,
+        -- Same reasoning for the filter bar: emptying the nodes must not
+        -- send it back to its default corner.
+        filterBarPos     = FarmMapDB.filterBarPos,
+        filterBarAlpha   = FarmMapDB.filterBarAlpha,
+        filterBarHorizontal = FarmMapDB.filterBarHorizontal,
+        filterBarScale   = FarmMapDB.filterBarScale,
+        worldPinScale    = FarmMapDB.worldPinScale,
+        -- Position and visibility of the minimap button: clearing the node
+        -- database must not move the button back.
+        minimapIcon      = FarmMapDB.minimapIcon,
+        -- Filters switched off for a missing profession, so they still
+        -- come back on once it is learned.
+        profAutoOff      = FarmMapDB.profAutoOff,
+        versionNotice    = FarmMapDB.versionNotice,
+        -- The new options window: which one the button opens, its
+        -- colours and its size.
+        legacyOptions    = FarmMapDB.legacyOptions,
+        uiTheme          = FarmMapDB.uiTheme,
+        uiWindow         = FarmMapDB.uiWindow,
+        sessionWindow    = FarmMapDB.sessionWindow,
+        -- Which changelog the player has seen: an emptied database must
+        -- not reopen the "What's new" window.
+        changelogSeen     = FarmMapDB.changelogSeen,
+        changelogPrevious = FarmMapDB.changelogPrevious,
+        -- Integrations: price addon, TSM price, waypoint on click.
+        priceSource       = FarmMapDB.priceSource,
+        tsmPrice          = FarmMapDB.tsmPrice,
+        waypointClick     = FarmMapDB.waypointClick,
+        waypointAddon     = FarmMapDB.waypointAddon,
+        uiScale           = FarmMapDB.uiScale,
+        filterBarStyleIcons = FarmMapDB.filterBarStyleIcons,
+        tooltipIcon         = FarmMapDB.tooltipIcon,
+        -- The player's own themes (Theme page): settings, not nodes.
+        userThemes        = FarmMapDB.userThemes,
+        userThemeNext     = FarmMapDB.userThemeNext,
+    }
+    HBDPins:RemoveAllMinimapIcons(addonName)
+    ClearWorldMapPins()
+end
+
+-- ---- For the new options window (UI\OptionsWindow.lua) ----
+-- What its settings pages need, so a change made there does exactly what
+-- the legacy panel does. Wrapped where the function is assigned later in
+-- this file, so the call always reaches the current one.
+ns.ClearNodeDatabase   = ClearNodeDatabase
+ns.ManualMigration     = function() ManualMigration() end
+ns.OpenExportPopup     = function() OpenExportPopup() end
+ns.OpenImportPopup     = function() OpenImportPopup() end
+ns.RefreshAllPins      = function() RefreshAllPins() end
+ns.IsAuctionatorLoaded = function() return IsAuctionatorLoaded() and true or false end
+ns.IsTSMLoaded = Integ.IsTSMLoaded
+ns.IsTomTomLoaded = function() return (TomTom and TomTom.AddWaypoint) and true or false end
+ns.IsWaypointUILoaded = function()
+    return (WaypointUIAPI and WaypointUIAPI.Navigation and WaypointUIAPI.Navigation.NewUserNavigation) and true or false
+end
+-- "auctionator", "tsm" or nil; HasPriceSource = some harvest value exists.
+ns.PriceSource, ns.HasPriceSource = Integ.PriceSource, Integ.HasPriceSource
+ns.TSM_PRICE_KEYS = Integ.TSM_PRICE_KEYS
+-- Whether another addon (an icon pack) is loaded, on every client.
+ns.IsAddOnLoaded = function(name)
+    local check = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+    return check and check(name) and true or false
+end
+ns.GetAddOnVersion     = function(name) return GetMeta(name, "Version") end
+ns.TYPE_COLORS         = TYPE_COLORS
+-- Node types a style preview shows: no Logging outside Retail.
+ns.PREVIEW_TYPES       = PRESET_ROW_TYPES
+
+-- Every style a map can use, in the order of the legacy Colors panel, then
+-- the icon packs. dbKey = "minimapStyle" or "worldmapStyle".
+function ns.StyleList(dbKey)
+    local list = {
+        { key = "blizzard",     label = L.PRESET_BLIZZARD },
+        { key = "blank",        label = L.PRESET_BLANK },
+        { key = "vivid",        label = L.PRESET_VIVID },
+        { key = "deuteranopia", label = L.PRESET_DEUT  },
+        { key = "protanopia",   label = L.PRESET_PROT  },
+        { key = "tritanopia",   label = L.PRESET_TRIT  },
+        { key = "ring",         label = L.PRESET_RING       },
+        { key = "ringcolor",    label = L.PRESET_RING_COLOR },
+    }
+    local packs = FarmMapStyles.GetAll()
+    table.sort(packs, function(a, b) return a.label < b.label end)
+    for _, pack in ipairs(packs) do
+        list[#list + 1] = { key = pack.key, label = pack.label, pack = true }
+    end
+    return list
+end
+
+-- The current style of a map, with the same defaults as the legacy panel.
+function ns.GetStyle(dbKey)
+    if dbKey == "minimapStyle" then return FarmMapDB.minimapStyle or "blank" end
+    return FarmMapDB.worldmapStyle or "blizzard"
+end
+
+-- Picks a style: same effect as a click on a row of the legacy panel,
+-- which is then re-synced so both windows agree.
+function ns.SetStyle(dbKey, styleKey)
+    FarmMapDB[dbKey] = styleKey
+    if dbKey == "minimapStyle" then ApplyMinimapStyle(styleKey) else RefreshAllPins() end
+    if FarmMap_SyncColorPanel then FarmMap_SyncColorPanel() end
+    if FarmMap_SyncPackPanel  then FarmMap_SyncPackPanel()  end
+end
+
+-- Draws a style's icon for one node type on a texture, the way the legacy
+-- preview rows do. Returns the vertical offset that corrects the padding of
+-- the atlas sprites (0 for centred icons such as rings).
+local PREVIEW_OFFSET_Y = { Herbo = -2, Peche = 2 }
+function ns.PreviewIcon(tex, styleKey, nodeType)
+    local pins = GetStylePins(styleKey)
+    local pin  = pins and pins[nodeType]
+    if pin then
+        ApplyPinTexture(tex, pin)
+        return pin.centered and 0 or (PREVIEW_OFFSET_Y[nodeType] or 0)
+    end
+    local coords = WORLD_MAP_TEXCOORDS[nodeType]
+    if coords then
+        tex:SetTexture(BLIP_DEFAULT)
+        tex:SetTexCoord(unpack(coords))
+        tex:SetDesaturated(false)
+        tex:SetVertexColor(1, 1, 1)
+    end
+    return PREVIEW_OFFSET_Y[nodeType] or 0
 end
 
 local function CreateOptions()
@@ -3001,40 +3615,7 @@ local function CreateOptions()
     btnReset:SetText(L.DB_CLEAR)
     FitButton(btnReset)
     btnReset:SetScript("OnClick", function()
-        FarmMapDB = {
-            version          = DB_VERSION,
-            showDebug        = FarmMapDB.showDebug,
-            debugCapture     = FarmMapDB.debugCapture,
-            showHerbo        = FarmMapDB.showHerbo,
-            showMinage       = FarmMapDB.showMinage,
-            showPeche        = FarmMapDB.showPeche,
-            showBois         = FarmMapDB.showBois,
-            minimapStyle     = FarmMapDB.minimapStyle,
-            worldmapStyle    = FarmMapDB.worldmapStyle,
-            replaceBlip      = FarmMapDB.replaceBlip,
-            showMinimapPins  = FarmMapDB.showMinimapPins,
-            language         = FarmMapDB.language,
-            showFloatingText = FarmMapDB.showFloatingText,
-            showProfit       = FarmMapDB.showProfit,
-            showFloatTier    = FarmMapDB.showFloatTier,
-            showNodeItemStats = FarmMapDB.showNodeItemStats,
-            -- Same reasoning for the filter bar: emptying the nodes must not
-            -- send it back to its default corner.
-            filterBarPos     = FarmMapDB.filterBarPos,
-            filterBarAlpha   = FarmMapDB.filterBarAlpha,
-            filterBarHorizontal = FarmMapDB.filterBarHorizontal,
-            filterBarScale   = FarmMapDB.filterBarScale,
-            worldPinScale    = FarmMapDB.worldPinScale,
-            -- Position and visibility of the minimap button: clearing the node
-            -- database must not move the button back.
-            minimapIcon      = FarmMapDB.minimapIcon,
-            -- Filters switched off for a missing profession, so they still
-            -- come back on once it is learned.
-            profAutoOff      = FarmMapDB.profAutoOff,
-            versionNotice    = FarmMapDB.versionNotice,
-        }
-        HBDPins:RemoveAllMinimapIcons(addonName)
-        ClearWorldMapPins()
+        ClearNodeDatabase()
         print("|cffffd100FarmMap :|r " .. L.DB_CLEARED)
     end)
 
@@ -3221,6 +3802,50 @@ local function CreateOptions()
     nodeItemsHint:SetWidth(270)
     nodeItemsHint:SetJustifyH("LEFT")
     nodeItemsHint:SetText("|cffaaaaaa" .. L.DISPLAY_NODE_ITEMS_HINT .. "|r")
+
+    -- Same box as in the new window's Display page, so a player who chose
+    -- this legacy panel can find the way back. Applied at the next login:
+    -- the Reload button only shows once the choice differs from it.
+    local checkNewWindow = CreateFrame("CheckButton", "FarmMapNewWindowCheck", displayPanel, "InterfaceOptionsCheckButtonTemplate")
+    checkNewWindow:SetPoint("TOPLEFT", nodeItemsHint, "BOTTOMLEFT", -4, -16)
+    _G[checkNewWindow:GetName() .. "Text"]:SetText(L.DISPLAY_NEW_WINDOW)
+
+    local newWindowHint = displayPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+    newWindowHint:SetPoint("TOPLEFT", checkNewWindow, "BOTTOMLEFT", 4, 0)
+    newWindowHint:SetWidth(270)
+    newWindowHint:SetJustifyH("LEFT")
+    newWindowHint:SetText("|cffaaaaaa" .. L.DISPLAY_NEW_WINDOW_DESC .. "|r")
+
+    local newWindowReload = CreateFrame("Button", nil, displayPanel, "UIPanelButtonTemplate")
+    newWindowReload:SetSize(120, 22)
+    newWindowReload:SetPoint("TOPLEFT", newWindowHint, "BOTTOMLEFT", 0, -6)
+    newWindowReload:SetText(RELOADUI)
+    FitButton(newWindowReload)
+    newWindowReload:SetScript("OnClick", ReloadUI)
+
+    local function SyncNewWindow()
+        checkNewWindow:SetChecked(FarmMapDB.legacyOptions ~= true)
+        newWindowReload:SetShown((FarmMapDB.legacyOptions == true) ~= (ns.legacyOptionsAtLogin == true))
+    end
+    checkNewWindow:SetScript("OnClick", function(self)
+        FarmMapDB.legacyOptions = (not self:GetChecked()) or nil
+        SyncNewWindow()
+    end)
+    displayPanel:HookScript("OnShow", SyncNewWindow)
+    SyncNewWindow()
+
+    -- The sliders read their value once, at creation: the new options window
+    -- can change it since. Re-read on show, like the boxes above.
+    displayPanel:HookScript("OnShow", function()
+        for _, s in ipairs({
+            { sliderSize, "floatSize" }, { sliderDur, "floatDuration" },
+            { sliderBarSize, "filterBarScale" }, { sliderBarAlpha, "filterBarAlpha" },
+            { sliderPin, "worldPinScale" },
+        }) do
+            local value = FarmMapDB[s[2]]
+            if value then s[1].slider:SetValue(value) end
+        end
+    end)
 
     Settings.RegisterCanvasLayoutSubcategory(category, displayPanel, L.DISPLAY_SECTION)
 
@@ -3751,8 +4376,7 @@ local function CreateOptions()
     btnResetStats:SetText(L.STATS_RESET)
     FitButton(btnResetStats)
     btnResetStats:SetScript("OnClick", function()
-        FarmMapStatsDB = { counts = {} }
-        if FarmMap_RefreshStats then FarmMap_RefreshStats() end
+        ns.ResetStats()
         print("|cffffd100FarmMap :|r " .. L.STATS_RESET_DONE)
     end)
 
@@ -3829,9 +4453,12 @@ local function CreateOptions()
         aucStatus:SetText(hasAuc and ("|cff33ff33" .. detected .. "|r")
                                   or ("|cff888888" .. L.INTEG_MISSING .. "|r"))
         checkProfit:SetChecked(FarmMapDB.showProfit ~= false)
-        checkProfit:SetEnabled(hasAuc and hasFloat)
-        _G[checkProfit:GetName() .. "Text"]:SetAlpha((hasAuc and hasFloat) and 1 or 0.4)
-        profitNote:SetText((hasAuc and not hasFloat) and ("|cffaaaaaa" .. L.INTEG_NEEDS_FLOAT .. "|r") or "")
+        -- TSM prices too since 2.0 (chosen in the new window): the box
+        -- follows whichever price addon is there.
+        local hasPrice = Integ.HasPriceSource()
+        checkProfit:SetEnabled(hasPrice and hasFloat)
+        _G[checkProfit:GetName() .. "Text"]:SetAlpha((hasPrice and hasFloat) and 1 or 0.4)
+        profitNote:SetText((hasPrice and not hasFloat) and ("|cffaaaaaa" .. L.INTEG_NEEDS_FLOAT .. "|r") or "")
     end
     integPanel:SetScript("OnShow", SyncIntegrations)
     SyncIntegrations()
@@ -3884,6 +4511,9 @@ local function CreateMinimapButton()
                 if FarmMapShowDebugCheck then
                     FarmMapShowDebugCheck:SetChecked(FarmMapDB.showDebug)
                 end
+            elseif not ns.legacyOptionsAtLogin and ns.OptionsWindow then
+                -- FarmMap's own window: not protected, it opens in combat.
+                ns.OptionsWindow:Toggle()
             elseif ns.optionsCategory then
                 -- OpenSettingsPanel is a protected function (HasRestrictions,
                 -- on Retail and Forever alike): an addon may not open the
@@ -4152,7 +4782,22 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end)
 
     -- ---- Login joueur ----
+    elseif event == "PLAYER_LOGOUT" then
+        -- Also fires on /reload: the next login measures the gap from here
+        -- to decide whether the dashboard session goes on.
+        if FarmMapStatsDB and FarmMapStatsDB.session then
+            FarmMapStatsDB.session.lastSeen = time()
+        end
+
     elseif event == "PLAYER_LOGIN" then
+        -- Which options window the minimap button opens, frozen for the
+        -- session: changing it asks for a reload (see the Display panels).
+        ns.legacyOptionsAtLogin = FarmMapDB.legacyOptions == true
+        -- Same for the language: the new window offers a reload while the
+        -- choice differs from the one this session runs in.
+        ns.languageAtLogin = FarmMapDB.language or "auto"
+        -- Dashboard: a /reload or a short disconnect keeps the session.
+        StartOrResumeSession()
         C_Timer.After(0.5, function()
             CheckProfessions()
             if FarmMap_UpdateFilterButtons then FarmMap_UpdateFilterButtons() end
@@ -4734,6 +5379,15 @@ SlashCmdList["FARMMAP"] = function(msg)
         FarmMapDB.language = "auto"
         print("|cffffd100FarmMap :|r " .. ClientString("SLASH_DEFAULT_DONE"))
 
+    -- New options window, while it is being built: not listed in /fm help
+    -- until the minimap button opens it.
+    elseif cmd == "ui" then
+        if ns.OptionsWindow then ns.OptionsWindow:Toggle() end
+
+    -- Reopens the "What's new" window, which otherwise shows once per version.
+    elseif cmd == "news" then
+        if ns.Changelog then ns.Changelog.Show(FarmMapDB.changelogPrevious) end
+
     elseif cmd == "atlas" then
         if not calibFrame then calibFrame = CreateAtlasCalibrator() end
         if calibFrame:IsShown() then calibFrame:Hide() else calibFrame:Show() end
@@ -4750,41 +5404,7 @@ SlashCmdList["FARMMAP"] = function(msg)
         OpenImportPopup()
 
     elseif cmd == "clear" then
-        local saved = {
-            version          = DB_VERSION,
-            showDebug        = FarmMapDB.showDebug,
-            debugCapture     = FarmMapDB.debugCapture,
-            showHerbo        = FarmMapDB.showHerbo,
-            showMinage       = FarmMapDB.showMinage,
-            showPeche        = FarmMapDB.showPeche,
-            showBois         = FarmMapDB.showBois,
-            minimapStyle     = FarmMapDB.minimapStyle,
-            worldmapStyle    = FarmMapDB.worldmapStyle,
-            replaceBlip      = FarmMapDB.replaceBlip,
-            showMinimapPins  = FarmMapDB.showMinimapPins,
-            language         = FarmMapDB.language,
-            showFloatingText = FarmMapDB.showFloatingText,
-            showProfit       = FarmMapDB.showProfit,
-            showFloatTier    = FarmMapDB.showFloatTier,
-            showNodeItemStats = FarmMapDB.showNodeItemStats,
-            -- Same reasoning for the filter bar: emptying the nodes must not
-            -- send it back to its default corner.
-            filterBarPos     = FarmMapDB.filterBarPos,
-            filterBarAlpha   = FarmMapDB.filterBarAlpha,
-            filterBarHorizontal = FarmMapDB.filterBarHorizontal,
-            filterBarScale   = FarmMapDB.filterBarScale,
-            worldPinScale    = FarmMapDB.worldPinScale,
-            -- Position and visibility of the minimap button: clearing the node
-            -- database must not move the button back.
-            minimapIcon      = FarmMapDB.minimapIcon,
-            -- Filters switched off for a missing profession, so they still
-            -- come back on once it is learned.
-            profAutoOff      = FarmMapDB.profAutoOff,
-            versionNotice    = FarmMapDB.versionNotice,
-        }
-        FarmMapDB = saved
-        HBDPins:RemoveAllMinimapIcons(addonName)
-        ClearWorldMapPins()
+        ClearNodeDatabase()
         print("|cffffd100FarmMap :|r " .. L.SLASH_CLEAR_CONFIRM)
 
     elseif cmd == "stats" then

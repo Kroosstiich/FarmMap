@@ -10,7 +10,7 @@
 ## Notes-zhCN: 记录矿石、草药、鱼和树木节点的位置。
 ## Author: Kroosstii
 ## Version: v2.0.0
-## X-Date: 07/10/2026
+## X-Date: 09/10/2026
 ## IconTexture: Interface\AddOns\FarmMap\Textures\icon
 ## SavedVariables: FarmMapDB FarmMapStatsDB
 ## OptionalDeps: Auctionator
@@ -40,3 +40,15 @@ lang\ruRU.lua
 data\ClassicItemExpansion.lua
 
 FarmMap.lua
+
+# New options window (v2). After FarmMap.lua: it reads what that file
+# shares through the addon namespace.
+UI\Theme.lua
+UI\OptionsWindow.lua
+UI\SessionWindow.lua
+
+# Changelog: one file per version and language, never edited after the
+# release (enUS is the fallback). UI\Changelog.lua draws them.
+changelog\v2.0.0\enUS.lua
+changelog\v2.0.0\frFR.lua
+UI\Changelog.lua
