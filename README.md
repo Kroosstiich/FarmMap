@@ -5,28 +5,53 @@ location of every herb, ore, fish and wood node you harvest — no manual input.
 Pins appear on your minimap and world map so you can build your own farming
 routes over time.
 
-[Download on CurseForge](https://www.curseforge.com/wow/addons/farmmap)
+**One download for every client:** Retail, WoW: Forever, MoP Classic and
+Classic (Era, Season of Discovery and Hardcore). It also loads on TBC
+Anniversary, where not every feature has been tested yet.
+
+[Download on CurseForge](https://www.curseforge.com/wow/addons/farmmap) ·
+[Discord](https://discord.gg/4BEGpmktK7)
 
 ## Features
 
 - Automatic node recording on harvest — herbs, ores, fish and wood
-- Pins on both the minimap and the world map, with filter buttons per resource —
-  Shift-drag to move the bar, Shift-right-click to flip it horizontal / vertical,
-  and a slider to fade it out when the cursor is elsewhere
+- Pins on both the minimap and the world map, with the node's icon in its
+  tooltip
+- Filter buttons on the world map per resource — Shift-drag to move the bar,
+  Shift-right-click to flip it horizontal / vertical, a slider to fade it out
+  when the cursor is elsewhere; the buttons wear the icons of your world map
+  style
 - Primordial / abundant node support with a distinct visual style
 - Optional floating text on harvest: quantity, tier, total bag count, and the
   value of what you gathered — value display contributed by
-  [buseQ](https://github.com/buseQ); it needs
-  [Auctionator](https://www.curseforge.com/wow/addons/auctionator), an optional
-  dependency, with its auction house database already scanned once
-- Multiple icon styles, including colorblind-friendly presets
-  (Deuteranopia, Protanopia, Tritanopia)
-- Minimap button — left click for the options, right click for the debug window
-- Export / import to share your node database with other players
+  [buseQ](https://github.com/buseQ); prices come from
+  [Auctionator](https://www.curseforge.com/wow/addons/auctionator) or
+  TradeSkillMaster, both optional
+- **Options window** drawn by FarmMap itself, identical on every client: a menu
+  by topic, a search that also finds the settings inside the pages, usable in
+  combat, and a window size of its own per client. The legacy Blizzard panel is
+  still available.
+- **Themes** for that window — Retail, Forever, Emerald and Sakura — plus your
+  own, made in game and shared as a line of text (see [Themes](#themes))
+- **Icon styles**: WoW Retail, vivid colours, white outline, colorblind-friendly
+  presets (Deuteranopia, Protanopia, Tritanopia), classic rings, the built-in
+  **Sakura** pack, and any icon pack you install; hover a style's icons in the
+  options to see them big
+- **Dashboard** for the current session — duration, nodes harvested, value,
+  gold per hour, latest harvests — and a small session window to keep on screen
+- **Node manager**: every node grouped by item and zone, search by item, filter
+  by zone or resource, delete a selection
+- **Export / import** to share your node database, with a preview before
+  anything is written; an export names the game client it comes from
+- **Integrations**: TradeSkillMaster as a second price source, and a click on a
+  node sets a waypoint with [TomTom](https://www.curseforge.com/wow/addons/tomtom)
+  or WaypointUI
+- A "What's new" window once per version
 - Harvest statistics per resource type
-- English, French, Korean, Simplified Chinese and Russian, auto-detected from the
-  game client with a manual override in the options — Korean by Crazyyoungs,
-  Simplified Chinese by buseQ, Russian by ZamestoTV
+- Minimap button — left click for the options, right click for the debug window
+- English and French, plus Korean, Simplified Chinese and Russian by the
+  community, auto-detected from the game client with a manual override in the
+  options
 
 ## Known limitations
 
@@ -45,8 +70,9 @@ routes over time.
 
 ## Installation
 
-Copy the `FarmMap` folder into `World of Warcraft\_retail_\Interface\AddOns\`,
-then restart the game client. A `/reload` is not enough when the file list
+Copy the `FarmMap` folder into the `Interface\AddOns\` folder of your game
+client — for example `World of Warcraft\_retail_\Interface\AddOns\` for Retail
+— then restart the game client. A `/reload` is not enough when the file list
 changes — the `.toc` is only read at startup.
 
 ## Slash commands
@@ -54,6 +80,8 @@ changes — the `.toc` is only read at startup.
 | Command | Description |
 |---|---|
 | `/fm help` | Show all available commands |
+| `/fm ui` | Open the options window |
+| `/fm news` | Show the "What's new" window again |
 | `/fm debug` | Show/hide the debug window |
 | `/fm export` | Open the database export window |
 | `/fm import` | Open the database import window |
@@ -89,9 +117,10 @@ request here if you are comfortable with git. The full step-by-step guide is in
 | `zhCN` | 简体中文 | buseQ (signs *bluse*) |
 | `ruRU` | Русский | Hubbotu (signs *ZamestoTV*) |
 
-Pull requests adding a language are welcome, and translators are credited both
-in-game and here. You can also send your file on the
-[FarmMap Discord](https://discord.gg/4BEGpmktK7) if you would rather not use git.
+The texts new in 2.0 are already in the Korean, Chinese and Russian files, in
+English and marked `[TRANSLATE]`: search for that word to find what is left.
+Each language arrives in a small update of its own once translated.
+Translators are credited both in-game and here.
 
 ## Contributors
 
@@ -100,10 +129,9 @@ A good part of what FarmMap does today arrived from the people using it.
 - **[buseQ](https://github.com/buseQ)**, who signs his translations *bluse*,
   wrote the harvest value display and sent it as
   [pull request #4](https://github.com/Kroosstiich/FarmMap/pull/4): the
-  floating text can now show what the items you just gathered are worth, read
-  from Auctionator through its public API and declared as an optional
-  dependency. The idea and the code are entirely his, and it was merged
-  unchanged. He also contributed the Simplified Chinese translation, and
+  floating text can now show what the items you just gathered are worth. The
+  idea and the code are entirely his, and it was merged unchanged. He also
+  contributed the Simplified Chinese translation, and
   [pull request #1](https://github.com/Kroosstiich/FarmMap/pull/1) before that.
   Thank you.
 - **[Hubbotu](https://github.com/Hubbotu)**, who signs *ZamestoTV*, contributed
@@ -114,15 +142,58 @@ A good part of what FarmMap does today arrived from the people using it.
   Thank you.
 - **Crazyyoungs** asked for the world map filter bar to be movable and to fade
   out, so it stops colliding with other addons that use the same corner of the
-  map. That request became the Shift-drag and the opacity slider. He also
-  maintains the Korean translation, and has twice translated new strings within
-  the hour, before anyone thought to tell him they existed. Thank you.
+  map, and then for its size; he also reported the untranslated expansion
+  names. He maintains the Korean translation, and has twice translated new
+  strings within the hour, before anyone thought to tell him they existed.
+  Thank you.
+- **r0s0j** asked for the world map icon size and the zone summary. Thank you.
+- **[SorelDesign](https://soreldesign.fr)** drew FarmMap's icon and the Sakura
+  pack by hand. Thank you.
+- **Komî** has tested FarmMap in game with the author since the very first
+  version. Thank you.
+
+## Themes
+
+A theme sets the colours of FarmMap's options window — and nothing else. Sizes,
+spacing and layout are fixed, so no theme can break the window, and icons go
+through icon packs. Four themes are built in: Retail, Forever, Emerald and
+Sakura; each client opens on its own default until you pick one.
+
+**In game**, the Theme page makes a copy of any theme; click a colour of your
+copy to change it, and the window shows the change at once. Your themes are
+saved with your FarmMap settings — no file is written. *Export* turns a theme
+into one line of text (`FMTHEME1;…`) that another player pastes into
+Import / Export. That text is read as a name and colours only, never run as
+code.
+
+**As an addon**, a theme registers itself like an icon pack:
+
+```lua
+FarmMapThemes.Register("mytheme", {
+    label  = "My Theme",
+    author = "Me",                  -- optional, shown on the theme card
+    url    = "https://example.org", -- optional, offered to copy from the card
+    colors = {
+        bg = "#1b1418", panel = "#241a20", panel2 = "#2f2229", line = "#4a3541",
+        accent = "#f2a7c3", accentSoft = "#9c5b77",
+        text = "#f6eaf0", dim = "#bfa3b1", faint = "#84697a",
+        good = "#9ad4a0", warn = "#eab676", bad = "#e2574c",
+    },
+})
+```
+
+`bg` is the window ground, `panel` and `panel2` the cards and title bar, `line`
+the borders, `accent` the titles and selection, `accentSoft` the accent at rest,
+`text` / `dim` / `faint` the three levels of text, and `good` / `warn` / `bad`
+the state colours. A colour left out falls back to the client's default theme.
 
 ## Icon packs
 
 FarmMap exposes a public API so separate addons can register their own icon
 styles. Existing packs:
 
+- **Sakura** — built into FarmMap since 2.0, drawn by
+  [SorelDesign](https://soreldesign.fr)
 - [Old Colors](https://www.curseforge.com/wow/addons/farmmap-old-colors)
 - [The Artisan's Anthology](https://www.curseforge.com/wow/addons/farmmap-the-artisans-anthology)
 
@@ -132,14 +203,14 @@ after a game patch shifts Blizzard's atlas layout.
 ### Making your own icon pack
 
 A pack is a small separate addon that ships its textures and registers them
-with `FarmMapStyles.Register`. Its styles then appear in FarmMap's
-*Colors → Packs* options panel.
+with `FarmMapStyles.Register`. Its styles then appear in FarmMap's *Map and
+icons* page, marked "pack".
 
 `FarmMap_MyPack.toc` — `Dependencies` makes sure FarmMap is loaded first; list
 the interface number of every client the pack should run on:
 
 ```
-## Interface: 120100, 16001
+## Interface: 120100, 120007, 16001, 50504, 20506, 11509
 ## Title: FarmMap - My Pack
 ## Dependencies: FarmMap
 
@@ -168,14 +239,23 @@ f:SetScript("OnEvent", function(self, event, addon)
 end)
 ```
 
-Textures must be `.tga` or `.blp` with power-of-two dimensions. The
-[Old Colors](https://www.curseforge.com/wow/addons/farmmap-old-colors) pack is
-a complete working example.
+Each pin also accepts two optional fields:
+
+- `centered = true` — the drawing sits in the middle of its cell. Previews and
+  the filter bar then skip the small per-type nudge they apply to Blizzard's
+  off-centre sprites.
+- `grow = 2` — draws the icon that many pixels bigger, on both maps, for
+  detailed drawings that read small at the default size.
+
+The rich node types (`HerboR`, `MinageR`, `PecheR`) can reuse the same entries;
+FarmMap tints them gold. Textures must be `.tga` or `.blp` with power-of-two
+dimensions. The [Old Colors](https://www.curseforge.com/wow/addons/farmmap-old-colors)
+pack is a complete working example.
 
 ## Development
 
-FarmMap's Lua code is written with AI assistance (Claude Opus 5, by Anthropic).
-Every change is reviewed and tested in game by the author before it is released.
+FarmMap's Lua code is written with AI assistance (Claude, by Anthropic). Every
+change is reviewed and tested in game by the author before it is released.
 
 This concerns the **code only**. The artwork is not AI-generated — see the
 License section below for how the two differ.
@@ -187,6 +267,11 @@ v3.0 — see [LICENSE](LICENSE).
 
 The GPLv3 does **not** extend to everything shipped in this repository:
 
+- **FarmMap's icon and the Sakura icons** (`Textures/icon.tga`,
+  `Textures/sakura.tga`) were drawn by hand by
+  [SorelDesign](https://soreldesign.fr), who keeps all rights to them. They are
+  shipped with FarmMap with her permission and are not covered by the GPL: do
+  not reuse them elsewhere without asking her.
 - **Icon textures** (`Textures/atlas-blip-farmmap-*.tga`) are *modified* versions
   of Blizzard's in-game `Interface\Minimap\ObjectIconsAtlas`, into which the
   author's own hand-made artwork has been added — colorblind-friendly, vivid
@@ -196,20 +281,26 @@ The GPLv3 does **not** extend to everything shipped in this repository:
   addon can display icons consistent with the game.
 - **Blizzard gathering icons** (`Textures/atlas-blip-farmmap-blizzard.tga`) are
   four icons cropped, unmodified, from that same Blizzard atlas. They are
-  shipped so the "Blizzard atlas" style keeps working when Blizzard reshuffles
-  its own file. They remain Blizzard Entertainment's property.
+  shipped so the "WoW Retail" style keeps working when Blizzard reshuffles its
+  own file. They remain Blizzard Entertainment's property.
+- **The KROO logo** (`Media/logo.png`, and `Media/logo-white.png`, the same
+  shape in white so the window can tint it) is the author's own mark. The
+  Discord and PayPal icons in `Media/` belong to their respective owners.
 - **Bundled libraries** in `Libs/` keep their own licenses — see
   [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).
 
-**No AI-generated artwork is used in this addon.** Every image asset added by
-the author was made by hand.
+**No AI-generated artwork is used in this addon.** Every image asset was made by
+hand — by the author, by SorelDesign, or by Blizzard.
 
-The one exception is not artwork: the UI frame textures in `Textures/ui/` are
+The exceptions are not artwork. The UI frame textures in `Textures/ui/` are
 plain rounded rectangles computed by a small script,
 [`tools/make_frame_textures.py`](tools/make_frame_textures.py) — each pixel's
 opacity comes from geometry alone, not from an image generator, and anyone can
-run the script to rebuild them. Like the rest of FarmMap's code, the script
-itself was written with AI assistance.
+run the script to rebuild them. `data/ClassicItemExpansion.lua`, which tells
+the Classic clients which expansion a gathered item belongs to, is generated
+from public game data by
+[`tools/make_classic_expansions.py`](tools/make_classic_expansions.py). Like
+the rest of FarmMap's code, both scripts were written with AI assistance.
 
 World of Warcraft and Blizzard Entertainment are trademarks or registered
 trademarks of Blizzard Entertainment, Inc. This addon is not affiliated with
