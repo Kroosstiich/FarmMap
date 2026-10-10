@@ -16,8 +16,8 @@ ns.changelog["2.0.1"].enUS = {
     {
         kind = "new",
         entries = {
-            { module = "Simplified Chinese",
-              text = "FarmMap is fully in Chinese again, translated by bluse: every text 2.0 added, the What's new window included. Nothing else changes in this version." },
+            { module = "Localisation update",
+              text = "Simplified Chinese" },
         },
     },
 }

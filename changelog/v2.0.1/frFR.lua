@@ -15,8 +15,8 @@ ns.changelog["2.0.1"].frFR = {
     {
         kind = "new",
         entries = {
-            { module = "Chinois simplifié",
-              text = "FarmMap est de nouveau entièrement en chinois, grâce à la traduction de bluse : tous les textes ajoutés par la 2.0, y compris la fenêtre « Quoi de neuf ». Rien d'autre ne change dans cette version." },
+            { module = "Mise à jour des traductions",
+              text = "Chinois simplifié" },
         },
     },
 }
