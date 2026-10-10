@@ -51,4 +51,5 @@ UI\SessionWindow.lua
 # release (enUS is the fallback). UI\Changelog.lua draws them.
 changelog\v2.0.0\enUS.lua
 changelog\v2.0.0\frFR.lua
+changelog\v2.0.0\zhCN.lua
 UI\Changelog.lua
