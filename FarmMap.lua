@@ -51,6 +51,10 @@ local GetItemCount = (C_Item and C_Item.GetItemCount) or GetItemCount
 local HBD     = LibStub("HereBeDragons-2.0")
 local HBDPins = LibStub("HereBeDragons-Pins-2.0")
 
+-- Minimap pins are still registered with HereBeDragons so it can place them.
+-- This table only controls FarmMap's own proximity visibility on top of that.
+ns.MinimapProximity = { pins = {}, elapsed = 0 }
+
 -- Main frame for events
 local eventFrame = CreateFrame("Frame")
 eventFrame:RegisterAllEvents()
@@ -920,7 +924,7 @@ local function ApplyMinimapStyle(style)
 
     if HAS_NATIVE_BLIP and FarmMapDB and FarmMapDB.replaceBlip and blipTex then
         SetNativeBlip(blipTex)
-        HBDPins:RemoveAllMinimapIcons(addonName)
+        ns.MinimapProximity.Clear()
         RefreshWorldMapPins()
     else
         SetNativeBlip(BLIP_DEFAULT)
@@ -1301,6 +1305,48 @@ local function ClearWorldMapPins()
     wipe(activeWorldPins)
 end
 
+function ns.MinimapProximity.Clear()
+    HBDPins:RemoveAllMinimapIcons(addonName)
+    wipe(ns.MinimapProximity.pins)
+end
+
+function ns.MinimapProximity.Apply(pin, hideNearby, radius, playerX, playerY, playerInstance)
+    if hideNearby == nil then
+        hideNearby = FarmMapDB and FarmMapDB.hideNearbyMinimapPins ~= false
+        radius = FarmMapDB and FarmMapDB.nearbyMinimapPinRadius or 50
+        if hideNearby then
+            playerX, playerY, playerInstance = HBD:GetPlayerWorldPosition()
+        end
+    end
+
+    local hidden = false
+    if hideNearby and playerX and pin.farmMapInstance == playerInstance then
+        local distance = HBD:GetWorldDistance(playerInstance, playerX, playerY,
+                                               pin.farmMapWorldX, pin.farmMapWorldY)
+        hidden = distance and distance <= radius
+    end
+    pin:SetAlpha(hidden and 0 or 1)
+    pin:EnableMouse(not hidden)
+end
+
+function ns.MinimapProximity.Update()
+    local hideNearby = FarmMapDB and FarmMapDB.hideNearbyMinimapPins ~= false
+    local radius = FarmMapDB and FarmMapDB.nearbyMinimapPinRadius or 50
+    local playerX, playerY, playerInstance
+    if hideNearby then playerX, playerY, playerInstance = HBD:GetPlayerWorldPosition() end
+    for _, pin in ipairs(ns.MinimapProximity.pins) do
+        ns.MinimapProximity.Apply(pin, hideNearby, radius, playerX, playerY, playerInstance)
+    end
+end
+
+ns.MinimapProximity.frame = CreateFrame("Frame")
+ns.MinimapProximity.frame:SetScript("OnUpdate", function(_, elapsed)
+    ns.MinimapProximity.elapsed = ns.MinimapProximity.elapsed + elapsed
+    if ns.MinimapProximity.elapsed < 0.2 then return end
+    ns.MinimapProximity.elapsed = 0
+    ns.MinimapProximity.Update()
+end)
+
 -- Everything the other addons' integrations need (TomTom here, the price
 -- addons further down), in ONE table: Lua allows at most 200 locals in the
 -- file's main chunk, and FarmMap.lua sits close to that limit. Over it, the
@@ -1375,6 +1421,9 @@ local function CreatePoint(nodeData, isMinimap, mapID)
     local f = CreateFrame("Frame", nil, nil)
     if isMinimap then
         f:SetSize(PIN_BASE_SIZE, PIN_BASE_SIZE)
+        f.farmMapWorldX, f.farmMapWorldY, f.farmMapInstance =
+            HBD:GetWorldCoordinatesFromZone(nodeData.x, nodeData.y, mapID)
+        ns.MinimapProximity.pins[#ns.MinimapProximity.pins + 1] = f
     else
         -- World map only: the minimap keeps its native size, which is what the
         -- request asked for.
@@ -1658,9 +1707,15 @@ end
 
 local function BatchAddMinimapPins(list, index)
     local limit = math.min(index + MINIMAP_BATCH - 1, #list)
+    local hideNearby = FarmMapDB and FarmMapDB.hideNearbyMinimapPins ~= false
+    local radius = FarmMapDB and FarmMapDB.nearbyMinimapPinRadius or 50
+    local playerX, playerY, playerInstance
+    if hideNearby then playerX, playerY, playerInstance = HBD:GetPlayerWorldPosition() end
     for i = index, limit do
         local e = list[i]
-        HBDPins:AddMinimapIconMap(addonName, CreatePoint(e.node, true, e.mapID), e.mapID, e.node.x, e.node.y, true)
+        local pin = CreatePoint(e.node, true, e.mapID)
+        ns.MinimapProximity.Apply(pin, hideNearby, radius, playerX, playerY, playerInstance)
+        HBDPins:AddMinimapIconMap(addonName, pin, e.mapID, e.node.x, e.node.y, true)
     end
     if limit < #list then
         C_Timer.After(0, function() BatchAddMinimapPins(list, limit + 1) end)
@@ -1701,7 +1756,7 @@ end
 
 local function DoRefresh()
     refreshPending = false
-    HBDPins:RemoveAllMinimapIcons(addonName)
+    ns.MinimapProximity.Clear()
     RefreshWorldMapPins()
     -- The filter bar may wear the world map style's icons (an option).
     if FarmMap_ApplyFilterBarIcons and FarmMapDB then FarmMap_ApplyFilterBarIcons() end
@@ -2227,7 +2282,9 @@ local function ProcessHarvestLoot()
             local ext     = FarmMapStyles.Get(mmStyle)
             local useBlip = HAS_NATIVE_BLIP and FarmMapDB.replaceBlip and ((ext and ext.blip) or BLIP_TEXTURES[mmStyle])
             if not useBlip and FarmMapDB.showMinimapPins ~= false then
-                HBDPins:AddMinimapIconMap(addonName, CreatePoint(node, true, mapID), mapID, pos.x, pos.y, true)
+                local pin = CreatePoint(node, true, mapID)
+                ns.MinimapProximity.Apply(pin)
+                HBDPins:AddMinimapIconMap(addonName, pin, mapID, pos.x, pos.y, true)
             end
             HBDPins:AddWorldMapIconMap(addonName, CreatePoint(node, false, mapID), mapID, pos.x, pos.y)
         end
@@ -3323,6 +3380,8 @@ local function ClearNodeDatabase()
         worldmapStyle    = FarmMapDB.worldmapStyle,
         replaceBlip      = FarmMapDB.replaceBlip,
         showMinimapPins  = FarmMapDB.showMinimapPins,
+        hideNearbyMinimapPins = FarmMapDB.hideNearbyMinimapPins,
+        nearbyMinimapPinRadius = FarmMapDB.nearbyMinimapPinRadius,
         language         = FarmMapDB.language,
         showFloatingText = FarmMapDB.showFloatingText,
         showProfit       = FarmMapDB.showProfit,
@@ -3368,7 +3427,7 @@ local function ClearNodeDatabase()
         userThemes        = FarmMapDB.userThemes,
         userThemeNext     = FarmMapDB.userThemeNext,
     }
-    HBDPins:RemoveAllMinimapIcons(addonName)
+    ns.MinimapProximity.Clear()
     ClearWorldMapPins()
 end
 
@@ -3381,6 +3440,7 @@ ns.ManualMigration     = function() ManualMigration() end
 ns.OpenExportPopup     = function() OpenExportPopup() end
 ns.OpenImportPopup     = function() OpenImportPopup() end
 ns.RefreshAllPins      = function() RefreshAllPins() end
+ns.UpdateMinimapPinProximity = function() ns.MinimapProximity.Update() end
 ns.IsAuctionatorLoaded = function() return IsAuctionatorLoaded() and true or false end
 ns.IsTSMLoaded = Integ.IsTSMLoaded
 ns.IsTomTomLoaded = function() return (TomTom and TomTom.AddWaypoint) and true or false end
@@ -4032,12 +4092,25 @@ local function CreateOptions()
         RefreshAllPins()
     end)
 
+    local checkHideNearby = CreateFrame("CheckButton", "FarmMapHideNearbyMinimapPinsCheck", colorPanel, "InterfaceOptionsCheckButtonTemplate")
+    checkHideNearby:SetPoint("TOPLEFT", checkPins, "BOTTOMLEFT", 0, -4)
+    _G[checkHideNearby:GetName() .. "Text"]:SetText(L.HIDE_NEARBY_MINIMAP_PINS)
+    checkHideNearby:SetChecked(FarmMapDB and FarmMapDB.hideNearbyMinimapPins ~= false)
+    checkHideNearby:SetScript("OnClick", function(self)
+        FarmMapDB.hideNearbyMinimapPins = self:GetChecked()
+        ns.MinimapProximity.Update()
+    end)
+
+    local sliderHideNearbyRadius = MakeSlider(colorPanel, checkHideNearby,
+        L.HIDE_NEARBY_MINIMAP_PINS_RADIUS, 50, 300, 25, "nearbyMinimapPinRadius", "%d yd",
+        function() ns.MinimapProximity.Update() end)
+
     -- Minimap button (LibDBIcon). The checkbox is hidden when the libs are
     -- absentes — l'addon reste fonctionnel sans elles.
     local checkMinimapBtn
     if ns.HasMinimapButton and ns.HasMinimapButton() then
         checkMinimapBtn = CreateFrame("CheckButton", "FarmMapShowMinimapButtonCheck", colorPanel, "InterfaceOptionsCheckButtonTemplate")
-        checkMinimapBtn:SetPoint("TOPLEFT", checkPins, "BOTTOMLEFT", 0, -4)
+        checkMinimapBtn:SetPoint("TOPLEFT", sliderHideNearbyRadius, "BOTTOMLEFT", 0, -4)
         _G[checkMinimapBtn:GetName() .. "Text"]:SetText(L.SHOW_MINIMAP_BUTTON)
         checkMinimapBtn:SetChecked(not (FarmMapDB.minimapIcon and FarmMapDB.minimapIcon.hide))
         checkMinimapBtn:SetScript("OnClick", function(self)
@@ -4046,7 +4119,7 @@ local function CreateOptions()
     end
 
     local mmAnchor = colorPanel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-    mmAnchor:SetPoint("TOPLEFT", checkMinimapBtn or checkPins, "BOTTOMLEFT", 0, -6)
+    mmAnchor:SetPoint("TOPLEFT", checkMinimapBtn or sliderHideNearbyRadius, "BOTTOMLEFT", 0, -6)
     mmAnchor:SetText("")
 
     local wmSep = colorPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
@@ -4121,6 +4194,9 @@ local function CreateOptions()
     local function SyncColorPanel()
         local mmStyle = FarmMapDB.minimapStyle  or "blank"
         local wmStyle = FarmMapDB.worldmapStyle or "blizzard"
+        if sliderHideNearbyRadius then
+            sliderHideNearbyRadius.slider:SetValue(FarmMapDB.nearbyMinimapPinRadius or 50)
+        end
         -- checkBlip is disabled and always unchecked, nothing to sync here
         for _, row in ipairs(mmRows) do
             local active = (row.presetKey == mmStyle) and not FarmMapStyles.Get(mmStyle)
@@ -4738,6 +4814,10 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         if FarmMapDB.showPeche    == nil then FarmMapDB.showPeche    = true end
         if FarmMapDB.showBois     == nil then FarmMapDB.showBois     = true end
         if FarmMapDB.showMinimapPins == nil then FarmMapDB.showMinimapPins = true end
+        if FarmMapDB.hideNearbyMinimapPins == nil then FarmMapDB.hideNearbyMinimapPins = true end
+        local proximityRadius = tonumber(FarmMapDB.nearbyMinimapPinRadius) or 50
+        proximityRadius = math.max(50, math.min(300, proximityRadius))
+        FarmMapDB.nearbyMinimapPinRadius = math.floor((proximityRadius + 12.5) / 25) * 25
         FarmMapDB.minimapStyle     = FarmMapDB.minimapStyle     ~= nil and FarmMapDB.minimapStyle     or "blank"
         FarmMapDB.worldmapStyle    = FarmMapDB.worldmapStyle    ~= nil and FarmMapDB.worldmapStyle    or "blizzard"
         -- "atlas" (the world map default until v2.0.0) pointed at the game's

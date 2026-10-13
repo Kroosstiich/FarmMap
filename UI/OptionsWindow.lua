@@ -1563,6 +1563,23 @@ ItemsPage({
                   SyncLegacyCheck("FarmMapShowMinimapPinsCheck", on)
                   if ns.RefreshAllPins then ns.RefreshAllPins() end
               end },
+            { type = "switch", key = "hideNearbyMinimapPins",
+              name = L("UI_MINIMAP_HIDE_NEARBY"), desc = L("UI_MINIMAP_HIDE_NEARBY_DESC"),
+              get = function() return FarmMapDB.hideNearbyMinimapPins ~= false end,
+              set = function(on)
+                  FarmMapDB.hideNearbyMinimapPins = on and true or false
+                  SyncLegacyCheck("FarmMapHideNearbyMinimapPinsCheck", on)
+                  if ns.UpdateMinimapPinProximity then ns.UpdateMinimapPinProximity() end
+              end },
+            { type = "slider", key = "nearbyMinimapPinRadius",
+              name = L("UI_MINIMAP_HIDE_NEARBY_RADIUS"), min = 50, max = 300, step = 25,
+              disabled = function() return FarmMapDB.hideNearbyMinimapPins == false end,
+              format = function(v) return ("%d yd"):format(v) end,
+              get = DB("nearbyMinimapPinRadius"),
+              set = function(v)
+                  FarmMapDB.nearbyMinimapPinRadius = v
+                  if ns.UpdateMinimapPinProximity then ns.UpdateMinimapPinProximity() end
+              end },
             { type = "switch", key = "minimapButton",
               visible = ns.HasMinimapButton and ns.HasMinimapButton() or false,
               name = L("UI_MINIMAP_BUTTON"), desc = L("UI_MINIMAP_BUTTON_DESC"),
