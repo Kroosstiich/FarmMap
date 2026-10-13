@@ -4107,7 +4107,7 @@ local function CreateOptions()
     end)
 
     local sliderHideNearbyRadius = MakeSlider(colorPanel, checkHideNearby,
-        L.HIDE_NEARBY_MINIMAP_PINS_RADIUS, 50, 300, 25, "nearbyMinimapPinRadius", "%d yd",
+        L.HIDE_NEARBY_MINIMAP_PINS_RADIUS, 50, 300, 25, "nearbyMinimapPinRadius", L.UNIT_YARDS,
         function() ns.MinimapProximity.Update() end)
 
     -- Minimap button (LibDBIcon). The checkbox is hidden when the libs are

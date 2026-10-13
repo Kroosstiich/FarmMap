@@ -132,6 +132,7 @@ ns.locales.enUS = {
         SHOW_MINIMAP_PINS      = "Show pins on the minimap",
         HIDE_NEARBY_MINIMAP_PINS = "Hide nearby pins",
         HIDE_NEARBY_MINIMAP_PINS_RADIUS = "Hide pins within",
+        UNIT_YARDS             = "%d yd",
         SHOW_MINIMAP_BUTTON    = "Show the FarmMap minimap button",
         MINIMAP_BTN_LEFT       = "Left click: open the options",
         MINIMAP_BTN_RIGHT      = "Right click: show/hide the debug window",

@@ -93,6 +93,7 @@ ns.locales.ruRU = {
         SHOW_MINIMAP_PINS      = "Показывать метки на миникарте",
         HIDE_NEARBY_MINIMAP_PINS = "Hide nearby pins",  -- [TRANSLATE]
         HIDE_NEARBY_MINIMAP_PINS_RADIUS = "Hide pins within",  -- [TRANSLATE]
+        UNIT_YARDS             = "%d yd",  -- [TRANSLATE]
         SHOW_MINIMAP_BUTTON    = "Показывать кнопку FarmMap у миникарты",
         MINIMAP_BTN_LEFT       = "ЛКМ: открыть настройки",
         MINIMAP_BTN_RIGHT      = "ПКМ: показать/скрыть окно отладки",

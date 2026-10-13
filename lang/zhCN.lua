@@ -85,6 +85,7 @@ ns.locales.zhCN = {
         SHOW_MINIMAP_PINS      = "在小地图上显示标记",
         HIDE_NEARBY_MINIMAP_PINS = "隐藏附近标记",
         HIDE_NEARBY_MINIMAP_PINS_RADIUS = "隐藏此范围内的标记",
+        UNIT_YARDS             = "%d码",
         SHOW_MINIMAP_BUTTON    = "显示 FarmMap 小地图按钮",
         MINIMAP_BTN_LEFT       = "左键：打开设置",
         MINIMAP_BTN_RIGHT      = "右键：显示/隐藏调试窗口",

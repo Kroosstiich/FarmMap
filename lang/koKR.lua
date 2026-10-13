@@ -129,6 +129,7 @@ ns.locales.koKR = {
         SHOW_MINIMAP_PINS      = "미니맵에 핀 표시",
         HIDE_NEARBY_MINIMAP_PINS = "Hide nearby pins",  -- [TRANSLATE]
         HIDE_NEARBY_MINIMAP_PINS_RADIUS = "Hide pins within",  -- [TRANSLATE]
+        UNIT_YARDS             = "%d yd",  -- [TRANSLATE]
         SHOW_MINIMAP_BUTTON    = "FarmMap 미니맵 버튼 표시",
         MINIMAP_BTN_LEFT       = "좌클릭: 옵션 열기",
         MINIMAP_BTN_RIGHT      = "우클릭: 디버그 창 표시/숨기기",
