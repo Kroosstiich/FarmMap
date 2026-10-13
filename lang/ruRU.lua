@@ -455,6 +455,7 @@ ns.locales.ruRU = {
         UI_FILTERBAR_ICONS     = "Style icons in the bar",  -- [TRANSLATE]
         UI_FILTERBAR_ICONS_DESC = "The buttons show the icons of the style chosen for the world map, an icon pack's included, so the bar matches the map. With a ring style, or off, they keep their usual icons.",  -- [TRANSLATE]
         UI_CONTRIB_SOREL       = "FarmMap's icon and the Sakura pack (soreldesign.fr)",  -- [TRANSLATE]
+        UI_CONTRIB_FIOTE       = "hiding nearby pins on the minimap",  -- [TRANSLATE]
         UI_TOOLTIP_ICON        = "Node icon in the tooltip",  -- [TRANSLATE]
         UI_TOOLTIP_ICON_DESC   = "Shows the icon of the pin you hover at the top right of its tooltip, in the style chosen for that map.",  -- [TRANSLATE]
     },

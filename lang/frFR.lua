@@ -454,5 +454,6 @@ ns.locales.frFR = {
         UI_CONTRIB_CRAZY       = "idées : barre de filtres déplaçable et sa taille, noms d'extension traduits",
         UI_CONTRIB_R0S0J       = "idées : taille des icônes de la carte, résumé de la zone",
         UI_CONTRIB_SOREL       = "icône de FarmMap et pack Sakura (soreldesign.fr)",
+        UI_CONTRIB_FIOTE       = "masquage des épingles proches sur la minicarte",
     },
 }

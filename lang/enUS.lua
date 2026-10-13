@@ -479,5 +479,6 @@ ns.locales.enUS = {
         UI_CONTRIB_CRAZY       = "ideas: movable filter bar and its size, translated expansion names",
         UI_CONTRIB_R0S0J       = "ideas: world map icon size, zone summary",
         UI_CONTRIB_SOREL       = "FarmMap's icon and the Sakura pack (soreldesign.fr)",
+        UI_CONTRIB_FIOTE       = "hiding nearby pins on the minimap",
     },
 }

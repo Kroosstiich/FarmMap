@@ -960,6 +960,7 @@ local function CreditGroups()
                 SAME_PERSON.bluse .. " — " .. L("UI_CONTRIB_BUSEQ"),
                 "Crazyyoungs — " .. L("UI_CONTRIB_CRAZY"),
                 "r0s0j — " .. L("UI_CONTRIB_R0S0J"),
+                "fiote — " .. L("UI_CONTRIB_FIOTE"),
             } },
             -- The artist of FarmMap's icon (v2.0) and of the Sakura pack.
             { label = L("UI_CREDIT_ART"), entries = {

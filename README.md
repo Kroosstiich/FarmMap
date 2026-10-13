@@ -141,6 +141,11 @@ A good part of what FarmMap does today arrived from the people using it.
   locale, every single key, with the colour codes and escapes carried over
   untouched. Russian was not on any roadmap; it exists because he wrote it.
   Thank you.
+- **[fiote](https://github.com/fiote)** wrote the option that hides the pins
+  close to your character on the minimap, sent as
+  [pull request #10](https://github.com/Kroosstiich/FarmMap/pull/10): after a
+  long wood farm, the minimap filled up with pins until the player arrow was
+  lost among them. Thank you.
 - **Crazyyoungs** asked for the world map filter bar to be movable and to fade
   out, so it stops colliding with other addons that use the same corner of the
   map, and then for its size; he also reported the untranslated expansion

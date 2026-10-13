@@ -417,5 +417,6 @@ ns.locales.zhCN = {
         UI_CONTRIB_CRAZY       = "创意：可移动筛选栏及其尺寸、资料片名称翻译",
         UI_CONTRIB_R0S0J       = "创意：世界地图图标大小、区域汇总",
         UI_CONTRIB_SOREL       = "FarmMap 图标与 Sakura 整合包（soreldesign.fr）",
+        UI_CONTRIB_FIOTE       = "hiding nearby pins on the minimap",  -- [TRANSLATE]
     },
 }
