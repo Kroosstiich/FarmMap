@@ -373,6 +373,10 @@ loader:SetScript("OnEvent", function()
     FarmMapDB.changelogSeen = current
     if seen == nil and IsNewInstall() then return end
     if not ns.changelog[current] then return end
-    -- After the login burst of chat and frames, so it is not lost under them.
-    C_Timer.After(4, function() Changelog.Show(seen) end)
+    -- After the login burst of chat and frames, so it is not lost under them,
+    -- and after the setup assistant when it has screens to show: never both.
+    C_Timer.After(4, function()
+        local function show() Changelog.Show(seen) end
+        if ns.Setup then ns.Setup.After(show) else show() end
+    end)
 end)

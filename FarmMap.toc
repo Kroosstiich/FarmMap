@@ -46,6 +46,8 @@ FarmMap.lua
 UI\Theme.lua
 UI\OptionsWindow.lua
 UI\SessionWindow.lua
+# Setup assistant: after OptionsWindow.lua, whose settings it shows.
+UI\Setup.lua
 
 # Changelog: one file per version and language, never edited after the
 # release (enUS is the fallback). UI\Changelog.lua draws them.

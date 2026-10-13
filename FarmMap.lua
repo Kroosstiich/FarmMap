@@ -1341,6 +1341,9 @@ end
 
 ns.MinimapProximity.frame = CreateFrame("Frame")
 ns.MinimapProximity.frame:SetScript("OnUpdate", function(_, elapsed)
+    -- Off: nothing to recompute. Turning it off already showed every pin
+    -- again (the switches call Update() themselves).
+    if not (FarmMapDB and FarmMapDB.hideNearbyMinimapPins) then return end
     ns.MinimapProximity.elapsed = ns.MinimapProximity.elapsed + elapsed
     if ns.MinimapProximity.elapsed < 0.2 then return end
     ns.MinimapProximity.elapsed = 0
@@ -3426,6 +3429,8 @@ local function ClearNodeDatabase()
         -- The player's own themes (Theme page): settings, not nodes.
         userThemes        = FarmMapDB.userThemes,
         userThemeNext     = FarmMapDB.userThemeNext,
+        -- The setup assistant's screens already answered.
+        setupSeen         = FarmMapDB.setupSeen,
     }
     ns.MinimapProximity.Clear()
     ClearWorldMapPins()
@@ -4814,7 +4819,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         if FarmMapDB.showPeche    == nil then FarmMapDB.showPeche    = true end
         if FarmMapDB.showBois     == nil then FarmMapDB.showBois     = true end
         if FarmMapDB.showMinimapPins == nil then FarmMapDB.showMinimapPins = true end
-        if FarmMapDB.hideNearbyMinimapPins == nil then FarmMapDB.hideNearbyMinimapPins = true end
+        -- Off until the player turns it on (the setup assistant offers it):
+        -- an update must not change what everyone's minimap shows.
+        if FarmMapDB.hideNearbyMinimapPins == nil then FarmMapDB.hideNearbyMinimapPins = false end
         local proximityRadius = tonumber(FarmMapDB.nearbyMinimapPinRadius) or 50
         proximityRadius = math.max(50, math.min(300, proximityRadius))
         FarmMapDB.nearbyMinimapPinRadius = math.floor((proximityRadius + 12.5) / 25) * 25
@@ -5467,6 +5474,10 @@ SlashCmdList["FARMMAP"] = function(msg)
     -- Reopens the "What's new" window, which otherwise shows once per version.
     elseif cmd == "news" then
         if ns.Changelog then ns.Changelog.Show(FarmMapDB.changelogPrevious) end
+
+    -- Runs the setup assistant again, every screen.
+    elseif cmd == "setup" then
+        if ns.Setup then ns.Setup.Show(true) end
 
     elseif cmd == "atlas" then
         if not calibFrame then calibFrame = CreateAtlasCalibrator() end

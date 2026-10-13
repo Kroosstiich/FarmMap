@@ -1174,81 +1174,98 @@ local function ItemsSearchText(def)
     return table.concat(parts, " ")
 end
 
+-- Lays a list of items out in `frame` (which holds frame.rows) and returns
+-- the height used. Shared by the settings pages and the setup assistant;
+-- `wheel` is the scroll frame the rows hand their mouse wheel to.
+function OptionsWindow.LayoutItems(frame, items, width, wheel)
+    -- Rows still in use are never hidden: hiding a search box drops
+    -- its keyboard focus, and the nodes page re-lays itself on every
+    -- letter typed. Only the rows left unused are hidden, at the end.
+    local used = {}
+    local y = 0
+    for _, item in ipairs(items) do
+        if item.visible ~= false then
+            used[item.key] = true
+            local row = frame.rows[item.key]
+            if not row then
+                if item.type == "notice" then
+                    row = ReloadNotice(frame)
+                elseif item.type == "custom" then
+                    row = item.build(frame)
+                else
+                    row = ROW_MAKERS[item.type](frame)
+                end
+                frame.rows[item.key] = row
+                -- Rows are drawn over the page: hand them its wheel (and
+                -- to a custom row, for the rows it builds itself).
+                row.wheel = wheel or scroll
+                Theme.CatchWheel(row, row.wheel)
+            end
+
+            if item.type == "notice" then
+                y = row:Place(y, width, item.show(), item.text)
+            else
+                -- inset: a bordered card flush with the page's
+                -- clipping edge would lose that side of its outline.
+                local x = item.inset and 1 or 0
+                row:ClearAllPoints()
+                row:SetPoint("TOPLEFT", x, -y)
+                row:SetWidth(width - x * 2)
+                if item.type == "section" then
+                    row:SetContent(item.text)
+                elseif item.type == "hint" then
+                    row:SetContent(item.text, width)
+                elseif item.type == "button" then
+                    row:SetContent(item.name, item.desc, width, item.label)
+                    row.button:SetScript("OnClick", function() item.onClick(row) end)
+                    -- enabled = false: nothing to do (a pack already
+                    -- installed), so the button says so and rests.
+                    local enabled = item.enabled ~= false
+                    row.button:SetEnabled(enabled)
+                    row.button:SetAlpha(enabled and 1 or 0.5)
+                elseif item.type == "custom" then
+                    row:SetHeight(math.max(1, item.layout(row, width)))
+                else
+                    if item.type == "slider" then
+                        row:SetRange(item.min, item.max, item.step)
+                        row.format = item.format
+                    end
+                    row.isDisabled = item.disabled
+                    row:SetContent(item.name, item.desc, width)
+                    if item.type == "choice" then
+                        row:Bind(item.get, item.set, item.choices())
+                    else
+                        row:Bind(item.get, item.set)
+                    end
+                end
+                row:Show()
+                y = y + row:GetHeight() + (item.gap or 0)
+            end
+        end
+    end
+    for key, row in pairs(frame.rows) do
+        if not used[key] then row:Hide() end
+    end
+    return y + 4
+end
+
 local function ItemsPage(def)
     OptionsWindow:AddPage({
         id = def.id, group = "settings", titleKey = def.titleKey, descKey = def.descKey,
+        items = def.items,
         SearchText = not def.noSearch and function() return ItemsSearchText(def) end or nil,
         Build = function(frame) frame.rows = {} end,
-        Layout = function(frame, width)
-            -- Rows still in use are never hidden: hiding a search box drops
-            -- its keyboard focus, and the nodes page re-lays itself on every
-            -- letter typed. Only the rows left unused are hidden, at the end.
-            local used = {}
-            local y = 0
-            for _, item in ipairs(def.items()) do
-                if item.visible ~= false then
-                    used[item.key] = true
-                    local row = frame.rows[item.key]
-                    if not row then
-                        if item.type == "notice" then
-                            row = ReloadNotice(frame)
-                        elseif item.type == "custom" then
-                            row = item.build(frame)
-                        else
-                            row = ROW_MAKERS[item.type](frame)
-                        end
-                        frame.rows[item.key] = row
-                        -- Rows are drawn over the page: hand them its wheel.
-                        Theme.CatchWheel(row, scroll)
-                    end
-
-                    if item.type == "notice" then
-                        y = row:Place(y, width, item.show(), item.text)
-                    else
-                        -- inset: a bordered card flush with the page's
-                        -- clipping edge would lose that side of its outline.
-                        local x = item.inset and 1 or 0
-                        row:ClearAllPoints()
-                        row:SetPoint("TOPLEFT", x, -y)
-                        row:SetWidth(width - x * 2)
-                        if item.type == "section" then
-                            row:SetContent(item.text)
-                        elseif item.type == "hint" then
-                            row:SetContent(item.text, width)
-                        elseif item.type == "button" then
-                            row:SetContent(item.name, item.desc, width, item.label)
-                            row.button:SetScript("OnClick", function() item.onClick(row) end)
-                            -- enabled = false: nothing to do (a pack already
-                            -- installed), so the button says so and rests.
-                            local enabled = item.enabled ~= false
-                            row.button:SetEnabled(enabled)
-                            row.button:SetAlpha(enabled and 1 or 0.5)
-                        elseif item.type == "custom" then
-                            row:SetHeight(math.max(1, item.layout(row, width)))
-                        else
-                            if item.type == "slider" then
-                                row:SetRange(item.min, item.max, item.step)
-                                row.format = item.format
-                            end
-                            row.isDisabled = item.disabled
-                            row:SetContent(item.name, item.desc, width)
-                            if item.type == "choice" then
-                                row:Bind(item.get, item.set, item.choices())
-                            else
-                                row:Bind(item.get, item.set)
-                            end
-                        end
-                        row:Show()
-                        y = y + row:GetHeight() + (item.gap or 0)
-                    end
-                end
-            end
-            for key, row in pairs(frame.rows) do
-                if not used[key] then row:Hide() end
-            end
-            return y + 4
-        end,
+        Layout = function(frame, width) return OptionsWindow.LayoutItems(frame, def.items(), width) end,
     })
+end
+
+-- One setting of a page, by key, as that page defines it: the setup
+-- assistant shows it with the same get/set, so both have the same effect.
+function OptionsWindow.FindItem(pageID, key)
+    local def = pages[pageID]
+    for _, item in ipairs(def and def.items and def.items() or {}) do
+        if item.key == key then return item end
+    end
 end
 
 -- Keeps a legacy panel checkbox in step with a change made here. The legacy
@@ -1519,7 +1536,7 @@ local function LayoutStyleColumns(f, width)
         for r, style in ipairs(ns.StyleList(col.dbKey)) do
             local row = col.rows[r] or StyleRow(f)
             col.rows[r] = row
-            Theme.CatchWheel(row, scroll)
+            Theme.CatchWheel(row, f.wheel or scroll)
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", x, -y)
             FillStyleRow(row, style, col.dbKey, colW)
