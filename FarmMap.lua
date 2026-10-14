@@ -3431,6 +3431,7 @@ local function ClearNodeDatabase()
         userThemeNext     = FarmMapDB.userThemeNext,
         -- The setup assistant's screens already answered.
         setupSeen         = FarmMapDB.setupSeen,
+        setupDisabled     = FarmMapDB.setupDisabled,
     }
     ns.MinimapProximity.Clear()
     ClearWorldMapPins()

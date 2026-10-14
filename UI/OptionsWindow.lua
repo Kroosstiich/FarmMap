@@ -280,6 +280,9 @@ local function ShowLink(url, hint)
     linkBox.box:SetFocus()
     linkBox.box:HighlightText()
 end
+-- The setup assistant's welcome page opens the same box on the Discord link.
+OptionsWindow.ShowLink = ShowLink
+OptionsWindow.DISCORD_URL = LINKS[1].url
 
 local function LinkButton(parent, link)
     local b = CreateFrame("Button", nil, parent)

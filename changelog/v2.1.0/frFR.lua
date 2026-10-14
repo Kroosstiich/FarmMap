@@ -16,7 +16,7 @@ ns.changelog["2.1.0"].frFR = {
         kind = "new",
         entries = {
             { module = "Assistant d'installation",
-              text = "Une nouvelle fenêtre vous présente les principaux réglages de FarmMap, un par écran : à quoi sert chacun, activé ou non, avec une petite scène qui le montre. Elle s'ouvre une fois ; après une mise à jour, elle ne montre que les nouveaux réglages. Tapez /fm setup pour la relancer." },
+              text = "Une nouvelle fenêtre vous présente les principaux réglages de FarmMap, un par écran : à quoi sert chacun, activé ou non, avec une petite scène qui le montre. Elle s'ouvre une fois ; après une mise à jour, elle ne montre que les nouveaux réglages. Sa première page indique où trouver de l'aide, et permet de l'arrêter pour l'instant ou de ne plus jamais la voir. Tapez /fm setup pour la relancer." },
             { module = "Masquer les épingles proches",
               text = "Les épingles proches de votre personnage peuvent disparaître de la minicarte, pour ne plus cacher sa flèche. Choisissez la distance, de 50 à 300 mètres. Désactivé par défaut. Une idée et un code de fiote." },
         },

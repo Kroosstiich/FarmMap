@@ -45,7 +45,10 @@ end
 -- plays the selected answer. A new screen added in a later version is
 -- shown on its own to the players who already went through.
 local STEPS = {
-    -- First: the icons are what every other screen's scene shows.
+    -- A thank-you and where to get help; its own buttons (never again,
+    -- stop for now, continue). Seen once, then only with /fm setup.
+    { id = "welcome", text = "WELCOME", welcome = true },
+    -- Then the icons: they are what every other screen's scene shows.
     { id = "styles", text = "STYLES", page = "icons", key = "styleColumns", demo = "style" },
     { id = "minimapPins", text = "MINIMAP_PINS", page = "icons", key = "showMinimapPins", demo = "pins" },
     { id = "hideNearby", text = "HIDE_NEARBY", page = "icons", key = "hideNearbyMinimapPins",
@@ -63,6 +66,7 @@ local STEPS = {
 }
 
 local window, queue, index, after
+local Go   -- defined after Draw, which calls it
 
 local function Item(step)
     if step.item then return step.item() end
@@ -70,6 +74,7 @@ local function Item(step)
 end
 
 local function Applies(step)
+    if step.welcome then return true end
     local item = Item(step)
     return item ~= nil and item.visible ~= false and (not step.when or step.when())
 end
@@ -284,7 +289,12 @@ local function Draw()
     y = y + math.floor(c.body:GetStringHeight() + 0.5) + 18
 
     local items = {}
-    if item.type == "switch" then
+    if step.welcome then
+        for _, card in ipairs(c.cards) do card:Hide() end
+        items[1] = { type = "button", key = "setupDiscord", name = "Discord",
+                     label = L("SETUP_WELCOME_DISCORD"),
+                     onClick = function() OptionsWindow.ShowLink(OptionsWindow.DISCORD_URL) end }
+    elseif item.type == "switch" then
         -- Clients other than Retail may track a single kind of gathering at
         -- a time: a screen can say so in a text of its own.
         local onKey = prefix .. "_ON"
@@ -339,21 +349,44 @@ local function Draw()
     c.items:SetHeight(math.max(1, h))
     c:SetHeight(y + h)
 
-    -- Where this screen stands among those that apply right now (an
+    -- Where this screen stands among the settings that apply right now (an
     -- earlier answer can add or remove one: no value, no value screen).
     local pos, total = 0, 0
     for i, s in ipairs(queue) do
-        if Applies(s) then
+        if Applies(s) and not s.welcome then
             total = total + 1
             if i <= index then pos = pos + 1 end
         end
     end
-    window.counter:SetText(L("SETUP_STEP"):format(pos, total))
-    window.prev:SetShown(Step(index, -1) ~= nil)
-    window.next:SetLabel(L(Step(index, 1) and "SETUP_NEXT" or "SETUP_DONE"))
+    window.counter:SetText(step.welcome and "" or L("SETUP_STEP"):format(pos, total))
+
+    -- The welcome page's three answers, in the slots of Skip, Back, Next.
+    local skip, prev, nextBtn = window.skip, window.prev, window.next
+    if step.welcome then
+        skip:SetLabel(L("SETUP_NEVER"))
+        skip.tipTitle, skip.tipBody = L("SETUP_NEVER"), L("SETUP_NEVER_TIP")
+        skip:SetScript("OnClick", function()
+            FarmMapDB.setupDisabled = true
+            window:Hide()
+        end)
+        prev:SetLabel(L("SETUP_STOP"))
+        prev.tipTitle, prev.tipBody = L("SETUP_STOP"), L("SETUP_STOP_TIP")
+        prev:SetScript("OnClick", function() window:Hide() end)
+        prev:Show()
+        nextBtn:SetLabel(L("SETUP_CONTINUE"))
+    else
+        skip:SetLabel(L("SETUP_SKIP"))
+        skip.tipTitle, skip.tipBody = nil, nil
+        skip:SetScript("OnClick", function() window:Hide() end)
+        prev:SetLabel(L("SETUP_PREV"))
+        prev.tipTitle, prev.tipBody = nil, nil
+        prev:SetScript("OnClick", function() Go(-1) end)
+        prev:SetShown(Step(index, -1) ~= nil)
+        nextBtn:SetLabel(L(Step(index, 1) and "SETUP_NEXT" or "SETUP_DONE"))
+    end
 end
 
-local function Go(dir)
+function Go(dir)
     local i = Step(index, dir)
     if i then
         index = i
@@ -413,9 +446,9 @@ local function CreateWindow()
     window.prev:SetLabel(L("SETUP_PREV"))
     window.prev:SetPoint("RIGHT", window.next, "LEFT", -10, 0)
     window.prev:SetScript("OnClick", function() Go(-1) end)
-    local skip = Theme.ActionButton(footer, L("SETUP_SKIP"))
-    skip:SetPoint("LEFT", 14, 0)
-    skip:SetScript("OnClick", function() window:Hide() end)
+    window.skip = Theme.ActionButton(footer, L("SETUP_SKIP"))
+    window.skip:SetPoint("LEFT", 14, 0)
+    window.skip:SetScript("OnClick", function() window:Hide() end)
 
     local hint = Theme.Font(window:CreateFontString(nil, "OVERLAY"), 12, "faint")
     hint:SetPoint("BOTTOMLEFT", footer, "TOPLEFT", PAD, 8)
@@ -464,13 +497,20 @@ end)
 -- Returns false when there is nothing to show.
 function Setup.Show(all)
     if window and window:IsShown() then return true end
+    -- "Never show again": only /fm setup opens it.
+    if not all and FarmMapDB.setupDisabled then return false end
     local seen = FarmMapDB.setupSeen or {}
     queue = {}
+    local settings = 0
     for _, step in ipairs(STEPS) do
-        if all or not seen[step.id] then queue[#queue + 1] = step end
+        if all or not seen[step.id] then
+            queue[#queue + 1] = step
+            if not step.welcome and Applies(step) then settings = settings + 1 end
+        end
     end
     index = Step(0, 1)
-    if not index then
+    -- A welcome page alone, with no setting after it, is not worth opening.
+    if not index or settings == 0 then
         queue = nil
         return false
     end
