@@ -117,10 +117,10 @@ request here if you are comfortable with git. The full step-by-step guide is in
 | `zhCN` | 简体中文 | buseQ (signs *bluse*) |
 | `ruRU` | Русский | Hubbotu (signs *ZamestoTV*) |
 
-Simplified Chinese is complete since 2.0.1. The texts new in 2.0 are already
-in the Korean and Russian files, in English and marked `[TRANSLATE]`: search
-for that word to find what is left. Each language arrives in a small update of
-its own once translated.
+Simplified Chinese is complete since 2.0.1, Korean since 2.1.1. The texts new
+in 2.0 are already in the Russian file, in English and marked `[TRANSLATE]`:
+search for that word to find what is left. Each language arrives in a small
+update of its own once translated.
 Translators are credited both in-game and here.
 
 ## Contributors

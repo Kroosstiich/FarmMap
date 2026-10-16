@@ -9,8 +9,8 @@
 ## Notes-frFR: Enregistre la position des minerais, plantes, poissons et bois.
 ## Notes-zhCN: 记录矿石、草药、鱼和树木节点的位置。
 ## Author: Kroosstii
-## Version: v2.1.0
-## X-Date: 14/10/2026
+## Version: v2.1.1
+## X-Date: 16/10/2026
 ## IconTexture: Interface\AddOns\FarmMap\Textures\icon
 ## SavedVariables: FarmMapDB FarmMapStatsDB
 ## OptionalDeps: Auctionator
@@ -58,4 +58,6 @@ changelog\v2.0.1\enUS.lua
 changelog\v2.0.1\frFR.lua
 changelog\v2.1.0\enUS.lua
 changelog\v2.1.0\frFR.lua
+changelog\v2.1.1\enUS.lua
+changelog\v2.1.1\frFR.lua
 UI\Changelog.lua
