@@ -1,7 +1,8 @@
 -- ============================================================
 --  FarmMap — small session window
 --
---  The dashboard's four numbers (duration, nodes, value, gold per hour) in
+--  The dashboard's numbers (duration, nodes, and with Auctionator or TSM
+--  value and gold per hour) in
 --  a small movable window, to keep an eye on a farm without opening the
 --  options. Switched on from the dashboard page; remembered with its
 --  position in FarmMapDB.sessionWindow. Kroosstii's idea (2026-10-08).
@@ -67,7 +68,7 @@ local function Create()
     rule:SetPoint("TOPLEFT", 10, -32)
     rule:SetPoint("TOPRIGHT", -10, -32)
 
-    frame.rows = {}
+    frame.rows, frame.labels = {}, {}
     for i, line in ipairs(LINES) do
         local label = Theme.Font(frame:CreateFontString(nil, "OVERLAY"), 12.5, "dim")
         label:SetPoint("TOPLEFT", 12, -(38 + (i - 1) * ROW_H))
@@ -75,7 +76,7 @@ local function Create()
         local value = Theme.Font(frame:CreateFontString(nil, "OVERLAY"), 13.5, i == 4 and "accent" or "text")
         value:SetPoint("TOPRIGHT", -12, -(38 + (i - 1) * ROW_H))
         value:SetJustifyH("RIGHT")
-        frame.rows[i] = value
+        frame.rows[i], frame.labels[i] = value, label
     end
 
     local pos = Saved().pos
@@ -105,8 +106,17 @@ function SessionWindow:Update()
     if n.perHour then nodes = nodes .. "  (" .. L("UI_DASH_PER_HOUR"):format(n.perHour) .. ")" end
     frame.rows[1]:SetText(OW.Duration(n.elapsed))
     frame.rows[2]:SetText(nodes)
-    frame.rows[3]:SetText(n.value and OW.Money(n.value) or "—")
-    frame.rows[4]:SetText(n.gph and OW.Money(n.gph) or "—")
+    -- Value and gold per hour only with Auctionator or TSM: without them
+    -- there is nothing to show, and the window keeps its two lines.
+    local priced = ns.HasPriceSource()
+    for i = 3, 4 do
+        frame.rows[i]:SetShown(priced)
+        frame.labels[i]:SetShown(priced)
+    end
+    frame:SetHeight(38 + (priced and #LINES or 2) * ROW_H + 8)
+    -- A plain "-": the em dash is missing from the Korean client's font.
+    frame.rows[3]:SetText(n.value and OW.Money(n.value) or "-")
+    frame.rows[4]:SetText(n.gph and OW.Money(n.gph) or "-")
 end
 
 function SessionWindow:IsEnabled()

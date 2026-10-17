@@ -182,7 +182,7 @@ ns.locales.koKR = {
 		-- 명령어당 하나의 키: 나중에 추가된 명령어는 
         -- 아직 업데이트되지 않은 언어의 경우 목록에서 사라지는 대신 
         -- 영어로 표시됩니다.
-        SLASH_HELP_TITLE     = "|cffffd100=== FarmMap — 명령어 ===|r",
+        SLASH_HELP_TITLE     = "|cffffd100=== FarmMap - 명령어 ===|r",
         SLASH_CMD_HELP       = "이 도움말 표시",
         SLASH_CMD_DEBUG      = "디버그 창 표시/숨기기",
         SLASH_CMD_EXPORT     = "DB 내보내기 창 열기",
@@ -202,7 +202,7 @@ ns.locales.koKR = {
 
         MIGR_PREFIX          = "FarmMap DB 갱신:",
         MIGR_DONE            = "DB가 최신 상태입니다.",
-        MIGR_TOTAL           = "DB 갱신 완료 —",
+        MIGR_TOTAL           = "DB 갱신 완료 -",
         MIGR_ENTRIES         = "개의 항목이 수정되었습니다.",
         UNKNOWN              = "알 수 없음",
         UNKNOWN_EXP          = "알 수 없음",
@@ -391,7 +391,7 @@ ns.locales.koKR = {
         UI_PACKS_DESC          = "아이콘 팩은 별도의 작은 애드온입니다. 설치하면 해당 스타일이 위 목록에 추가됩니다. CurseForge에서 더 많은 팩을 찾아보거나 FarmMapStyles.Register를 사용하여 직접 만들 수도 있습니다 (GitHub의 README 파일 참조).",
         UI_PROFIT              = "플로팅 텍스트에 수확물 가치 표시",
         UI_PROFIT_DESC         = "채집 시 각 수확물이 경매장에서 얼마의 가치를 가졌는지 표시합니다.",
-        UI_PROFIT_NEEDS_AUC    = "Auctionator 또는 TSM 애드온이 필요합니다.",
+        UI_PROFIT_NEEDS_AUC    = "경매장 애드온 필요 [Auctionator/TSM]",
         UI_PROFIT_NEEDS_FLOAT  = "디스플레이 설정에서 플로팅 텍스트를 먼저 켜세요.",
         UI_SEC_PRICES          = "수확물 가치 설정",
         UI_SEC_WAYPOINTS       = "내비게이션",
@@ -428,7 +428,7 @@ ns.locales.koKR = {
         UI_NODES_SEARCH        = "아이템 또는 지역 이름 (예: 평온초)",
         UI_NODES_ALL_ZONES     = "모든 지역",
         UI_NODES_WHERE         = "\"%s\" 발견 장소",
-        UI_NODES_WHERE_LINE    = "%s — %d회 수확, 노드 %d개",
+        UI_NODES_WHERE_LINE    = "%s - %d회 수확, 노드 %d개",
         UI_NODES_COL_ITEM      = "아이템",
         UI_NODES_COL_ZONE      = "지역",
         UI_NODES_COL_NODES     = "노드",

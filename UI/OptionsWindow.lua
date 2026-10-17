@@ -948,7 +948,7 @@ local function CreditGroups()
         local p = byPerson[who]
         -- A single language keeps its own font; a latin list keeps ours.
         translations[#translations + 1] = {
-            text = who .. " — " .. table.concat(p.names, ", "),
+            text = who .. " - " .. table.concat(p.names, ", "),
             font = #p.codes == 1 and Theme.FontPath(p.codes[1]) or nil,
         }
     end
@@ -959,15 +959,16 @@ local function CreditGroups()
         id = "contrib", title = L("UI_CONTRIBUTORS"), wide = true,
         sections = {
             { label = L("UI_TRANSLATORS"), entries = translations },
+            -- Plain "-" separators: the em dash is missing from the Korean font.
             { label = L("UI_CREDIT_CODE"), entries = {
-                SAME_PERSON.bluse .. " — " .. L("UI_CONTRIB_BUSEQ"),
-                "Crazyyoungs — " .. L("UI_CONTRIB_CRAZY"),
-                "r0s0j — " .. L("UI_CONTRIB_R0S0J"),
-                "fiote — " .. L("UI_CONTRIB_FIOTE"),
+                SAME_PERSON.bluse .. " - " .. L("UI_CONTRIB_BUSEQ"),
+                "Crazyyoungs - " .. L("UI_CONTRIB_CRAZY"),
+                "r0s0j - " .. L("UI_CONTRIB_R0S0J"),
+                "fiote - " .. L("UI_CONTRIB_FIOTE"),
             } },
             -- The artist of FarmMap's icon (v2.0) and of the Sakura pack.
             { label = L("UI_CREDIT_ART"), entries = {
-                "SorelDesign — " .. L("UI_CONTRIB_SOREL"),
+                "SorelDesign - " .. L("UI_CONTRIB_SOREL"),
             } },
             -- People who tested FarmMap in game with Kroosstii, from v1 on.
             { label = L("UI_CREDIT_TESTERS"), entries = {
@@ -1870,19 +1871,28 @@ OptionsWindow.Money, OptionsWindow.Duration = Money, Duration
 
 local function LayoutTiles(f, width)
     local n = OptionsWindow.SessionNumbers()
+    -- A plain "-" for "nothing yet": the em dash is missing from the Korean
+    -- client's font (it showed as an empty box).
     local data = {
         { L("UI_DASH_TIME"), Duration(n.elapsed), L("UI_DASH_TIME_SUB") },
         { L("UI_DASH_NODES"), tostring(n.nodes),
-          n.perHour and L("UI_DASH_PER_HOUR"):format(n.perHour) or "—" },
-        { L("UI_DASH_VALUE"), n.value and Money(n.value) or "—",
-          n.value and L("UI_DASH_VALUE_SUB"):format(
-              ns.PriceSource() == "tsm" and "TSM" or "Auctionator") or L("UI_PROFIT_NEEDS_AUC") },
-        { L("UI_DASH_GPH"), n.gph and Money(n.gph) or "—", L("UI_DASH_GPH_SUB") },
+          n.perHour and L("UI_DASH_PER_HOUR"):format(n.perHour) or "-" },
     }
+    -- Value and gold per hour only with Auctionator or TSM: without them
+    -- the two tiles would only ever be empty.
+    if ns.HasPriceSource() then
+        data[3] = { L("UI_DASH_VALUE"), n.value and Money(n.value) or "-",
+                    L("UI_DASH_VALUE_SUB"):format(ns.PriceSource() == "tsm" and "TSM" or "Auctionator") }
+        data[4] = { L("UI_DASH_GPH"), n.gph and Money(n.gph) or "-", L("UI_DASH_GPH_SUB") }
+    end
     local GAP = 12
-    local cols = width >= 700 and 4 or 2
+    local cols = (width >= 700 and #data == 4) and 4 or 2
     local w = math.floor((width - 2 - GAP * (cols - 1)) / cols)
     for i, tile in ipairs(f.tiles) do
+        tile:SetShown(data[i] ~= nil)
+    end
+    for i, tile in ipairs(f.tiles) do
+        if not data[i] then break end
         local col, line = (i - 1) % cols, math.floor((i - 1) / cols)
         tile:ClearAllPoints()
         tile:SetPoint("TOPLEFT", 1 + col * (w + GAP), -(line * (TILE_H + GAP)))
@@ -1895,7 +1905,7 @@ local function LayoutTiles(f, width)
         tile.s:SetWidth(w - 28)
         if i == 4 then tile.v:SetTextColor(Theme.RGB("accent")) end
     end
-    return math.ceil(4 / cols) * (TILE_H + GAP)
+    return math.ceil(#data / cols) * (TILE_H + GAP)
 end
 
 -- Harvests per resource type, as bars scaled to the largest.
