@@ -9,7 +9,7 @@ local _, ns = ...
 ns.changelog = ns.changelog or {}
 ns.changelog["2.1.2"] = ns.changelog["2.1.2"] or {}
 -- Release date, shared by every language (same format as ## X-Date).
-ns.changelog["2.1.2"].date = "17/10/2026"
+ns.changelog["2.1.2"].date = "19/10/2026"
 
 ns.changelog["2.1.2"].frFR = {
     {
