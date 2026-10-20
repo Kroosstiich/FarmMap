@@ -179,7 +179,8 @@ local function DrawReleases(container, p, versions, width, y, heading, lastSeen)
         if inEnglish then Beside(NextTag(container, p, L("UI_CL_IN_ENGLISH"), "warn")) end
         if date then
             local d = NextText(container, p, 12, "faint")
-            d:SetText(date)
+            -- "9 octobre 2026" rather than "09/10/2026", in the player's language.
+            d:SetText(ns.Intl.Date(date))
             Beside(d)
         end
         y = y + math.floor(title:GetStringHeight() + 0.5) + 14

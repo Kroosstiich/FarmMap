@@ -102,7 +102,7 @@ function SessionWindow:Update()
     if not (frame and frame:IsShown() and ns.OptionsWindow) then return end
     local OW = ns.OptionsWindow
     local n = OW.SessionNumbers()
-    local nodes = tostring(n.nodes)
+    local nodes = ns.Intl.Number(n.nodes)
     if n.perHour then nodes = nodes .. "  (" .. L("UI_DASH_PER_HOUR"):format(n.perHour) .. ")" end
     frame.rows[1]:SetText(OW.Duration(n.elapsed))
     frame.rows[2]:SetText(nodes)

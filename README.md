@@ -193,6 +193,13 @@ the borders, `accent` the titles and selection, `accentSoft` the accent at rest,
 `text` / `dim` / `faint` the three levels of text, and `good` / `warn` / `bad`
 the state colours. A colour left out falls back to the client's default theme.
 
+Since 2.2, the big surfaces can blend into a second colour, from top to
+bottom: add `bgTo`, `panelTo` or `panel2To` (the bottom colour of `bg`,
+`panel`, `panel2`). Buttons, inputs and tags stay flat. Leave them out and the
+surface stays flat; a gradient is never borrowed from another theme. In game,
+the Theme page has a *Gradients* tick per surface, and the exported text
+carries them (`bgTo:…`) — FarmMap 2.1 and earlier still read such a text, flat.
+
 ## Icon packs
 
 FarmMap exposes a public API so separate addons can register their own icon
