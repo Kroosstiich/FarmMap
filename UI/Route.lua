@@ -378,10 +378,37 @@ local function StopGuiding()
     ns.ClearRouteWaypoint()
 end
 
+-- Everything that shows the route's state follows a change.
+local function Changed()
+    if FarmMap_UpdateRouteButton then FarmMap_UpdateRouteButton() end
+    if ns.SessionWindow then ns.SessionWindow:Update() end
+    if ns.OptionsWindow then ns.OptionsWindow:Refresh() end
+end
+
 function Route.Toggle()
     FarmMapDB.routeShown = not FarmMapDB.routeShown or nil
     Route.Refresh()
     if Guiding() then GuideNearest() elseif not FarmMapDB.routeShown then StopGuiding() end
+    Changed()
+end
+
+function Route.IsGuiding() return Guiding() and true or false end
+
+-- The guidance turned on or off in one click (a pin's right-click menu,
+-- the session window): on, the route is shown too, and the waypoint goes
+-- to `node` when given (the pin clicked), else to the nearest route node.
+function Route.Guide(on, mapID, node)
+    FarmMapDB.routeGuide = on and true or false
+    if on then
+        if not FarmMapDB.routeShown then
+            FarmMapDB.routeShown = true
+            Route.Refresh()
+        end
+        if node then GuideTo(mapID, node) else GuideNearest() end
+    else
+        StopGuiding()
+    end
+    Changed()
 end
 
 -- Shift-click: the waypoint moves on to the next node of the loop.
@@ -409,6 +436,7 @@ end
 function Route.SetGuide(on)
     FarmMapDB.routeGuide = on and true or false
     if Guiding() then GuideNearest() elseif not on then StopGuiding() end
+    if ns.SessionWindow then ns.SessionWindow:Update() end
 end
 
 -- A new zone: the minimap shows that zone's route.

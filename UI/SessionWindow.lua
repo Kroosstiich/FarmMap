@@ -79,6 +79,16 @@ local function Create()
         frame.rows[i], frame.labels[i] = value, label
     end
 
+    -- The route's guidance in one click (2.2), with TomTom or WaypointUI:
+    -- on, the route is shown too. Placed under the numbers in Update.
+    frame.guide = Theme.ActionButton(frame, "")
+    frame.guide:SetHeight(24)
+    frame.guide.tipTitle = L("UI_ROUTE_GUIDE")
+    frame.guide.tipBody = L("SESSION_GUIDE_TIP")
+    frame.guide:SetScript("OnClick", function()
+        if ns.Route then ns.Route.Guide(not ns.Route.IsGuiding()) end
+    end)
+
     local pos = Saved().pos
     if pos then
         frame:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
@@ -113,7 +123,20 @@ function SessionWindow:Update()
         frame.rows[i]:SetShown(priced)
         frame.labels[i]:SetShown(priced)
     end
-    frame:SetHeight(38 + (priced and #LINES or 2) * ROW_H + 8)
+    local height = 38 + (priced and #LINES or 2) * ROW_H + 8
+    -- The guidance button, only when there is something to guide with.
+    local canGuide = ns.Route and (ns.IsTomTomLoaded() or ns.IsWaypointUILoaded())
+    frame.guide:SetShown(canGuide and true or false)
+    if canGuide then
+        local on = ns.Route.IsGuiding()
+        frame.guide:SetLabel(L(on and "SESSION_GUIDE_ON" or "SESSION_GUIDE_OFF"))
+        frame.guide:ClearAllPoints()
+        frame.guide:SetPoint("TOPLEFT", 10, -(height - 2))
+        frame.guide:SetPoint("TOPRIGHT", -10, -(height - 2))
+        frame.guide.text:SetTextColor(Theme.RGB(on and "accent" or "dim"))
+        height = height + 24 + 8
+    end
+    frame:SetHeight(height)
     -- A plain "-": the em dash is missing from the Korean client's font.
     frame.rows[3]:SetText(n.value and OW.Money(n.value) or "-")
     frame.rows[4]:SetText(n.gph and OW.Money(n.gph) or "-")

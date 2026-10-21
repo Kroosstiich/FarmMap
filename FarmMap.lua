@@ -1652,8 +1652,14 @@ local function CreatePoint(nodeData, isMinimap, mapID)
         if button ~= "RightButton" then return end
         GameTooltip:Hide()
 
+        -- With TomTom or WaypointUI, a first line starts (or stops) the
+        -- route's guidance from this node (2.2, asked by Kroosstii).
+        local canGuide = ns.Route and Integ.WaypointAddon(true)
+        local guiding  = canGuide and ns.Route.IsGuiding()
+        local ROW_H    = 32
+
         local menu = CreateFrame("Frame", "FarmMapNodeContextMenu", UIParent, "BackdropTemplate")
-        menu:SetSize(180, 32)
+        menu:SetSize(canGuide and 240 or 180, canGuide and ROW_H * 2 or ROW_H)
         menu:SetFrameStrata("TOOLTIP")
         menu:SetBackdrop({
             bgFile   = "Interface\\ChatFrame\\ChatFrameBackground",
@@ -1668,15 +1674,34 @@ local function CreatePoint(nodeData, isMinimap, mapID)
         local s = UIParent:GetEffectiveScale()
         menu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", mx / s, my / s)
 
-        local btnDel = CreateFrame("Button", nil, menu)
-        btnDel:SetAllPoints()
-        btnDel:SetScript("OnEnter", function(self) self:GetParent():SetBackdropColor(0.8, 0.1, 0.1, 0.9) end)
-        btnDel:SetScript("OnLeave", function(self) self:GetParent():SetBackdropColor(0.05, 0.05, 0.05, 0.95) end)
+        -- One line of the menu: its own hover highlight, its label.
+        local function Row(index, text, r, g, b)
+            local row = CreateFrame("Button", nil, menu)
+            row:SetPoint("TOPLEFT", 2, -2 - (index - 1) * (ROW_H - 2))
+            row:SetPoint("TOPRIGHT", -2, -2 - (index - 1) * (ROW_H - 2))
+            row:SetHeight(ROW_H - 4)
+            local hi = row:CreateTexture(nil, "BACKGROUND")
+            hi:SetAllPoints()
+            hi:SetColorTexture(r, g, b, 0.35)
+            hi:Hide()
+            row:SetScript("OnEnter", function() hi:Show() end)
+            row:SetScript("OnLeave", function() hi:Hide() end)
+            local label = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            label:SetPoint("LEFT", 6, 0)
+            label:SetText(text)
+            label:SetTextColor(r, g, b, 1)
+            return row
+        end
 
-        local lbl = menu:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lbl:SetPoint("LEFT", menu, "LEFT", 8, 0)
-        lbl:SetText(L.DELETE_NODE)
-        lbl:SetTextColor(1, 0.3, 0.3, 1)
+        if canGuide then
+            local btnGuide = Row(1, guiding and L.ROUTE_GUIDE_STOP or L.ROUTE_GUIDE_FROM_HERE, 1, 0.82, 0)
+            btnGuide:SetScript("OnClick", function()
+                menu:Hide()
+                local ok, err = pcall(ns.Route.Guide, not guiding, mapID, nodeData)
+                if not ok then AddDebug("WAYPOINT", tostring(err)) end
+            end)
+        end
+        local btnDel = Row(canGuide and 2 or 1, L.DELETE_NODE, 1, 0.3, 0.3)
 
         btnDel:SetScript("OnClick", function()
             if FarmMapDB then
@@ -1704,6 +1729,9 @@ local function CreatePoint(nodeData, isMinimap, mapID)
             menu:Hide()
             dismissFrame:Hide()
         end)
+        -- Closed by one of its lines too: the catcher goes with it, or it
+        -- would swallow the next click on the screen.
+        menu:SetScript("OnHide", function() dismissFrame:Hide() end)
         menu:SetFrameStrata("TOOLTIP")
         menu:Show()
     end)
@@ -3363,6 +3391,8 @@ local function CreateFilterButtons()
     end)
 
     FarmMap_UpdateFilterButtons = UpdateButtons
+    -- The route can be turned on from a pin's menu or the session window.
+    FarmMap_UpdateRouteButton = UpdateRouteButton
     FarmMap_ResetFilterBar = function()
         FarmMapDB.filterBarPos = nil
         ApplyBarPosition()
