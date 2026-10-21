@@ -79,9 +79,20 @@ local function Create()
         frame.rows[i], frame.labels[i] = value, label
     end
 
-    -- The route's guidance in one click (2.2), with TomTom or WaypointUI:
-    -- on, the route is shown too. Placed under the numbers in Update.
-    frame.guide = Theme.ActionButton(frame, "")
+    -- The route (2.2): a lap's estimated time while it is shown, then its
+    -- buttons. All placed under the numbers in Update.
+    frame.lapLabel = Theme.Font(frame:CreateFontString(nil, "OVERLAY"), 12.5, "dim")
+    frame.lapLabel:SetText(L("SESSION_LAP"))
+    frame.lapValue = Theme.Font(frame:CreateFontString(nil, "OVERLAY"), 13.5, "text")
+    frame.lapValue:SetJustifyH("RIGHT")
+    -- Show or hide the route; its colour says which.
+    frame.route = Theme.ActionButton(frame, L("ROUTE_TITLE"))
+    frame.route:SetHeight(24)
+    frame.route.tipTitle = L("ROUTE_TITLE")
+    frame.route.tipBody = L("SESSION_ROUTE_TIP")
+    frame.route:SetScript("OnClick", function() if ns.Route then ns.Route.Toggle() end end)
+    -- The guidance, with TomTom or WaypointUI: on, the route is shown too.
+    frame.guide = Theme.ActionButton(frame, L("SESSION_GUIDE"))
     frame.guide:SetHeight(24)
     frame.guide.tipTitle = L("UI_ROUTE_GUIDE")
     frame.guide.tipBody = L("SESSION_GUIDE_TIP")
@@ -134,26 +145,48 @@ function SessionWindow:Update()
         frame.rows[i]:SetShown(priced)
         frame.labels[i]:SetShown(priced)
     end
-    local height = 38 + (priced and #LINES or 2) * ROW_H + 8
-    -- The guidance button, only when there is something to guide with.
-    local canGuide = ns.Route and (ns.IsTomTomLoaded() or ns.IsWaypointUILoaded())
+    local lines = priced and #LINES or 2
+    local height = 38 + lines * ROW_H + 8
+    local hasRoute = ns.Route ~= nil
+    local half = math.floor((W - 20 - 6) / 2)
+
+    -- A lap of the route of the player's zone, while the route is shown.
+    local lap = hasRoute and FarmMapDB.routeShown and ns.Route.LapMinutes(ns.Route.PlayerZone())
+    frame.lapLabel:SetShown(lap and true or false)
+    frame.lapValue:SetShown(lap and true or false)
+    if lap then
+        local y = 38 + lines * ROW_H
+        frame.lapLabel:ClearAllPoints()
+        frame.lapLabel:SetPoint("TOPLEFT", 12, -y)
+        frame.lapValue:ClearAllPoints()
+        frame.lapValue:SetPoint("TOPRIGHT", -12, -y)
+        frame.lapValue:SetText("~" .. OW.Duration(lap * 60))
+        height = height + ROW_H
+    end
+
+    -- Route and guidance side by side; the route alone (full width) when
+    -- there is no navigation addon to guide with. Colour = on or off.
+    local canGuide = hasRoute and (ns.IsTomTomLoaded() or ns.IsWaypointUILoaded())
+    frame.route:SetShown(hasRoute)
     frame.guide:SetShown(canGuide and true or false)
-    if canGuide then
-        local on = ns.Route.IsGuiding()
-        frame.guide:SetLabel(L(on and "SESSION_GUIDE_ON" or "SESSION_GUIDE_OFF"))
-        frame.guide:ClearAllPoints()
-        frame.guide:SetPoint("TOPLEFT", 10, -(height - 2))
-        frame.guide:SetPoint("TOPRIGHT", -10, -(height - 2))
-        frame.guide.text:SetTextColor(Theme.RGB(on and "accent" or "dim"))
+    if hasRoute then
+        frame.route:ClearAllPoints()
+        frame.route:SetPoint("TOPLEFT", 10, -(height - 2))
+        frame.route:SetWidth(canGuide and half or (W - 20))
+        frame.route.text:SetTextColor(Theme.RGB(FarmMapDB.routeShown and "accent" or "dim"))
+        if canGuide then
+            frame.guide:ClearAllPoints()
+            frame.guide:SetPoint("TOPRIGHT", -10, -(height - 2))
+            frame.guide:SetWidth(half)
+            frame.guide.text:SetTextColor(Theme.RGB(ns.Route.IsGuiding() and "accent" or "dim"))
+        end
         height = height + 24 + 8
     end
     -- Direction and another route: the route works without a navigation
     -- addon, so these two are always there.
-    local hasRoute = ns.Route ~= nil
     frame.dir:SetShown(hasRoute)
     frame.newRoute:SetShown(hasRoute)
     if hasRoute then
-        local half = math.floor((W - 20 - 6) / 2)
         frame.dir:SetLabel(L(FarmMapDB.routeReverse and "ROUTE_CCW" or "ROUTE_CW"))
         frame.dir:ClearAllPoints()
         frame.dir:SetPoint("TOPLEFT", 10, -(height - 2))

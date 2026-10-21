@@ -302,6 +302,20 @@ local function LapText(r)
     return L("ROUTE_TIME"):format(time, L(measured and "ROUTE_SPEED_MEASURED" or "ROUTE_SPEED_BASE"))
 end
 
+-- The zone the player farms (a sub-zone counts as its zone).
+function Route.PlayerZone()
+    local mapID = HBD:GetPlayerZone()
+    return mapID and ZoneOf(mapID)
+end
+
+-- A lap of a zone's route in minutes, nil without a route there (the
+-- session window shows it).
+function Route.LapMinutes(mapID)
+    local r = Route.Get(mapID)
+    if #r.loop < 2 then return nil end
+    return math.max(1, math.floor(LapSeconds(r.length, #r.loop) / 60 + 0.5))
+end
+
 -- Tooltip lines for the Route button: what the route of a map holds.
 function Route.Describe(mapID)
     local r = Route.Get(mapID)
