@@ -160,12 +160,51 @@ function Route.Get(mapID)
     return r
 end
 
+-- ---- lap time -----------------------------------------------------------------
+--
+-- An estimate, said as one: the loop's length at a speed, plus a few
+-- seconds per node for the harvest. The speed starts as a ground mount's
+-- and becomes the player's own, measured while the route is shown (only
+-- while moving: stops are counted by the harvest time already).
+
+local BASE_SPEED   = 14     -- yards per second, a ground mount (100% bonus)
+local HARVEST_TIME = 3      -- seconds per node: cast and loot
+local MIN_SAMPLES  = 20     -- half-second samples before trusting the measure
+
+local lastPos   -- { x, y, instance } at the previous sample
+
+local function SampleSpeed(dt)
+    local px, py, instance = HBD:GetPlayerWorldPosition()
+    if not px then lastPos = nil return end
+    local prev = lastPos
+    lastPos = { px, py, instance }
+    if not prev or prev[3] ~= instance then return end
+    local speed = HBD:GetWorldDistance(instance, prev[1], prev[2], px, py) / dt
+    -- Standing still, or a teleport / flight path jump: not a riding speed.
+    if not speed or speed < 2 or speed > 120 then return end
+    local s = FarmMapDB.routeSpeed or { v = speed, n = 0 }
+    s.v = s.v * 0.95 + speed * 0.05
+    s.n = s.n + 1
+    FarmMapDB.routeSpeed = s
+end
+
+local function LapText(r)
+    local s = FarmMapDB.routeSpeed
+    local measured = s and s.n >= MIN_SAMPLES
+    local speed = measured and s.v or BASE_SPEED
+    local seconds = r.length / speed + #r.loop * HARVEST_TIME
+    local m = math.max(1, math.floor(seconds / 60 + 0.5))
+    local time = m < 60 and L("UI_DUR_MIN"):format(m) or L("UI_DUR_H"):format(math.floor(m / 60), m % 60)
+    return L("ROUTE_TIME"):format(time, L(measured and "ROUTE_SPEED_MEASURED" or "ROUTE_SPEED_BASE"))
+end
+
 -- Tooltip lines for the Route button: what the route of a map holds.
 function Route.Describe(mapID)
     local r = Route.Get(mapID)
     if #r.loop < 2 then return { L("ROUTE_NONE") } end
     local lines = { L("ROUTE_INFO"):format(ns.Intl.Number(#r.loop),
                     L("UNIT_YARDS"):format(math.floor(r.length / 10 + 0.5) * 10)),
+                    LapText(r),
                     L(FarmMapDB.routeReverse and "ROUTE_DIR_CCW" or "ROUTE_DIR_CW") }
     if r.total > #r.loop then lines[#lines + 1] = L("ROUTE_CAPPED"):format(#r.loop) end
     return lines
@@ -392,6 +431,8 @@ end
 -- player more than 10 yards away from it.
 local ARRIVAL = 30
 C_Timer.NewTicker(0.5, function()
+    -- The lap time learns the player's speed while the route is shown.
+    if FarmMapDB and FarmMapDB.routeShown then SampleSpeed(0.5) else lastPos = nil end
     if not (target and Guiding()) then return end
     local px, py, instance = HBD:GetPlayerWorldPosition()
     local wx, wy, winst = HBD:GetWorldCoordinatesFromZone(target.node.x, target.node.y, target.mapID)

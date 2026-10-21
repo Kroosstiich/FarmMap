@@ -3616,6 +3616,7 @@ local function ClearNodeDatabase()
         routeShown        = FarmMapDB.routeShown,
         routeGuide        = FarmMapDB.routeGuide,
         routeReverse      = FarmMapDB.routeReverse,
+        routeSpeed        = FarmMapDB.routeSpeed,
     }
     ns.MinimapProximity.Clear()
     ClearWorldMapPins()
