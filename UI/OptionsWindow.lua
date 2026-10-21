@@ -1844,13 +1844,35 @@ ItemsPage({
               disabled = function() return not hasNav() end,
               get = function() return FarmMapDB.waypointClick ~= false end,
               set = function(on) FarmMapDB.waypointClick = on and true or false end },
-            -- The route (2.2, Route button of the filter bar): its guidance
-            -- sits with the other TomTom / WaypointUI settings.
-            { type = "switch", key = "routeGuide", gap = 12,
+            -- The route (2.2, Route button of the filter bar): all its
+            -- settings together, under Navigation where its guidance belongs.
+            { type = "section", key = "secRoute", text = L("UI_SEC_ROUTE") },
+            { type = "hint", key = "routeHint", text = L("UI_ROUTE_HINT") },
+            { type = "switch", key = "routeGuide",
               name = L("UI_ROUTE_GUIDE"), desc = L("UI_ROUTE_GUIDE_DESC"),
               disabled = function() return not hasNav() end,
               get = function() return FarmMapDB.routeGuide == true end,
               set = function(on) if ns.Route then ns.Route.SetGuide(on) end end },
+            { type = "choice", key = "routeDir",
+              name = L("UI_ROUTE_DIR"), desc = L("UI_ROUTE_DIR_DESC"),
+              choices = function()
+                  return { { value = "cw", label = L("ROUTE_CW") }, { value = "ccw", label = L("ROUTE_CCW") } }
+              end,
+              get = function() return FarmMapDB.routeReverse and "ccw" or "cw" end,
+              set = function(v) if ns.Route then ns.Route.SetReverse(v == "ccw") end end },
+            -- 5 to 60 minutes; the last step (65) means no limit.
+            { type = "slider", key = "routeMaxMinutes",
+              name = L("UI_ROUTE_MAXTIME"), desc = L("UI_ROUTE_MAXTIME_DESC"),
+              min = 5, max = 65, step = 5,
+              format = function(v) return v >= 65 and L("ROUTE_NO_LIMIT") or L("UI_DUR_MIN"):format(v) end,
+              get = function() return FarmMapDB.routeMaxMinutes or 65 end,
+              set = function(v)
+                  FarmMapDB.routeMaxMinutes = v
+                  if ns.Route then ns.Route.RefreshSoon() end
+              end },
+            { type = "button", key = "routeNew", gap = 12,
+              name = L("UI_ROUTE_NEW"), desc = L("UI_ROUTE_NEW_DESC"), label = L("ROUTE_NEW_LABEL"),
+              onClick = function() if ns.Route then ns.Route.NewRoute() end end },
 
             { type = "custom", key = "ask", build = ask.build, layout = ask.layout,
               search = L("UI_INTEG_ASK_TITLE") .. " " .. L("UI_INTEG_ASK"), inset = true },

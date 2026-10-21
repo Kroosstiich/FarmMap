@@ -36,38 +36,104 @@ local MINIMAP_REF   = "FarmMapRoute"   -- its own HBD key: node pins are untouch
 
 local function L(key) return ns.L[key] or key end
 
+-- The zone a sub-zone (a town, a cave) belongs to: the player is often on
+-- such a smaller map while the route lives on the zone's. The minimap
+-- showed the route only now and then because of this (Kroosstii,
+-- 2026-10-22).
+local ZONE_TYPE = Enum and Enum.UIMapType and Enum.UIMapType.Zone or 3
+local function ZoneOf(mapID)
+    local data, id = HBD.mapData, mapID
+    while data[id] and data[id].mapType ~= ZONE_TYPE and (data[id].parent or 0) > 0 do
+        id = data[id].parent
+    end
+    if data[id] and data[id].mapType == ZONE_TYPE then return id end
+    return mapID
+end
+
+-- ---- speed: lap time and time limit ------------------------------------------
+--
+-- An estimate, said as one: the loop's length at a speed, plus a few
+-- seconds per node for the harvest. The speed starts as a ground mount's
+-- and becomes the player's own, measured while the route is shown (only
+-- while moving: stops are counted by the harvest time already).
+
+local BASE_SPEED   = 14     -- yards per second, a ground mount (100% bonus)
+local HARVEST_TIME = 3      -- seconds per node: cast and loot
+local MIN_SAMPLES  = 20     -- half-second samples before trusting the measure
+local NO_LIMIT     = 65     -- the time slider's last step: no limit
+
+local function Speed()
+    local s = FarmMapDB.routeSpeed
+    if s and s.n >= MIN_SAMPLES then return s.v, true end
+    return BASE_SPEED, false
+end
+
+local function LapSeconds(length, count)
+    return length / Speed() + count * HARVEST_TIME
+end
+
+-- The longest lap the player allows, in seconds (nil: no limit).
+local function Budget()
+    local m = tonumber(FarmMapDB.routeMaxMinutes)
+    if not m or m >= NO_LIMIT then return nil end
+    return m * 60
+end
+
 -- ---- the loop ---------------------------------------------------------------
 
-local cache = {}   -- [mapID] = { sig =, loop = { nodes in order }, total =, length = }
+local cache = {}    -- [mapID] = { sig =, loop = { nodes in order }, total =, length = }
+local offered = {}  -- [mapID] = { [edge key] = true }: loops "Another route" already gave
 
--- What a loop depends on: the zone's node count and the filters.
+-- 0 = the route built from the player's position; each "Another route"
+-- moves the zone to the next variant (saved, so the route stays after a
+-- reload).
+local function Variant(mapID)
+    return FarmMapDB.routeVariant and FarmMapDB.routeVariant[mapID] or 0
+end
+
+-- What a loop depends on: the zone's node count, the filters and the
+-- route's own settings.
 local function Signature(mapID)
     local list = FarmMapDB[mapID]
     return table.concat({ type(list) == "table" and #list or 0,
         tostring(FarmMapDB.showHerbo), tostring(FarmMapDB.showMinage),
         tostring(FarmMapDB.showPeche), tostring(FarmMapDB.showBois),
-        tostring(FarmMapDB.routeReverse) }, ":")
+        tostring(FarmMapDB.routeReverse), tostring(FarmMapDB.routeMaxMinutes),
+        Variant(mapID) }, ":")
 end
 
-local function Build(mapID)
-    local nodes = {}
+-- The zone's nodes the filters show, most harvested first, at most
+-- MAX_NODES. Returns them and how many there were before the cut.
+local function Candidates(mapID)
+    local nodes, count = {}, {}
     local list = FarmMapDB[mapID]
-    for _, node in ipairs(type(list) == "table" and list or {}) do
-        if ns.ShouldShowNode(node.type) then nodes[#nodes + 1] = node end
+    for i, node in ipairs(type(list) == "table" and list or {}) do
+        if ns.ShouldShowNode(node.type) then
+            nodes[#nodes + 1] = node
+            count[node] = ns.NodeHarvests(mapID, node) * 100000 - i   -- ties: older first
+        end
     end
+    table.sort(nodes, function(a, b) return count[a] > count[b] end)
     local total = #nodes
-    if total > MAX_NODES then
-        local count = {}
-        for _, node in ipairs(nodes) do count[node] = ns.NodeHarvests(mapID, node) end
-        table.sort(nodes, function(a, b) return count[a] > count[b] end)
-        for i = total, MAX_NODES + 1, -1 do nodes[i] = nil end
-    end
-    local n = #nodes
-    if n < 2 then return { loop = nodes, total = total, length = 0 } end
+    for i = total, MAX_NODES + 1, -1 do nodes[i] = nil end
+    return nodes, total
+end
 
-    -- Distances in yards: zone coordinates are not square.
-    local w, h = HBD:GetZoneSize(mapID)
-    if not w or w <= 0 or not h or h <= 0 then w, h = 1000, 1000 end
+-- A repeatable random sequence (Park-Miller) for a variant.
+local function Random(seed)
+    local s = seed * 7919 % 2147483646 + 1
+    return function()
+        s = s * 16807 % 2147483647
+        return s / 2147483647
+    end
+end
+
+-- One loop through `nodes` (two or more). Variant 0 starts from the node
+-- nearest the player and always takes the nearest next node; a variant
+-- starts elsewhere and picks among the three nearest at each step, for
+-- a loop of another shape. Then 2-opt either way.
+local function Solve(nodes, w, h, mapID, variant)
+    local n = #nodes
     local d = {}
     for i = 1, n do
         d[i] = {}
@@ -77,27 +143,43 @@ local function Build(mapID)
         end
     end
 
-    -- Start from the node closest to the player when the player is here.
+    local rand = variant > 0 and Random(variant) or nil
     local start = 1
-    local px, py, pmap = HBD:GetPlayerZonePosition()
-    if pmap == mapID and px then
-        local best = math.huge
-        for i, node in ipairs(nodes) do
-            local dx, dy = (node.x - px) * w, (node.y - py) * h
-            local dd = dx * dx + dy * dy
-            if dd < best then best, start = dd, i end
+    if rand then
+        start = math.floor(rand() * n) + 1
+    else
+        local px, py, pmap = HBD:GetPlayerZonePosition()
+        if px and ZoneOf(pmap) == mapID then
+            local best = math.huge
+            for i, node in ipairs(nodes) do
+                local dx, dy = (node.x - px) * w, (node.y - py) * h
+                local dd = dx * dx + dy * dy
+                if dd < best then best, start = dd, i end
+            end
         end
     end
 
-    -- Nearest neighbour.
+    -- Nearest neighbour (one of the three nearest, for a variant).
     local order, used = { start }, { [start] = true }
     for _ = 2, n do
-        local last, best, bi = order[#order], math.huge, nil
+        local last = order[#order]
+        local near = {}
         for j = 1, n do
-            if not used[j] and d[last][j] < best then best, bi = d[last][j], j end
+            if not used[j] then
+                local k = #near + 1
+                near[k] = j
+                -- Keep the three nearest, sorted.
+                while k > 1 and d[last][near[k]] < d[last][near[k - 1]] do
+                    near[k], near[k - 1] = near[k - 1], near[k]
+                    k = k - 1
+                end
+                if #near > 3 then near[4] = nil end
+            end
         end
-        order[#order + 1] = bi
-        used[bi] = true
+        local pick = near[1]
+        if rand and #near > 1 then pick = near[math.floor(rand() * #near) + 1] end
+        order[#order + 1] = pick
+        used[pick] = true
     end
 
     -- 2-opt: reverse a stretch whenever that shortens the loop.
@@ -125,25 +207,59 @@ local function Build(mapID)
         loop[i] = nodes[idx]
         length = length + d[idx][order[i % n + 1]]
     end
+    return loop, length
+end
 
-    -- A fixed direction, clockwise unless reversed (right-click on the
-    -- Route button): a rebuilt loop (a new node) used to come out the other
-    -- way round and the guidance sent the player back (Kroosstii,
-    -- 2026-10-22). Signed area with y growing downwards: positive =
-    -- clockwise on screen.
-    local area = 0
+-- A fixed direction, clockwise unless the player reverses it (options,
+-- session window): a rebuilt loop (a new node) used to come out the other
+-- way round and the guidance sent the player back (Kroosstii, 2026-10-22).
+-- Signed area with y growing downwards: positive = clockwise on screen.
+local function Orient(loop, w, h)
+    local n, area = #loop, 0
     for i = 1, n do
         local a, b = loop[i], loop[i % n + 1]
         area = area + (a.x * w) * (b.y * h) - (b.x * w) * (a.y * h)
     end
-    local clockwise = not FarmMapDB.routeReverse
-    if (area > 0) ~= clockwise then
+    if (area > 0) ~= (not FarmMapDB.routeReverse) then
         -- Same start, the other way round.
         for i = 2, math.floor(n / 2) + 1 do
             local j = n + 2 - i
             if i < j then loop[i], loop[j] = loop[j], loop[i] end
         end
     end
+end
+
+local function Build(mapID)
+    local nodes, total = Candidates(mapID)
+    if #nodes < 2 then return { loop = nodes, total = total, length = 0 } end
+    -- Distances in yards: zone coordinates are not square.
+    local w, h = HBD:GetZoneSize(mapID)
+    if not w or w <= 0 or not h or h <= 0 then w, h = 1000, 1000 end
+    local variant = Variant(mapID)
+    local loop, length = Solve(nodes, w, h, mapID, variant)
+
+    -- Longest lap allowed: the most nodes that fit, most harvested first
+    -- (they come first in `nodes`). Binary search on how many to keep.
+    local budget = Budget()
+    if budget and LapSeconds(length, #loop) > budget then
+        local lo, hi, fit = 2, #nodes - 1, nil
+        while lo <= hi do
+            local k = math.floor((lo + hi) / 2)
+            local l, len = Solve({ unpack(nodes, 1, k) }, w, h, mapID, variant)
+            if LapSeconds(len, k) <= budget then
+                fit, lo = { l, len }, k + 1
+            else
+                hi = k - 1
+            end
+        end
+        -- Even two nodes are too far apart: the two best, all the same.
+        if fit then
+            loop, length = fit[1], fit[2]
+        else
+            loop, length = Solve({ nodes[1], nodes[2] }, w, h, mapID, variant)
+        end
+    end
+    Orient(loop, w, h)
     return { loop = loop, total = total, length = length }
 end
 
@@ -160,16 +276,7 @@ function Route.Get(mapID)
     return r
 end
 
--- ---- lap time -----------------------------------------------------------------
---
--- An estimate, said as one: the loop's length at a speed, plus a few
--- seconds per node for the harvest. The speed starts as a ground mount's
--- and becomes the player's own, measured while the route is shown (only
--- while moving: stops are counted by the harvest time already).
-
-local BASE_SPEED   = 14     -- yards per second, a ground mount (100% bonus)
-local HARVEST_TIME = 3      -- seconds per node: cast and loot
-local MIN_SAMPLES  = 20     -- half-second samples before trusting the measure
+-- ---- measuring the player's speed ----------------------------------------------
 
 local lastPos   -- { x, y, instance } at the previous sample
 
@@ -189,11 +296,8 @@ local function SampleSpeed(dt)
 end
 
 local function LapText(r)
-    local s = FarmMapDB.routeSpeed
-    local measured = s and s.n >= MIN_SAMPLES
-    local speed = measured and s.v or BASE_SPEED
-    local seconds = r.length / speed + #r.loop * HARVEST_TIME
-    local m = math.max(1, math.floor(seconds / 60 + 0.5))
+    local _, measured = Speed()
+    local m = math.max(1, math.floor(LapSeconds(r.length, #r.loop) / 60 + 0.5))
     local time = m < 60 and L("UI_DUR_MIN"):format(m) or L("UI_DUR_H"):format(math.floor(m / 60), m % 60)
     return L("ROUTE_TIME"):format(time, L(measured and "ROUTE_SPEED_MEASURED" or "ROUTE_SPEED_BASE"))
 end
@@ -299,20 +403,6 @@ local function Dot(i)
     ns.Theme.Track(tex, function(self) self:SetVertexColor(ns.Theme.RGBA("accent", 0.9)) end)
     dots[i] = dot
     return dot
-end
-
--- The zone a sub-zone (a town, a cave) belongs to: the player is often on
--- such a smaller map while the route lives on the zone's. The minimap
--- showed the route only now and then because of this (Kroosstii,
--- 2026-10-22).
-local ZONE_TYPE = Enum and Enum.UIMapType and Enum.UIMapType.Zone or 3
-local function ZoneOf(mapID)
-    local data, id = HBD.mapData, mapID
-    while data[id] and data[id].mapType ~= ZONE_TYPE and (data[id].parent or 0) > 0 do
-        id = data[id].parent
-    end
-    if data[id] and data[id].mapType == ZONE_TYPE then return id end
-    return mapID
 end
 
 -- The route's dots in FarmMap's proximity list (fiote's "hide nearby
@@ -475,11 +565,63 @@ end
 
 function Route.IsGuiding() return Guiding() and true or false end
 
--- Clockwise or anticlockwise (right-click on the Route button). The
--- guidance keeps its node; the next one follows the new direction.
-function Route.Reverse()
-    FarmMapDB.routeReverse = not FarmMapDB.routeReverse or nil
+-- Clockwise or anticlockwise (options, session window). The guidance
+-- keeps its node; the next one follows the new direction.
+function Route.SetReverse(on)
+    FarmMapDB.routeReverse = on and true or nil
     Route.Refresh()
+    Changed()
+end
+
+function Route.Reverse() Route.SetReverse(not FarmMapDB.routeReverse) end
+
+-- A slider moves many times a second: one redraw once it rests.
+local refreshQueued
+function Route.RefreshSoon()
+    if refreshQueued then return end
+    refreshQueued = true
+    C_Timer.After(0.3, function()
+        refreshQueued = false
+        Route.Refresh()
+    end)
+end
+
+-- A loop's edges, whatever its start and direction: to tell loops apart.
+local function EdgeKey(loop)
+    local keys, n = {}, #loop
+    for i = 1, n do
+        local a, b = loop[i], loop[i % n + 1]
+        local ka, kb = ("%.4f,%.4f"):format(a.x, a.y), ("%.4f,%.4f"):format(b.x, b.y)
+        keys[i] = ka < kb and (ka .. "-" .. kb) or (kb .. "-" .. ka)
+    end
+    table.sort(keys)
+    return table.concat(keys, ";")
+end
+
+-- "Another route" (options, session window): the next variant of the
+-- player's zone that gives a loop not offered yet. When the nodes allow
+-- no new one, the variants start over (a cycle of the few loops there
+-- are). Up to 4 tries: each one rebuilds the loop.
+function Route.NewRoute()
+    local mapID = ZoneOf(HBD:GetPlayerZone())
+    if not mapID then return end
+    local seen = offered[mapID] or {}
+    offered[mapID] = seen
+    seen[EdgeKey(Route.Get(mapID).loop)] = true
+    FarmMapDB.routeVariant = FarmMapDB.routeVariant or {}
+    local v, fresh = Variant(mapID), false
+    for _ = 1, 4 do
+        v = v + 1
+        FarmMapDB.routeVariant[mapID] = v
+        local key = EdgeKey(Route.Get(mapID).loop)
+        if not seen[key] then
+            seen[key], fresh = true, true
+            break
+        end
+    end
+    if not fresh then offered[mapID] = nil end   -- all seen: a new cycle
+    Route.Refresh()
+    if Guiding() then GuideNearest() end
     Changed()
 end
 

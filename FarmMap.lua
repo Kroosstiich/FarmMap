@@ -3381,7 +3381,6 @@ local function CreateFilterButtons()
             end
         end
         GameTooltip:AddLine(L.ROUTE_HINT, 0.7, 0.7, 0.7, true)
-        GameTooltip:AddLine(L.ROUTE_DIR_HINT, 0.7, 0.7, 0.7, true)
         GameTooltip:AddLine(L.ROUTE_SKIP_HINT, 0.7, 0.7, 0.7, true)
         GameTooltip:AddLine(L.FILTERBAR_DRAG_HINT, 0.7, 0.7, 0.7)
         GameTooltip:AddLine(L.FILTERBAR_FLIP_HINT, 0.7, 0.7, 0.7)
@@ -3391,13 +3390,11 @@ local function CreateFilterButtons()
     btnRoute:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     btnRoute:SetScript("OnClick", function(self, button)
         if button == "RightButton" then
+            -- Right-click alone does nothing: on the world map it zooms out
+            -- too (the direction lives in the options and the session window).
             if IsShiftKeyDown() then
                 FarmMapDB.filterBarHorizontal = not FarmMapDB.filterBarHorizontal
                 LayoutBar()
-            elseif ns.Route then
-                -- Right-click alone: the route the other way round.
-                ns.Route.Reverse()
-                if GameTooltip:GetOwner() == self then self:GetScript("OnEnter")(self) end
             end
             return
         end
@@ -3617,6 +3614,8 @@ local function ClearNodeDatabase()
         routeGuide        = FarmMapDB.routeGuide,
         routeReverse      = FarmMapDB.routeReverse,
         routeSpeed        = FarmMapDB.routeSpeed,
+        routeMaxMinutes   = FarmMapDB.routeMaxMinutes,
+        routeVariant      = FarmMapDB.routeVariant,
     }
     ns.MinimapProximity.Clear()
     ClearWorldMapPins()

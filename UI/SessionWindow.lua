@@ -88,6 +88,17 @@ local function Create()
     frame.guide:SetScript("OnClick", function()
         if ns.Route then ns.Route.Guide(not ns.Route.IsGuiding()) end
     end)
+    -- Under it, half and half: the route's direction, and another route.
+    frame.dir = Theme.ActionButton(frame, "")
+    frame.dir:SetHeight(24)
+    frame.dir.tipTitle = L("UI_ROUTE_DIR")
+    frame.dir.tipBody = L("SESSION_DIR_TIP")
+    frame.dir:SetScript("OnClick", function() if ns.Route then ns.Route.Reverse() end end)
+    frame.newRoute = Theme.ActionButton(frame, L("ROUTE_NEW_LABEL"))
+    frame.newRoute:SetHeight(24)
+    frame.newRoute.tipTitle = L("UI_ROUTE_NEW")
+    frame.newRoute.tipBody = L("SESSION_NEW_TIP")
+    frame.newRoute:SetScript("OnClick", function() if ns.Route then ns.Route.NewRoute() end end)
 
     local pos = Saved().pos
     if pos then
@@ -134,6 +145,22 @@ function SessionWindow:Update()
         frame.guide:SetPoint("TOPLEFT", 10, -(height - 2))
         frame.guide:SetPoint("TOPRIGHT", -10, -(height - 2))
         frame.guide.text:SetTextColor(Theme.RGB(on and "accent" or "dim"))
+        height = height + 24 + 8
+    end
+    -- Direction and another route: the route works without a navigation
+    -- addon, so these two are always there.
+    local hasRoute = ns.Route ~= nil
+    frame.dir:SetShown(hasRoute)
+    frame.newRoute:SetShown(hasRoute)
+    if hasRoute then
+        local half = math.floor((W - 20 - 6) / 2)
+        frame.dir:SetLabel(L(FarmMapDB.routeReverse and "ROUTE_CCW" or "ROUTE_CW"))
+        frame.dir:ClearAllPoints()
+        frame.dir:SetPoint("TOPLEFT", 10, -(height - 2))
+        frame.dir:SetWidth(half)
+        frame.newRoute:ClearAllPoints()
+        frame.newRoute:SetPoint("TOPRIGHT", -10, -(height - 2))
+        frame.newRoute:SetWidth(half)
         height = height + 24 + 8
     end
     frame:SetHeight(height)
