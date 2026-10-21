@@ -42,6 +42,12 @@ local COLOR_KEYS = {
     "good", "warn", "bad",
 }
 
+-- Surfaces that may blend into a second colour, top to bottom (2.2). The
+-- second colour sits next to the theme's own under "<name>To" (bgTo...);
+-- without it the surface stays flat. Small plates (buttons, inputs, tags)
+-- stay flat whatever the theme: only the big surfaces blend.
+local GRADIENT_KEYS = { "bg", "panel", "panel2" }
+
 -- Semantic colours shared by the built-in themes: they say what a thing IS
 -- (detected, changed, missing), not that it is FarmMap.
 local SEMANTIC = { good = "#4fd36a", warn = "#e0a040", bad = "#e05a4a" }
@@ -118,6 +124,9 @@ local function Register(key, def)
     for _, name in ipairs(COLOR_KEYS) do
         colors[name] = ParseColor(def.colors[name])
     end
+    for _, name in ipairs(GRADIENT_KEYS) do
+        colors[name .. "To"] = ParseColor(def.colors[name .. "To"])
+    end
     if not themes[key] then themeOrder[#themeOrder + 1] = key end
     themes[key] = {
         key    = key,
@@ -152,8 +161,11 @@ FarmMapThemes = {
 }
 
 -- The active colours, as { r, g, b } tables. Read through Theme.c at paint
--- time, never captured: a theme switch replaces them.
+-- time, never captured: a theme switch replaces them. Theme.g holds the
+-- bottom colour of the surfaces the active theme blends (nil: flat).
 Theme.c = {}
+Theme.g = {}
+Theme.GRADIENT_KEYS = GRADIENT_KEYS
 
 function Theme.Themes()
     local out = {}
@@ -186,6 +198,10 @@ local function ResolveColors()
     local fallback = themes[ClientDefault()]
     for _, name in ipairs(COLOR_KEYS) do
         Theme.c[name] = (active and active.colors[name]) or fallback.colors[name]
+    end
+    -- A gradient is the theme's own: never borrowed from the fallback.
+    for _, name in ipairs(GRADIENT_KEYS) do
+        Theme.g[name] = active and active.colors[name .. "To"] or nil
     end
 end
 
@@ -257,6 +273,10 @@ local function FullColors(key)
     for _, name in ipairs(COLOR_KEYS) do
         out[name] = ToHex((def and def.colors[name]) or fallback.colors[name])
     end
+    for _, name in ipairs(GRADIENT_KEYS) do
+        local to = def and def.colors[name .. "To"]
+        if to then out[name .. "To"] = ToHex(to) end
+    end
     return out
 end
 
@@ -287,6 +307,23 @@ function Theme.SetUserColor(key, name, r, g, b)
     if key == Theme.CurrentKey() then Theme.Reload() end
 end
 
+-- Turns a surface's gradient on or off in one of the player's themes. On,
+-- the bottom colour starts as a darker shade of the surface's own, for the
+-- player to change; off, the surface is flat again.
+function Theme.SetUserGradient(key, name, on)
+    local entry = UserEntry(key)
+    if not entry then return end
+    local to = name .. "To"
+    local value
+    if on then
+        local c = themes[key].colors[name] or Theme.c[name]
+        value = { c[1] * 0.6, c[2] * 0.6, c[3] * 0.6 }
+    end
+    entry.colors[to] = value and ToHex(value) or nil
+    themes[key].colors[to] = value
+    if key == Theme.CurrentKey() then Theme.Reload() end
+end
+
 function Theme.RenameUserTheme(key, label)
     local entry = UserEntry(key)
     label = CleanLabel(label)
@@ -312,7 +349,9 @@ end
 -- ---- Sharing as text ----
 -- One line: FMTHEME1;<name>;bg:0e1116;panel:161b22;...
 -- Read with string patterns only, never run as code: a shared text can
--- carry a name and colours, nothing else.
+-- carry a name and colours, nothing else. Gradients ride along as bgTo:...
+-- fields: FarmMap before 2.2 skips fields it does not know, so it still
+-- reads such a text (flat), and the tag stays FMTHEME1.
 local EXPORT_TAG = "FMTHEME1"
 
 function Theme.ExportTheme(key)
@@ -322,6 +361,10 @@ function Theme.ExportTheme(key)
     local colors = FullColors(key)
     for _, name in ipairs(COLOR_KEYS) do
         parts[#parts + 1] = name .. ":" .. colors[name]:sub(2)
+    end
+    for _, name in ipairs(GRADIENT_KEYS) do
+        local to = colors[name .. "To"]
+        if to then parts[#parts + 1] = name .. "To:" .. to:sub(2) end
     end
     return table.concat(parts, ";")
 end
@@ -341,6 +384,7 @@ function Theme.ParseThemeString(text)
     for field in (text .. ";"):gmatch("([^;]*);") do fields[#fields + 1] = field end
     local allowed = {}
     for _, name in ipairs(COLOR_KEYS) do allowed[name] = true end
+    for _, name in ipairs(GRADIENT_KEYS) do allowed[name .. "To"] = true end
     local colors, count = {}, 0
     for i = 3, #fields do
         local name, hex = fields[i]:match("^%s*(%w+):(%x%x%x%x%x%x)%s*$")
@@ -378,6 +422,99 @@ ResolveColors()
 local function RGB(name) local c = Theme.c[name] return c[1], c[2], c[3] end
 function Theme.RGB(name) return RGB(name) end
 function Theme.RGBA(name, a) local r, g, b = RGB(name) return r, g, b, a or 1 end
+
+local function Mix(a, b, t)
+    return { a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t }
+end
+
+-- Colours a texture from `top` to `bottom` (flat when bottom is nil).
+-- "VERTICAL": the first colour is the bottom edge, the second the top
+-- (same call on every client, checked in the Retail, MoP, Era and Forever
+-- sources).
+local function PaintBlend(tex, top, bottom, alpha)
+    alpha = alpha or 1
+    if bottom then
+        tex:SetGradient("VERTICAL", CreateColor(bottom[1], bottom[2], bottom[3], alpha),
+            CreateColor(top[1], top[2], top[3], alpha))
+    else
+        tex:SetVertexColor(top[1], top[2], top[3], alpha)
+    end
+end
+
+-- A surface in its theme colour, blended when the theme gives that surface
+-- a second colour and the caller allows it (big surfaces only).
+local function PaintSurface(tex, name, alpha, blend)
+    PaintBlend(tex, Theme.c[name], blend and Theme.g[name] or nil, alpha)
+end
+
+-- ============================================================
+-- TEXT IN THE PLAYER'S LANGUAGE (2.2)
+--
+-- Search that ignores accents and case ("eclat" finds "Éclat"), sorting
+-- as a dictionary does, numbers and dates written the local way. C_Intl
+-- exists on Retail since 12.1.5 and on WoW: Forever; elsewhere each helper
+-- keeps FarmMap's earlier behaviour. Every call is guarded: C_Intl may
+-- return nothing, and a missing feature must never break a page.
+-- ============================================================
+
+local Intl = {}
+ns.Intl = Intl
+
+local CI = C_Intl
+local function EnumValue(group, name, default)
+    return Enum and Enum[group] and Enum[group][name] or default
+end
+local PRIMARY   = EnumValue("CollationStrength", "Primary", 0)    -- ignores accents and case
+local SECONDARY = EnumValue("CollationStrength", "Secondary", 1)  -- accents count, case does not
+local INTEGER   = EnumValue("NumberStyle", "Integer", 1)
+local LONG_DATE = EnumValue("DateTimeStyle", "Long", 3)
+
+-- The game fonts have no narrow no-break space (French thousands) and may
+-- lack the no-break space: a plain space instead, or the digits would sit
+-- around an empty box (as the em dash did on Korean clients).
+local function PlainSpaces(s)
+    return (s:gsub("\226\128\175", " "):gsub("\194\160", " "))
+end
+
+local function Call(fn, ...)
+    if not (CI and CI[fn]) then return nil end
+    local ok, result = pcall(CI[fn], ...)
+    if ok then return result end
+end
+
+-- Whether `text` contains `query`, ignoring accents and case.
+function Intl.Match(text, query)
+    if not query or query == "" then return true end
+    local hits = Call("FindStringMatches", text, query, PRIMARY)
+    if type(hits) == "table" then return #hits > 0 end
+    return text:lower():find(query:lower(), 1, true) ~= nil
+end
+
+-- Sort order of two names, as a dictionary of the player's language
+-- orders them ("Éclat" next to "Eclat", not after "Z").
+function Intl.Less(a, b)
+    local r = Call("CompareStrings", a, b, SECONDARY)
+    if type(r) == "number" and r ~= 0 then return r < 0 end
+    return a < b
+end
+
+-- A whole number with the local thousands separator: 12,345 / 12 345.
+function Intl.Number(n)
+    local s = Call("FormatNumber", n, INTEGER)
+    if type(s) == "string" and s ~= "" then return PlainSpaces(s) end
+    return tostring(n)
+end
+
+-- A "dd/mm/yyyy" date (the changelog's) as the language writes it in
+-- full: 9 octobre 2026, October 9, 2026. Unchanged when it cannot be read.
+function Intl.Date(text)
+    local d, m, y = tostring(text or ""):match("^(%d+)/(%d+)/(%d+)$")
+    if not d then return text end
+    local at = time({ year = tonumber(y), month = tonumber(m), day = tonumber(d), hour = 12 })
+    local s = at and Call("FormatDate", at, LONG_DATE, "")
+    if type(s) == "string" and s ~= "" then return PlainSpaces(s) end
+    return text
+end
 
 -- ============================================================
 -- FONT
@@ -438,7 +575,7 @@ function Theme.Plate(frame, fillName, lineName, small, fillAlpha)
     edge:SetTextureSliceMargins(margin, margin, margin, margin)
 
     frame.plateFill, frame.plateEdge = fill, edge
-    frame.plateColors = { fill = fillName, line = lineName, alpha = fillAlpha or 1 }
+    frame.plateColors = { fill = fillName, line = lineName, alpha = fillAlpha or 1, small = small }
     Theme.Track(frame, function(self) Theme.PaintPlate(self) end)
     return frame
 end
@@ -464,13 +601,31 @@ function Theme.Band(frame, colorName, side)
         square:SetPoint("TOPLEFT", 0, -4)
         square:SetPoint("BOTTOMRIGHT")
     end
+    -- With a gradient, the square half takes the share of it that covers
+    -- its own height, so the two halves read as one surface.
     local function Paint()
-        local r, g, b = RGB(colorName)
-        rounded:SetVertexColor(r, g, b)
-        square:SetVertexColor(r, g, b)
+        local top, bottom = Theme.c[colorName], Theme.g[colorName]
+        PaintBlend(rounded, top, bottom)
+        if not bottom then
+            PaintBlend(square, top)
+            return
+        end
+        local h = frame:GetHeight()
+        local t = h > 4 and 4 / h or 0
+        if side == "BOTTOM" then
+            PaintBlend(square, top, Mix(top, bottom, 1 - t))
+        else
+            PaintBlend(square, Mix(top, bottom, t), bottom)
+        end
     end
     Theme.Track(rounded, Paint)
     return rounded, square
+end
+
+-- The size of one screen pixel in a frame's own units (its effective
+-- scale), as Blizzard's PixelUtil counts it.
+function Theme.PixelSize(frame)
+    return PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
 end
 
 -- Puts a window's edges on whole screen pixels. At most UI scales a
@@ -557,8 +712,7 @@ end
 function Theme.PaintPlate(frame, fillName, lineName, fillAlpha, lineAlpha)
     local pc = frame.plateColors
     if not pc then return end
-    local fr, fg, fb = RGB(fillName or pc.fill)
-    frame.plateFill:SetVertexColor(fr, fg, fb, fillAlpha or pc.alpha)
+    PaintSurface(frame.plateFill, fillName or pc.fill, fillAlpha or pc.alpha, not pc.small)
     local lr, lg, lb = RGB(lineName or pc.line)
     frame.plateEdge:SetVertexColor(lr, lg, lb, lineAlpha or 1)
 end
@@ -1076,12 +1230,14 @@ function Theme.SliderRow(parent)
     local row = CreateFrame("Frame", nil, parent)
     RowText(row)
 
+    -- Wide enough for a word, not only a number: "No limit" was cut to
+    -- "No limi" and pushed against the edge (route's longest lap, 2.2).
     local value = CreateFrame("EditBox", nil, row)
-    value:SetSize(70, 28)
+    value:SetSize(96, 28)
     value:SetPoint("TOPRIGHT", -1, -7)
     value:SetAutoFocus(false)
     value:SetJustifyH("RIGHT")
-    value:SetMaxLetters(7)
+    value:SetMaxLetters(14)
     value:SetTextInsets(4, 7, 0, 0)
     Theme.Font(value, 13, "dim")
     Theme.Plate(value, "bg", "line", true)
@@ -1117,7 +1273,7 @@ function Theme.SliderRow(parent)
     end
 
     function row:SetContent(name, desc, width)
-        local y = RowMeasure(self, name, desc, width - 84) + 12
+        local y = RowMeasure(self, name, desc, width - 110) + 12
         slider:ClearAllPoints()
         slider:SetPoint("TOPLEFT", 2, -y)
         slider:SetPoint("TOPRIGHT", -2, -y)
@@ -1154,7 +1310,9 @@ function Theme.SliderRow(parent)
     -- Typed values are clamped, snapped to the step, applied, then rewritten
     -- from the setting: the box never shows a value the addon is not using.
     local function Commit(self)
-        local v = tonumber(((self:GetText() or ""):gsub(",", ".")))
+        -- The first number in the box: "23", "23 min" and "23,5" all read.
+        local typed = (self:GetText() or ""):match("%-?%d+[.,]?%d*") or ""
+        local v = tonumber((typed:gsub(",", ".")))
         if v and row.set and row.minValue then
             v = math.max(row.minValue, math.min(row.maxValue, v))
             v = math.floor((v - row.minValue) / row.step + 0.5) * row.step + row.minValue
@@ -1213,11 +1371,33 @@ function Theme.ScrollFrame(parent)
         thumb:SetPoint("TOP", rail, "TOP", 0, -math.floor(offset * (viewport - height)))
     end
 
+    -- Puts the page's top on a whole screen pixel. A scroll offset (or the
+    -- page's own anchor, at the window's scale) between two pixels drew the
+    -- 1 px edges of switches and buttons thinner on one side, top or bottom
+    -- depending on the row (seen again in 2.2, Kroosstii, 2026-10-22).
+    local snapping
+    local function SnapScroll()
+        if snapping then return end
+        local top = scroll:GetTop()
+        if not top then return end
+        local px = Theme.PixelSize(content)
+        local v = scroll:GetVerticalScroll()
+        local pageTop = top + v
+        local nv = v + (math.floor(pageTop / px + 0.5) * px - pageTop)
+        if nv < 0 then nv = nv + px end
+        if math.abs(nv - v) > 0.0001 then
+            snapping = true
+            scroll:SetVerticalScroll(nv)
+            snapping = false
+        end
+    end
+
     -- The wheel must work over every control drawn on top of the page.
     local function Wheel(_, delta)
         local overflow = math.max(0, (content:GetHeight() or 0) - (scroll:GetHeight() or 0))
         scroll:SetVerticalScroll(math.max(0, math.min(overflow,
             scroll:GetVerticalScroll() - delta * 40)))
+        SnapScroll()
     end
     scroll:EnableMouseWheel(true)
     scroll:SetScript("OnMouseWheel", Wheel)
@@ -1228,6 +1408,11 @@ function Theme.ScrollFrame(parent)
     scroll:HookScript("OnVerticalScroll", Layout)
     scroll:HookScript("OnSizeChanged", Layout)
     content:HookScript("OnSizeChanged", Layout)
+    -- Once the page is placed: shown, resized, or a new page laid out.
+    scroll:HookScript("OnShow", function() C_Timer.After(0, SnapScroll) end)
+    scroll:HookScript("OnSizeChanged", function() C_Timer.After(0, SnapScroll) end)
+    content:HookScript("OnSizeChanged", function() C_Timer.After(0, SnapScroll) end)
+    scroll.SnapScroll = SnapScroll
     return scroll, content
 end
 

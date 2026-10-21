@@ -79,6 +79,38 @@ local function Create()
         frame.rows[i], frame.labels[i] = value, label
     end
 
+    -- The route (2.2): a lap's estimated time while it is shown, then its
+    -- buttons. All placed under the numbers in Update.
+    frame.lapLabel = Theme.Font(frame:CreateFontString(nil, "OVERLAY"), 12.5, "dim")
+    frame.lapLabel:SetText(L("SESSION_LAP"))
+    frame.lapValue = Theme.Font(frame:CreateFontString(nil, "OVERLAY"), 13.5, "text")
+    frame.lapValue:SetJustifyH("RIGHT")
+    -- Show or hide the route; its colour says which.
+    frame.route = Theme.ActionButton(frame, L("ROUTE_TITLE"))
+    frame.route:SetHeight(24)
+    frame.route.tipTitle = L("ROUTE_TITLE")
+    frame.route.tipBody = L("SESSION_ROUTE_TIP")
+    frame.route:SetScript("OnClick", function() if ns.Route then ns.Route.Toggle() end end)
+    -- The guidance, with TomTom or WaypointUI: on, the route is shown too.
+    frame.guide = Theme.ActionButton(frame, L("SESSION_GUIDE"))
+    frame.guide:SetHeight(24)
+    frame.guide.tipTitle = L("UI_ROUTE_GUIDE")
+    frame.guide.tipBody = L("SESSION_GUIDE_TIP")
+    frame.guide:SetScript("OnClick", function()
+        if ns.Route then ns.Route.Guide(not ns.Route.IsGuiding()) end
+    end)
+    -- Under it, half and half: the route's direction, and another route.
+    frame.dir = Theme.ActionButton(frame, "")
+    frame.dir:SetHeight(24)
+    frame.dir.tipTitle = L("UI_ROUTE_DIR")
+    frame.dir.tipBody = L("SESSION_DIR_TIP")
+    frame.dir:SetScript("OnClick", function() if ns.Route then ns.Route.Reverse() end end)
+    frame.newRoute = Theme.ActionButton(frame, L("ROUTE_NEW_LABEL"))
+    frame.newRoute:SetHeight(24)
+    frame.newRoute.tipTitle = L("UI_ROUTE_NEW")
+    frame.newRoute.tipBody = L("SESSION_NEW_TIP")
+    frame.newRoute:SetScript("OnClick", function() if ns.Route then ns.Route.NewRoute() end end)
+
     local pos = Saved().pos
     if pos then
         frame:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
@@ -102,7 +134,7 @@ function SessionWindow:Update()
     if not (frame and frame:IsShown() and ns.OptionsWindow) then return end
     local OW = ns.OptionsWindow
     local n = OW.SessionNumbers()
-    local nodes = tostring(n.nodes)
+    local nodes = ns.Intl.Number(n.nodes)
     if n.perHour then nodes = nodes .. "  (" .. L("UI_DASH_PER_HOUR"):format(n.perHour) .. ")" end
     frame.rows[1]:SetText(OW.Duration(n.elapsed))
     frame.rows[2]:SetText(nodes)
@@ -113,7 +145,58 @@ function SessionWindow:Update()
         frame.rows[i]:SetShown(priced)
         frame.labels[i]:SetShown(priced)
     end
-    frame:SetHeight(38 + (priced and #LINES or 2) * ROW_H + 8)
+    local lines = priced and #LINES or 2
+    local height = 38 + lines * ROW_H + 8
+    local hasRoute = ns.Route ~= nil
+    local half = math.floor((W - 20 - 6) / 2)
+
+    -- A lap of the route of the player's zone, while the route is shown.
+    local lap = hasRoute and FarmMapDB.routeShown and ns.Route.LapMinutes(ns.Route.PlayerZone())
+    frame.lapLabel:SetShown(lap and true or false)
+    frame.lapValue:SetShown(lap and true or false)
+    if lap then
+        local y = 38 + lines * ROW_H
+        frame.lapLabel:ClearAllPoints()
+        frame.lapLabel:SetPoint("TOPLEFT", 12, -y)
+        frame.lapValue:ClearAllPoints()
+        frame.lapValue:SetPoint("TOPRIGHT", -12, -y)
+        frame.lapValue:SetText("~" .. OW.Duration(lap * 60))
+        height = height + ROW_H
+    end
+
+    -- Route and guidance side by side; the route alone (full width) when
+    -- there is no navigation addon to guide with. Colour = on or off.
+    local canGuide = hasRoute and (ns.IsTomTomLoaded() or ns.IsWaypointUILoaded())
+    frame.route:SetShown(hasRoute)
+    frame.guide:SetShown(canGuide and true or false)
+    if hasRoute then
+        frame.route:ClearAllPoints()
+        frame.route:SetPoint("TOPLEFT", 10, -(height - 2))
+        frame.route:SetWidth(canGuide and half or (W - 20))
+        frame.route.text:SetTextColor(Theme.RGB(FarmMapDB.routeShown and "accent" or "dim"))
+        if canGuide then
+            frame.guide:ClearAllPoints()
+            frame.guide:SetPoint("TOPRIGHT", -10, -(height - 2))
+            frame.guide:SetWidth(half)
+            frame.guide.text:SetTextColor(Theme.RGB(ns.Route.IsGuiding() and "accent" or "dim"))
+        end
+        height = height + 24 + 8
+    end
+    -- Direction and another route: the route works without a navigation
+    -- addon, so these two are always there.
+    frame.dir:SetShown(hasRoute)
+    frame.newRoute:SetShown(hasRoute)
+    if hasRoute then
+        frame.dir:SetLabel(L(FarmMapDB.routeReverse and "ROUTE_CCW" or "ROUTE_CW"))
+        frame.dir:ClearAllPoints()
+        frame.dir:SetPoint("TOPLEFT", 10, -(height - 2))
+        frame.dir:SetWidth(half)
+        frame.newRoute:ClearAllPoints()
+        frame.newRoute:SetPoint("TOPRIGHT", -10, -(height - 2))
+        frame.newRoute:SetWidth(half)
+        height = height + 24 + 8
+    end
+    frame:SetHeight(height)
     -- A plain "-": the em dash is missing from the Korean client's font.
     frame.rows[3]:SetText(n.value and OW.Money(n.value) or "-")
     frame.rows[4]:SetText(n.gph and OW.Money(n.gph) or "-")

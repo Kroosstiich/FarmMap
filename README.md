@@ -46,6 +46,11 @@ Anniversary, where not every feature has been tested yet.
 - **Integrations**: TradeSkillMaster as a second price source, and a click on a
   node sets a waypoint with [TomTom](https://www.curseforge.com/wow/addons/tomtom)
   or WaypointUI
+- **Route**: a button on the filter bar draws a loop through the nodes you know
+  in the zone, on the world map and the minimap, with its direction, a longest
+  lap and an estimated lap time; with TomTom or WaypointUI, the waypoint moves
+  to the next node after each harvest or as you reach it
+- A setup assistant that explains each main setting, with an animated example
 - A "What's new" window once per version
 - Harvest statistics per resource type
 - Minimap button — left click for the options, right click for the debug window
@@ -192,6 +197,13 @@ FarmMapThemes.Register("mytheme", {
 the borders, `accent` the titles and selection, `accentSoft` the accent at rest,
 `text` / `dim` / `faint` the three levels of text, and `good` / `warn` / `bad`
 the state colours. A colour left out falls back to the client's default theme.
+
+Since 2.2, the big surfaces can blend into a second colour, from top to
+bottom: add `bgTo`, `panelTo` or `panel2To` (the bottom colour of `bg`,
+`panel`, `panel2`). Buttons, inputs and tags stay flat. Leave them out and the
+surface stays flat; a gradient is never borrowed from another theme. In game,
+the Theme page has a *Gradients* tick per surface, and the exported text
+carries them (`bgTo:…`) — FarmMap 2.1 and earlier still read such a text, flat.
 
 ## Icon packs
 

@@ -18,6 +18,7 @@
 local _, ns = ...
 
 local Theme = ns.Theme
+local Intl = ns.Intl    -- accent-free search, sorting, local numbers (Theme.lua)
 local OptionsWindow = {}
 ns.OptionsWindow = OptionsWindow
 
@@ -167,7 +168,7 @@ end
 -- (def.SearchText: setting names, addon names...). Searching "TomTom" used
 -- to find nothing, the word being only inside the Integrations page.
 local function LayoutRail(filter)
-    filter = filter and filter:lower() or ""
+    filter = filter or ""
     local function Matches(def)
         if filter == "" then return true end
         local hay = L(def.titleKey) .. " " .. L(def.descKey)
@@ -176,7 +177,8 @@ local function LayoutRail(filter)
             local ok, more = pcall(def.SearchText)
             if ok and more then hay = hay .. " " .. more end
         end
-        return hay:lower():find(filter, 1, true) ~= nil
+        -- Accents and case do not count: "theme" finds "Thème".
+        return Intl.Match(hay, filter)
     end
 
     local y, shown = 0, 0
@@ -678,8 +680,8 @@ end
 -- Blizzard's colour picker, the same on every client (checked in the
 -- Retail, Forever, MoP and Era sources). Changes show live; Cancel puts
 -- the colour back.
-local function PickColor(themeKey, name)
-    local c = Theme.c[name]
+local function PickColor(themeKey, name, current)
+    local c = current or Theme.c[name]
     local before = { c[1], c[2], c[3] }
     local function Set(r, g, b)
         Theme.SetUserColor(themeKey, name, r, g, b)
@@ -732,10 +734,59 @@ local function TokenRow(parent)
     return row
 end
 
+-- One surface's gradient (2.2): a tick to turn it on, then its bottom
+-- colour, picked like the others. Only the player's own themes.
+local function GradientRow(parent)
+    local row = CreateFrame("Frame", nil, parent)
+    row:SetSize(TOKEN_W - 16, 26)
+    row.check = CreateFrame("Button", nil, row)
+    row.check:SetSize(18, 18)
+    row.check:SetPoint("LEFT", 4, 0)
+    Theme.Plate(row.check, "bg", "line", true)
+    row.check.tick = row.check:CreateTexture(nil, "OVERLAY")
+    row.check.tick:SetPoint("TOPLEFT", 4, -4)
+    row.check.tick:SetPoint("BOTTOMRIGHT", -4, 4)
+    row.check.tick:SetTexture("Interface\\AddOns\\FarmMap\\Textures\\ui\\tag-fill")
+    row.check.tick:SetTextureSliceMargins(4, 4, 4, 4)
+    Theme.Track(row.check.tick, function(self) self:SetVertexColor(Theme.RGB("accent")) end)
+    row.label = Theme.Font(row:CreateFontString(nil, "OVERLAY"), 12.5, "text")
+    row.label:SetPoint("LEFT", row.check, "RIGHT", 8, 0)
+    row.label:SetJustifyH("LEFT")
+    row.label:SetWordWrap(false)
+    row.swatch = CreateFrame("Button", nil, row)
+    row.swatch:SetSize(20, 20)
+    row.swatch:SetPoint("RIGHT", -4, 0)
+    row.swatch.fill = row.swatch:CreateTexture(nil, "ARTWORK")
+    row.swatch.fill:SetAllPoints()
+    row.swatch.fill:SetTexture("Interface\\AddOns\\FarmMap\\Textures\\ui\\tag-fill")
+    row.swatch.fill:SetTextureSliceMargins(4, 4, 4, 4)
+    row.hex = Theme.Font(row:CreateFontString(nil, "OVERLAY"), 12, "faint")
+    row.hex:SetPoint("RIGHT", row.swatch, "LEFT", -6, 0)
+    row.label:SetPoint("RIGHT", row.hex, "LEFT", -6, 0)
+    row.check:SetScript("OnClick", function()
+        Theme.SetUserGradient(Theme.CurrentKey(), row.key, not row.on)
+        OptionsWindow:Refresh()
+    end)
+    row.swatch:SetScript("OnClick", function()
+        if row.on then PickColor(Theme.CurrentKey(), row.key .. "To", Theme.g[row.key]) end
+    end)
+    function row:Fill()
+        local bottom = Theme.g[self.key]
+        self.on = bottom ~= nil
+        self.check.tick:SetShown(self.on)
+        Theme.PaintPlate(self.check, nil, self.on and "accent" or "line")
+        self.swatch:SetShown(self.on)
+        self.hex:SetText(self.on and ("#" .. Hex(bottom)) or L("UI_THEME_GRADIENT_OFF"))
+        if self.on then self.swatch.fill:SetVertexColor(bottom[1], bottom[2], bottom[3]) end
+    end
+    return row
+end
+
 OptionsWindow:AddPage({
     id = "theme", group = "settings", titleKey = "UI_THEME", descKey = "UI_THEME_DESC",
     SearchText = function()
-        local parts = { L("UI_THEME_EDIT"), L("UI_THEME_LOCKED"), L("UI_THEME_OWN") }
+        local parts = { L("UI_THEME_EDIT"), L("UI_THEME_LOCKED"), L("UI_THEME_OWN"),
+                        L("UI_THEME_GRADIENT_TITLE"), L("UI_THEME_GRADIENT_DESC") }
         for _, def in ipairs(Theme.Themes()) do parts[#parts + 1] = def.label end
         return table.concat(parts, " ")
     end,
@@ -772,6 +823,17 @@ OptionsWindow:AddPage({
             row.key = token[1]
             Theme.Track(row.swatch, function(self) self:SetVertexColor(Theme.RGB(token[1])) end)
             ed.tokens[i] = row
+        end
+        -- Gradients of the big surfaces (2.2), under the colours.
+        ed.gradTitle = Theme.Font(ed:CreateFontString(nil, "OVERLAY"), 13, "text")
+        ed.gradTitle:SetJustifyH("LEFT")
+        ed.gradDesc = Theme.Font(ed:CreateFontString(nil, "OVERLAY"), 12, "dim")
+        ed.gradDesc:SetJustifyH("LEFT")
+        ed.gradients = {}
+        for i, name in ipairs(Theme.GRADIENT_KEYS) do
+            local row = GradientRow(ed)
+            row.key = name
+            ed.gradients[i] = row
         end
         ed.copy = Theme.ActionButton(ed, L("UI_THEME_COPY"), true)
         ed.copy:SetScript("OnClick", function()
@@ -871,6 +933,32 @@ OptionsWindow:AddPage({
             row:SetPoint("TOPLEFT", 11 + col * colW, -(top + line * TOKEN_H))
         end
         local by = top + math.ceil(#ed.tokens / tokenCols) * TOKEN_H + 8
+        -- Gradients: only a theme of the player's own can have them set.
+        ed.gradTitle:SetShown(editable)
+        ed.gradDesc:SetShown(editable)
+        for _, row in ipairs(ed.gradients) do row:SetShown(editable) end
+        if editable then
+            ed.gradTitle:ClearAllPoints()
+            ed.gradTitle:SetPoint("TOPLEFT", 14, -(by + 4))
+            ed.gradTitle:SetText(L("UI_THEME_GRADIENT_TITLE"))
+            ed.gradDesc:ClearAllPoints()
+            ed.gradDesc:SetPoint("TOPLEFT", ed.gradTitle, "BOTTOMLEFT", 0, -4)
+            ed.gradDesc:SetWidth(width - 30)
+            ed.gradDesc:SetText(L("UI_THEME_GRADIENT_DESC"))
+            local rowsTop = by + 4 + math.floor(ed.gradTitle:GetStringHeight() + 0.5) + 4
+                + math.floor(ed.gradDesc:GetStringHeight() + 0.5) + 10
+            -- GRADIENT_KEYS are the first three TOKENS (bg, panel, panel2):
+            -- each row is named like that colour.
+            for i, row in ipairs(ed.gradients) do
+                local col, line = (i - 1) % tokenCols, math.floor((i - 1) / tokenCols)
+                row.label:SetText(L(TOKENS[i][2]))
+                row:SetWidth(colW - 8)
+                row:ClearAllPoints()
+                row:SetPoint("TOPLEFT", 11 + col * colW, -(rowsTop + line * TOKEN_H))
+                row:Fill()
+            end
+            by = rowsTop + math.ceil(#ed.gradients / tokenCols) * TOKEN_H + 8
+        end
         ed.copy:ClearAllPoints()
         ed.copy:SetPoint("TOPLEFT", 14, -by)
         ed.export:ClearAllPoints()
@@ -1187,6 +1275,11 @@ function OptionsWindow.LayoutItems(frame, items, width, wheel)
     -- letter typed. Only the rows left unused are hidden, at the end.
     local used = {}
     local y = 0
+    -- Rows start on whole screen pixels (the page itself is snapped by
+    -- Theme.ScrollFrame): at the window's scale, whole UI units are not
+    -- whole pixels, and 1 px edges came out thinner on one side.
+    local px = Theme.PixelSize(frame)
+    local function Snap(v) return math.floor(v / px + 0.5) * px end
     for _, item in ipairs(items) do
         if item.visible ~= false then
             used[item.key] = true
@@ -1213,7 +1306,7 @@ function OptionsWindow.LayoutItems(frame, items, width, wheel)
                 -- clipping edge would lose that side of its outline.
                 local x = item.inset and 1 or 0
                 row:ClearAllPoints()
-                row:SetPoint("TOPLEFT", x, -y)
+                row:SetPoint("TOPLEFT", Snap(x), -Snap(y))
                 row:SetWidth(width - x * 2)
                 if item.type == "section" then
                     row:SetContent(item.text)
@@ -1611,6 +1704,7 @@ ItemsPage({
                   SyncLegacyCheck("FarmMapShowMinimapButtonCheck", on)
               end },
 
+
             { type = "section", key = "packs", text = L("UI_SEC_PACKS") },
             { type = "hint", key = "packsHint", text = L("UI_PACKS_DESC") },
             PackItem("packOld", PACK_LINKS[1]),
@@ -1755,6 +1849,36 @@ ItemsPage({
               disabled = function() return not hasNav() end,
               get = function() return FarmMapDB.waypointClick ~= false end,
               set = function(on) FarmMapDB.waypointClick = on and true or false end },
+            -- The route (2.2, Route button of the filter bar): all its
+            -- settings together, under Navigation where its guidance belongs.
+            { type = "section", key = "secRoute", text = L("UI_SEC_ROUTE") },
+            { type = "hint", key = "routeHint", text = L("UI_ROUTE_HINT") },
+            { type = "switch", key = "routeGuide",
+              name = L("UI_ROUTE_GUIDE"), desc = L("UI_ROUTE_GUIDE_DESC"),
+              disabled = function() return not hasNav() end,
+              get = function() return FarmMapDB.routeGuide == true end,
+              set = function(on) if ns.Route then ns.Route.SetGuide(on) end end },
+            { type = "choice", key = "routeDir",
+              name = L("UI_ROUTE_DIR"), desc = L("UI_ROUTE_DIR_DESC"),
+              choices = function()
+                  return { { value = "cw", label = L("ROUTE_CW") }, { value = "ccw", label = L("ROUTE_CCW") } }
+              end,
+              get = function() return FarmMapDB.routeReverse and "ccw" or "cw" end,
+              set = function(v) if ns.Route then ns.Route.SetReverse(v == "ccw") end end },
+            -- 5 to 60 minutes, to the minute (typed or dragged); the last
+            -- step (61) means no limit.
+            { type = "slider", key = "routeMaxMinutes",
+              name = L("UI_ROUTE_MAXTIME"), desc = L("UI_ROUTE_MAXTIME_DESC"),
+              min = 5, max = 61, step = 1,
+              format = function(v) return v >= 61 and L("ROUTE_NO_LIMIT") or L("UI_DUR_MIN"):format(v) end,
+              get = function() return math.min(FarmMapDB.routeMaxMinutes or 61, 61) end,
+              set = function(v)
+                  FarmMapDB.routeMaxMinutes = v
+                  if ns.Route then ns.Route.RefreshSoon() end
+              end },
+            { type = "button", key = "routeNew", gap = 12,
+              name = L("UI_ROUTE_NEW"), desc = L("UI_ROUTE_NEW_DESC"), label = L("ROUTE_NEW_LABEL"),
+              onClick = function() if ns.Route then ns.Route.NewRoute() end end },
 
             { type = "custom", key = "ask", build = ask.build, layout = ask.layout,
               search = L("UI_INTEG_ASK_TITLE") .. " " .. L("UI_INTEG_ASK"), inset = true },
@@ -1792,7 +1916,8 @@ local function Money(copper)
     copper = math.floor(copper or 0)
     local g, s, c = math.floor(copper / 10000), math.floor(copper / 100) % 100, copper % 100
     local parts = {}
-    if g > 0 then parts[#parts + 1] = g .. COIN:format("Gold") end
+    -- Gold can run into thousands: written with the local separator.
+    if g > 0 then parts[#parts + 1] = Intl.Number(g) .. COIN:format("Gold") end
     if s > 0 or g > 0 then parts[#parts + 1] = s .. COIN:format("Silver") end
     if g == 0 then parts[#parts + 1] = c .. COIN:format("Copper") end
     return table.concat(parts, " ")
@@ -1875,7 +2000,7 @@ local function LayoutTiles(f, width)
     -- client's font (it showed as an empty box).
     local data = {
         { L("UI_DASH_TIME"), Duration(n.elapsed), L("UI_DASH_TIME_SUB") },
-        { L("UI_DASH_NODES"), tostring(n.nodes),
+        { L("UI_DASH_NODES"), Intl.Number(n.nodes),
           n.perHour and L("UI_DASH_PER_HOUR"):format(n.perHour) or "-" },
     }
     -- Value and gold per hour only with Auctionator or TSM: without them
@@ -1959,7 +2084,7 @@ local function LayoutByType(card, width)
         r.count:ClearAllPoints()
         r.count:SetPoint("TOPRIGHT", -14, -y)
         r.count:SetWidth(COUNT_W)
-        r.count:SetText(tostring(n))
+        r.count:SetText(Intl.Number(n))
     end
     local h = top + #card.rows * 28 + 8
     if card.withTotal then
@@ -2111,9 +2236,9 @@ local NODE_ROW_H = 30
 local function NodeMatches(g)
     if nodeFilter.off[g.baseType] then return false end
     if nodeFilter.mapID ~= 0 and g.mapID ~= nodeFilter.mapID then return false end
-    if nodeFilter.q ~= "" then
-        local hay = (g.name .. " " .. g.zone):lower()
-        if not hay:find(nodeFilter.q, 1, true) then return false end
+    -- Accents and case do not count: "eclat" finds "Éclat".
+    if nodeFilter.q ~= "" and not Intl.Match(g.name .. " " .. g.zone, nodeFilter.q) then
+        return false
     end
     return true
 end
@@ -2166,7 +2291,8 @@ local function BuildNodeFilters(parent)
     local f = CreateFrame("Frame", nil, parent)
     f.search = Theme.SearchBox(f, L("UI_NODES_SEARCH"))
     f.search.onChange = function(text)
-        nodeFilter.q = (text or ""):lower()
+        -- Kept as typed: "Where to find" shows it back.
+        nodeFilter.q = text or ""
         OptionsWindow:Refresh()
     end
     f.zone = Theme.Dropdown(f)
@@ -2189,7 +2315,7 @@ local function LayoutNodeFilters(f, width, groups)
             zones[#zones + 1] = { value = g.mapID, label = g.zone }
         end
     end
-    table.sort(zones, function(a, b) return a.label < b.label end)
+    table.sort(zones, function(a, b) return Intl.Less(a.label, b.label) end)
     table.insert(zones, 1, { value = 0, label = L("UI_NODES_ALL_ZONES") })
     if not seen[nodeFilter.mapID] then nodeFilter.mapID = 0 end
     f.zone:Bind(function() return nodeFilter.mapID end,
@@ -2361,11 +2487,11 @@ local function LayoutNodeTable(f, width, shown)
         row.nodes:ClearAllPoints()
         row.nodes:SetPoint("LEFT", cols[3] - 1, 0)
         row.nodes:SetWidth(NUM_W)
-        row.nodes:SetText(tostring(g.nodes))
+        row.nodes:SetText(Intl.Number(g.nodes))
         row.harvests:ClearAllPoints()
         row.harvests:SetPoint("LEFT", cols[4] - 1, 0)
         row.harvests:SetWidth(NUM_W)
-        row.harvests:SetText(tostring(g.harvests))
+        row.harvests:SetText(Intl.Number(g.harvests))
         row:Show()
     end
     local y = 28 + count * NODE_ROW_H
@@ -2393,9 +2519,10 @@ ItemsPage({
     id = "nodes", titleKey = "UI_NODES", descKey = "UI_NODES_DESC", noSearch = true,
     items = function()
         nodeGroups = ns.CollectNodeGroups()
+        -- In dictionary order: the "É" names among the "E", not after "Z".
         table.sort(nodeGroups, function(a, b)
-            if a.zone ~= b.zone then return a.zone < b.zone end
-            return a.name < b.name
+            if a.zone ~= b.zone then return Intl.Less(a.zone, b.zone) end
+            return Intl.Less(a.name, b.name)
         end)
         nodeShown = {}
         local selected = {}
@@ -2572,8 +2699,8 @@ local function LayoutPreview(card, width)
         else
             local z = p.zones[i]
             l.zone:SetText(z.name)
-            l.added:SetText(tostring(z.added))
-            l.known:SetText(tostring(z.known))
+            l.added:SetText(Intl.Number(z.added))
+            l.known:SetText(Intl.Number(z.known))
             l.zone:SetTextColor(Theme.RGB("text"))
             l.added:SetTextColor(Theme.RGB(z.added > 0 and "accent" or "dim"))
             l.known:SetTextColor(Theme.RGB("dim"))

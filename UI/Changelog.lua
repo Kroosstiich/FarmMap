@@ -7,8 +7,9 @@
 --  A language without its own file falls back to English.
 --
 --  What is shown (Kroosstii's rule):
---    - the CURRENT SERIES, newest first: every X.Y.* up to the installed
---      version, so at 2.0.1 the player reads 2.0.1 above 2.0.0;
+--    - the CURRENT SERIES and the ONE BEFORE IT, newest first: at 2.2.0,
+--      every 2.2.* and 2.1.* (Kroosstii, 2026-10-22: a new series still
+--      shows what the last one brought); at 2.3.0, 2.3.* and 2.2.*;
 --    - releases of other series the player skipped since their last visit,
 --      under "Also since your last visit";
 --    - older series only behind "Show older changelogs".
@@ -60,10 +61,20 @@ end
 -- `lastSeen` (other series only), and the rest.
 function Changelog.Groups(lastSeen)
     local ca, cb = Parse(Current())
-    local series, skipped, older = {}, {}, {}
-    for _, version in ipairs(Releases()) do
+    local releases = Releases()
+    -- The series just before the current one: the newest X.Y below it
+    -- (2.1 under 2.2; under 3.0, the last 2.x).
+    local pa, pb
+    for _, version in ipairs(releases) do
         local a, b = Parse(version)
-        if a == ca and b == cb then
+        if (a < ca or (a == ca and b < cb)) and (not pa or a > pa or (a == pa and b > pb)) then
+            pa, pb = a, b
+        end
+    end
+    local series, skipped, older = {}, {}, {}
+    for _, version in ipairs(releases) do
+        local a, b = Parse(version)
+        if (a == ca and b == cb) or (a == pa and b == pb) then
             series[#series + 1] = version
         elseif lastSeen and Newer(version, lastSeen) then
             skipped[#skipped + 1] = version
@@ -179,7 +190,8 @@ local function DrawReleases(container, p, versions, width, y, heading, lastSeen)
         if inEnglish then Beside(NextTag(container, p, L("UI_CL_IN_ENGLISH"), "warn")) end
         if date then
             local d = NextText(container, p, 12, "faint")
-            d:SetText(date)
+            -- "9 octobre 2026" rather than "09/10/2026", in the player's language.
+            d:SetText(ns.Intl.Date(date))
             Beside(d)
         end
         y = y + math.floor(title:GetStringHeight() + 0.5) + 14
