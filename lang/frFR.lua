@@ -366,7 +366,6 @@ ns.locales.frFR = {
         ROUTE_INFO             = "Boucle : %s nœuds, environ %s.",
         ROUTE_CAPPED           = "Les %d nœuds les plus récoltés de la zone.",
         ROUTE_NONE             = "Pas de route ici : il faut au moins 2 nœuds connus dans cette zone, pour les filtres allumés.",
-        UI_SEC_ROUTE           = "Route",
         UI_ROUTE_GUIDE         = "Me guider le long de la route",
         UI_ROUTE_GUIDE_DESC    = "Après chaque récolte d'un nœud de la route, le point de passage TomTom ou WaypointUI passe au nœud suivant de la boucle. Maj-clic sur le bouton Route pour sauter un nœud. La route elle-même s'affiche avec son bouton, sur la barre de filtres de la carte du monde.",
         SETUP_ROUTE_GUIDE_TITLE = "Guidage le long de la route",

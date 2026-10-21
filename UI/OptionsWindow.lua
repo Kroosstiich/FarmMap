@@ -1699,14 +1699,6 @@ ItemsPage({
                   SyncLegacyCheck("FarmMapShowMinimapButtonCheck", on)
               end },
 
-            -- The route (2.2) is shown with its button on the filter bar;
-            -- its guidance needs TomTom or WaypointUI.
-            { type = "section", key = "route", text = L("UI_SEC_ROUTE") },
-            { type = "switch", key = "routeGuide",
-              name = L("UI_ROUTE_GUIDE"), desc = L("UI_ROUTE_GUIDE_DESC"),
-              disabled = function() return not (ns.IsTomTomLoaded() or ns.IsWaypointUILoaded()) end,
-              get = function() return FarmMapDB.routeGuide == true end,
-              set = function(on) if ns.Route then ns.Route.SetGuide(on) end end },
 
             { type = "section", key = "packs", text = L("UI_SEC_PACKS") },
             { type = "hint", key = "packsHint", text = L("UI_PACKS_DESC") },
@@ -1852,6 +1844,13 @@ ItemsPage({
               disabled = function() return not hasNav() end,
               get = function() return FarmMapDB.waypointClick ~= false end,
               set = function(on) FarmMapDB.waypointClick = on and true or false end },
+            -- The route (2.2, Route button of the filter bar): its guidance
+            -- sits with the other TomTom / WaypointUI settings.
+            { type = "switch", key = "routeGuide", gap = 12,
+              name = L("UI_ROUTE_GUIDE"), desc = L("UI_ROUTE_GUIDE_DESC"),
+              disabled = function() return not hasNav() end,
+              get = function() return FarmMapDB.routeGuide == true end,
+              set = function(on) if ns.Route then ns.Route.SetGuide(on) end end },
 
             { type = "custom", key = "ask", build = ask.build, layout = ask.layout,
               search = L("UI_INTEG_ASK_TITLE") .. " " .. L("UI_INTEG_ASK"), inset = true },

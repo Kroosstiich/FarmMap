@@ -391,7 +391,6 @@ ns.locales.enUS = {
         ROUTE_INFO             = "Loop: %s nodes, about %s.",
         ROUTE_CAPPED           = "The %d most harvested nodes of the zone.",
         ROUTE_NONE             = "No route here: it needs at least 2 known nodes in this zone, for the filters that are on.",
-        UI_SEC_ROUTE           = "Route",
         UI_ROUTE_GUIDE         = "Guide me along the route",
         UI_ROUTE_GUIDE_DESC    = "After each harvest of a node of the route, the TomTom or WaypointUI waypoint moves to the next node of the loop. Shift-click the Route button to skip a node. The route itself is shown with its button on the world map's filter bar.",
         SETUP_ROUTE_GUIDE_TITLE = "Guidance along the route",

@@ -63,7 +63,7 @@ local STEPS = {
       demo = "waypoint",
       when = function() return ns.IsTomTomLoaded() or ns.IsWaypointUILoaded() end },
     -- 2.2: shown on its own to the players who went through in 2.1.
-    { id = "routeGuide", text = "ROUTE_GUIDE", page = "icons", key = "routeGuide",
+    { id = "routeGuide", text = "ROUTE_GUIDE", page = "integ", key = "routeGuide",
       when = function() return ns.IsTomTomLoaded() or ns.IsWaypointUILoaded() end },
     { id = "theme", text = "THEME", item = ThemeItem },
 }

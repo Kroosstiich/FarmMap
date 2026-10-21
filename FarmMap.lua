@@ -1429,7 +1429,8 @@ end
 function Integ.SetWaypoint(mapID, nodeData)
     local addon = Integ.WaypointAddon(true)
     if addon == "WaypointUI" then
-        WaypointUIAPI.Navigation.NewUserNavigation({ name = Integ.NodeName(nodeData), mapID = mapID,
+        Integ.routeWui = Integ.NodeName(nodeData)
+        WaypointUIAPI.Navigation.NewUserNavigation({ name = Integ.routeWui, mapID = mapID,
                                                      x = nodeData.x * 100, y = nodeData.y * 100 })
         Integ.wuiKey = mapID .. ":" .. nodeData.x .. ":" .. nodeData.y
     elseif addon == "TomTom" then
@@ -1441,6 +1442,22 @@ function Integ.SetWaypoint(mapID, nodeData)
             persistent = false, crazy = true,
         })
     end
+end
+
+-- The route or its guidance switched off: the waypoint it set goes too
+-- (WaypointUI kept it, and only the world map could clear it - Kroosstii,
+-- 2026-10-22). WaypointUI's navigation is cleared only while still ours.
+function Integ.ClearRouteWaypoint()
+    if Integ.routeUid and TomTom and TomTom.IsValidWaypoint and TomTom:IsValidWaypoint(Integ.routeUid) then
+        TomTom:RemoveWaypoint(Integ.routeUid)
+    end
+    Integ.routeUid = nil
+    local nav = WaypointUIAPI and WaypointUIAPI.Navigation
+    if Integ.routeWui and nav and nav.ClearUserNavigation then
+        local current = nav.GetUserNavigation and nav.GetUserNavigation()
+        if current and current.name == Integ.routeWui then nav.ClearUserNavigation() end
+    end
+    Integ.routeWui = nil
 end
 
 local function CreatePoint(nodeData, isMinimap, mapID)
@@ -3561,6 +3578,7 @@ ns.NodeHarvests = function(mapID, node)
     return entry and entry.n or 0
 end
 ns.SetWaypoint = function(mapID, node) Integ.SetWaypoint(mapID, node) end
+ns.ClearRouteWaypoint = function() Integ.ClearRouteWaypoint() end
 ns.IsWaypointUILoaded = function()
     return (WaypointUIAPI and WaypointUIAPI.Navigation and WaypointUIAPI.Navigation.NewUserNavigation) and true or false
 end

@@ -26,7 +26,9 @@ local HBDPins = LibStub("HereBeDragons-Pins-2.0")
 local MAX_NODES     = 200
 local MAX_PASSES    = 25      -- 2-opt passes; each one scans every pair once
 local MINIMAP_STEP  = 15      -- yards between two dots on the minimap
-local MAX_DOTS      = 600
+local MINIMAP_RANGE = 400     -- dots only this far around the player (the minimap shows less)
+local REBUILD_MOVE  = 100     -- yards moved before the dots are placed again
+local MAX_DOTS      = 400
 local LINE_PX       = 2.5     -- on screen, whatever the map's zoom
 local OUTLINE_PX    = 5
 local ARROW_PX      = 7
@@ -239,33 +241,92 @@ local function Dot(i)
     return dot
 end
 
--- Dots every MINIMAP_STEP yards along the route of the player's zone:
--- HereBeDragons places, rotates and hides them with the minimap.
+-- The zone a sub-zone (a town, a cave) belongs to: the player is often on
+-- such a smaller map while the route lives on the zone's. The minimap
+-- showed the route only now and then because of this (Kroosstii,
+-- 2026-10-22).
+local ZONE_TYPE = Enum and Enum.UIMapType and Enum.UIMapType.Zone or 3
+local function ZoneOf(mapID)
+    local data, id = HBD.mapData, mapID
+    while data[id] and data[id].mapType ~= ZONE_TYPE and (data[id].parent or 0) > 0 do
+        id = data[id].parent
+    end
+    if data[id] and data[id].mapType == ZONE_TYPE then return id end
+    return mapID
+end
+
+-- The route's dots in FarmMap's proximity list (fiote's "hide nearby
+-- pins"): the ones close to the player fade like the node pins, so the
+-- nodes under the route stay visible. Taken out before each rebuild.
+local function Unlist()
+    local list = ns.MinimapProximity.pins
+    for i = #list, 1, -1 do
+        if list[i].farmMapRouteDot then table.remove(list, i) end
+    end
+end
+
+local built   -- where the dots were last placed: { x =, y =, instance = }
+
+-- Dots every MINIMAP_STEP yards along the route of the player's zone,
+-- within MINIMAP_RANGE yards of the player only: a whole long loop came
+-- out cut short at the old cap. Placed in world coordinates, so they show
+-- in the zone's sub-zones too; HereBeDragons rotates and zooms them with
+-- the minimap. Rebuilt as the player moves (ticker below).
 local function UpdateMinimap()
     HBDPins:RemoveAllMinimapIcons(MINIMAP_REF)
+    Unlist()
+    built = nil
     if not (FarmMapDB and FarmMapDB.routeShown) then return end
+    local px, py, instance = HBD:GetPlayerWorldPosition()
     local mapID = HBD:GetPlayerZone()
-    if not mapID then return end
-    local r = Route.Get(mapID)
+    if not (px and mapID) then return end
+    local zone = ZoneOf(mapID)
+    local r = Route.Get(zone)
+    if #r.loop < 2 and zone ~= mapID then zone, r = mapID, Route.Get(mapID) end
     local loop, n = r.loop, #r.loop
     if n < 2 then return end
-    local w, h = HBD:GetZoneSize(mapID)
-    if not w or w <= 0 then return end
-    local k = 0
+    built = { x = px, y = py, instance = instance }
+
+    local pts = {}
+    for i, node in ipairs(loop) do
+        local wx, wy, inst = HBD:GetWorldCoordinatesFromZone(node.x, node.y, zone)
+        if not wx or inst ~= instance then return end
+        pts[i] = { wx, wy }
+    end
+    local range2, k = MINIMAP_RANGE * MINIMAP_RANGE, 0
+    local list = ns.MinimapProximity.pins
     for i = 1, n do
-        local a, b = loop[i], loop[i % n + 1]
-        local dx, dy = (b.x - a.x) * w, (b.y - a.y) * h
+        local a, b = pts[i], pts[i % n + 1]
+        local dx, dy = b[1] - a[1], b[2] - a[2]
         local steps = math.floor(math.sqrt(dx * dx + dy * dy) / MINIMAP_STEP)
         -- Not on the nodes themselves: their own pins are there.
         for s = 1, steps - 1 do
-            if k >= MAX_DOTS then return end
-            k = k + 1
-            local t = s / steps
-            HBDPins:AddMinimapIconMap(MINIMAP_REF, Dot(k), mapID,
-                a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, false)
+            local x, y = a[1] + dx * s / steps, a[2] + dy * s / steps
+            if (x - px) ^ 2 + (y - py) ^ 2 <= range2 then
+                if k >= MAX_DOTS then return end
+                k = k + 1
+                local dot = Dot(k)
+                dot.farmMapWorldX, dot.farmMapWorldY, dot.farmMapInstance = x, y, instance
+                dot.farmMapRouteDot = true
+                list[#list + 1] = dot
+                ns.MinimapProximity.Apply(dot)
+                HBDPins:AddMinimapIconWorld(MINIMAP_REF, dot, instance, x, y, false)
+            end
         end
     end
 end
+
+-- Once a second: moved far enough, the dots around the player are placed
+-- again. Cheap when standing still (one position read).
+C_Timer.NewTicker(1, function()
+    if not (FarmMapDB and FarmMapDB.routeShown) then return end
+    local px, py, instance = HBD:GetPlayerWorldPosition()
+    if not px then return end
+    if not built or built.instance ~= instance
+       or (px - built.x) ^ 2 + (py - built.y) ^ 2 > REBUILD_MOVE * REBUILD_MOVE then
+        UpdateMinimap()
+    end
+end)
 
 -- ---- guidance --------------------------------------------------------------------
 
@@ -311,10 +372,16 @@ function Route.Refresh()
     UpdateMinimap()
 end
 
+-- Off: the guidance's waypoint goes with the route.
+local function StopGuiding()
+    target = nil
+    ns.ClearRouteWaypoint()
+end
+
 function Route.Toggle()
     FarmMapDB.routeShown = not FarmMapDB.routeShown or nil
     Route.Refresh()
-    if Guiding() then GuideNearest() end
+    if Guiding() then GuideNearest() elseif not FarmMapDB.routeShown then StopGuiding() end
 end
 
 -- Shift-click: the waypoint moves on to the next node of the loop.
@@ -341,7 +408,7 @@ end
 -- The guidance switch (options): turning it on points at the nearest node.
 function Route.SetGuide(on)
     FarmMapDB.routeGuide = on and true or false
-    if Guiding() then GuideNearest() end
+    if Guiding() then GuideNearest() elseif not on then StopGuiding() end
 end
 
 -- A new zone: the minimap shows that zone's route.
