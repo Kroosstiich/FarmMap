@@ -46,6 +46,8 @@ FarmMap.lua
 UI\Theme.lua
 UI\OptionsWindow.lua
 UI\SessionWindow.lua
+# Optimal route (2.2): after FarmMap.lua and Theme.lua, which it reads.
+UI\Route.lua
 # Setup assistant: after OptionsWindow.lua, whose settings it shows.
 UI\Setup.lua
 

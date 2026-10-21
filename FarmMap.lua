@@ -1377,8 +1377,11 @@ Integ.waypoints = {}
 -- With both installed, the player picks (FarmMapDB.waypointAddon, asked
 -- by Kroosstii: WaypointUI showing TomTom's waypoint read as WaypointUI
 -- taking over); TomTom unless told otherwise.
-function Integ.WaypointAddon()
-    if not (FarmMapDB and FarmMapDB.waypointClick ~= false) then return nil end
+-- guided: asked by the route's guidance, which has its own switch
+-- (FarmMapDB.routeGuide) and does not depend on "waypoint on click".
+function Integ.WaypointAddon(guided)
+    if not FarmMapDB then return nil end
+    if not guided and FarmMapDB.waypointClick == false then return nil end
     local hasTomTom = TomTom and TomTom.AddWaypoint and TomTom.RemoveWaypoint
     local nav = WaypointUIAPI and WaypointUIAPI.Navigation
     local hasWUI = nav and nav.NewUserNavigation and nav.ClearUserNavigation
@@ -1418,6 +1421,26 @@ function Integ.ToggleWaypoint(mapID, nodeData)
         title = Integ.NodeName(nodeData), from = "FarmMap",
         persistent = false, crazy = true,
     })
+end
+
+-- The route's guidance (2.2): puts the waypoint on a node, replacing the
+-- one the route set before - one at a time, unlike the clicks on pins,
+-- which toggle their own.
+function Integ.SetWaypoint(mapID, nodeData)
+    local addon = Integ.WaypointAddon(true)
+    if addon == "WaypointUI" then
+        WaypointUIAPI.Navigation.NewUserNavigation({ name = Integ.NodeName(nodeData), mapID = mapID,
+                                                     x = nodeData.x * 100, y = nodeData.y * 100 })
+        Integ.wuiKey = mapID .. ":" .. nodeData.x .. ":" .. nodeData.y
+    elseif addon == "TomTom" then
+        if Integ.routeUid and TomTom.IsValidWaypoint and TomTom:IsValidWaypoint(Integ.routeUid) then
+            TomTom:RemoveWaypoint(Integ.routeUid)
+        end
+        Integ.routeUid = TomTom:AddWaypoint(mapID, nodeData.x, nodeData.y, {
+            title = Integ.NodeName(nodeData), from = "FarmMap",
+            persistent = false, crazy = true,
+        })
+    end
 end
 
 local function CreatePoint(nodeData, isMinimap, mapID)
@@ -1763,6 +1786,8 @@ local function DoRefresh()
     RefreshWorldMapPins()
     -- The filter bar may wear the world map style's icons (an option).
     if FarmMap_ApplyFilterBarIcons and FarmMapDB then FarmMap_ApplyFilterBarIcons() end
+    -- Filters or nodes changed: the route is drawn again (UI\Route.lua).
+    if ns.Route and FarmMapDB then ns.Route.Refresh() end
     if not FarmMapDB then return end
     -- Skips the HBDPins minimap pins only when a native blip is active
     local mmStyle = FarmMapDB.minimapStyle
@@ -2299,6 +2324,8 @@ local function ProcessHarvestLoot()
     RecordNodeStat(mapID, targetNode, lootItemIDs, lootItems, lootQuantities)
     RecordSession(foundType, mapID, nodeName, nodeNameID, lootItemIDs, lootQuantities)
     ShowFloatingLoot(lootItems, lootItemIDs, lootQuantities)
+    -- A new node joins the route; a route node moves the guidance on.
+    if ns.Route then ns.Route.OnHarvest(mapID, targetNode, not isUpdated) end
 end
 
 -- ============================================================
@@ -3108,6 +3135,28 @@ local function CreateFilterButtons()
     btnStats.tex = statsTex
     orderedBtns[#orderedBtns + 1] = btnStats
 
+    -- Route (2.2): a loop through the known nodes of the zone shown, drawn
+    -- by UI\Route.lua. Built like the summary button, last on the strip so
+    -- saved positions stay where they were.
+    local btnRoute = CreateFrame("Button", "FarmMapBtnRoute", bar, "BackdropTemplate")
+    btnRoute:SetSize(32, 32)
+    btnRoute:SetBackdrop({bgFile="Interface\\ChatFrame\\ChatFrameBackground", edgeFile="Interface\\Tooltips\\UI-Tooltip-Border", tile=true, tileSize=16, edgeSize=16, insets={left=2,right=2,top=2,bottom=2}})
+    btnRoute:SetBackdropColor(0, 0, 0, 0.8)
+    local routeTex = btnRoute:CreateTexture(nil, "ARTWORK")
+    routeTex:SetPoint("TOPLEFT",     btnRoute, "TOPLEFT",      4, -4)
+    routeTex:SetPoint("BOTTOMRIGHT", btnRoute, "BOTTOMRIGHT", -4,  4)
+    routeTex:SetTexture("Interface\\ICONS\\INV_Misc_Map_01")
+    btnRoute.tex = routeTex
+    orderedBtns[#orderedBtns + 1] = btnRoute
+    -- Gold border and full colour while the route is shown, grey otherwise.
+    local function UpdateRouteButton()
+        local on = FarmMapDB and FarmMapDB.routeShown
+        if on then btnRoute:SetBackdropBorderColor(1, 0.82, 0, 1) else btnRoute:SetBackdropBorderColor(0.3, 0.3, 0.3, 1) end
+        routeTex:SetDesaturated(not on)
+        routeTex:SetAlpha(on and 1 or 0.6)
+    end
+    UpdateRouteButton()
+
     LayoutBar()
 
     local allBtns = {
@@ -3240,6 +3289,56 @@ local function CreateFilterButtons()
         bar:StartMoving()
     end)
     btnStats:SetScript("OnDragStop", function()
+        if not bar.moving then return end
+        bar.moving = nil
+        bar:StopMovingOrSizing()
+        SaveBarPosition()
+    end)
+
+    btnRoute:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:ClearLines()
+        GameTooltip:AddLine("FarmMap - " .. L.ROUTE_TITLE, 1, 0.82, 0)
+        GameTooltip:AddLine(FarmMapDB.routeShown and L.TOGGLE_ON or L.TOGGLE_OFF, 1, 1, 1)
+        -- What the route of the map shown holds.
+        if ns.Route then
+            for _, line in ipairs(ns.Route.Describe(WorldMapFrame:GetMapID())) do
+                GameTooltip:AddLine(line, 1, 1, 1, true)
+            end
+        end
+        GameTooltip:AddLine(L.ROUTE_HINT, 0.7, 0.7, 0.7, true)
+        GameTooltip:AddLine(L.ROUTE_SKIP_HINT, 0.7, 0.7, 0.7, true)
+        GameTooltip:AddLine(L.FILTERBAR_DRAG_HINT, 0.7, 0.7, 0.7)
+        GameTooltip:AddLine(L.FILTERBAR_FLIP_HINT, 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    btnRoute:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    btnRoute:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    btnRoute:SetScript("OnClick", function(self, button)
+        if button == "RightButton" then
+            if IsShiftKeyDown() then
+                FarmMapDB.filterBarHorizontal = not FarmMapDB.filterBarHorizontal
+                LayoutBar()
+            end
+            return
+        end
+        if not ns.Route then return end
+        -- Shift: the guidance skips to the next node (one taken by someone else).
+        if IsShiftKeyDown() then
+            ns.Route.Skip()
+        else
+            ns.Route.Toggle()
+            UpdateRouteButton()
+        end
+        if GameTooltip:GetOwner() == self then self:GetScript("OnEnter")(self) end
+    end)
+    btnRoute:RegisterForDrag("LeftButton")
+    btnRoute:SetScript("OnDragStart", function()
+        if not IsShiftKeyDown() then return end
+        bar.moving = true
+        bar:StartMoving()
+    end)
+    btnRoute:SetScript("OnDragStop", function()
         if not bar.moving then return end
         bar.moving = nil
         bar:StopMovingOrSizing()
@@ -3432,6 +3531,9 @@ local function ClearNodeDatabase()
         -- The setup assistant's screens already answered.
         setupSeen         = FarmMapDB.setupSeen,
         setupDisabled     = FarmMapDB.setupDisabled,
+        -- The route (2.2): shown or not, and its guidance.
+        routeShown        = FarmMapDB.routeShown,
+        routeGuide        = FarmMapDB.routeGuide,
     }
     ns.MinimapProximity.Clear()
     ClearWorldMapPins()
@@ -3450,6 +3552,15 @@ ns.UpdateMinimapPinProximity = function() ns.MinimapProximity.Update() end
 ns.IsAuctionatorLoaded = function() return IsAuctionatorLoaded() and true or false end
 ns.IsTSMLoaded = Integ.IsTSMLoaded
 ns.IsTomTomLoaded = function() return (TomTom and TomTom.AddWaypoint) and true or false end
+-- For the route (UI\Route.lua): which nodes the filters show, how often a
+-- node was harvested, and the guidance's waypoint.
+ns.ShouldShowNode = ShouldShowNode
+ns.NodeHarvests = function(mapID, node)
+    local zone = FarmMapStatsDB and FarmMapStatsDB.byNode and FarmMapStatsDB.byNode[mapID]
+    local entry = zone and zone[NodeStatKey(node)]
+    return entry and entry.n or 0
+end
+ns.SetWaypoint = function(mapID, node) Integ.SetWaypoint(mapID, node) end
 ns.IsWaypointUILoaded = function()
     return (WaypointUIAPI and WaypointUIAPI.Navigation and WaypointUIAPI.Navigation.NewUserNavigation) and true or false
 end

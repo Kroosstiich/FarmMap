@@ -1699,6 +1699,15 @@ ItemsPage({
                   SyncLegacyCheck("FarmMapShowMinimapButtonCheck", on)
               end },
 
+            -- The route (2.2) is shown with its button on the filter bar;
+            -- its guidance needs TomTom or WaypointUI.
+            { type = "section", key = "route", text = L("UI_SEC_ROUTE") },
+            { type = "switch", key = "routeGuide",
+              name = L("UI_ROUTE_GUIDE"), desc = L("UI_ROUTE_GUIDE_DESC"),
+              disabled = function() return not (ns.IsTomTomLoaded() or ns.IsWaypointUILoaded()) end,
+              get = function() return FarmMapDB.routeGuide == true end,
+              set = function(on) if ns.Route then ns.Route.SetGuide(on) end end },
+
             { type = "section", key = "packs", text = L("UI_SEC_PACKS") },
             { type = "hint", key = "packsHint", text = L("UI_PACKS_DESC") },
             PackItem("packOld", PACK_LINKS[1]),
