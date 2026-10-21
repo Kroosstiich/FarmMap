@@ -45,7 +45,8 @@ local function Signature(mapID)
     local list = FarmMapDB[mapID]
     return table.concat({ type(list) == "table" and #list or 0,
         tostring(FarmMapDB.showHerbo), tostring(FarmMapDB.showMinage),
-        tostring(FarmMapDB.showPeche), tostring(FarmMapDB.showBois) }, ":")
+        tostring(FarmMapDB.showPeche), tostring(FarmMapDB.showBois),
+        tostring(FarmMapDB.routeReverse) }, ":")
 end
 
 local function Build(mapID)
@@ -124,6 +125,25 @@ local function Build(mapID)
         loop[i] = nodes[idx]
         length = length + d[idx][order[i % n + 1]]
     end
+
+    -- A fixed direction, clockwise unless reversed (right-click on the
+    -- Route button): a rebuilt loop (a new node) used to come out the other
+    -- way round and the guidance sent the player back (Kroosstii,
+    -- 2026-10-22). Signed area with y growing downwards: positive =
+    -- clockwise on screen.
+    local area = 0
+    for i = 1, n do
+        local a, b = loop[i], loop[i % n + 1]
+        area = area + (a.x * w) * (b.y * h) - (b.x * w) * (a.y * h)
+    end
+    local clockwise = not FarmMapDB.routeReverse
+    if (area > 0) ~= clockwise then
+        -- Same start, the other way round.
+        for i = 2, math.floor(n / 2) + 1 do
+            local j = n + 2 - i
+            if i < j then loop[i], loop[j] = loop[j], loop[i] end
+        end
+    end
     return { loop = loop, total = total, length = length }
 end
 
@@ -145,8 +165,9 @@ function Route.Describe(mapID)
     local r = Route.Get(mapID)
     if #r.loop < 2 then return { L("ROUTE_NONE") } end
     local lines = { L("ROUTE_INFO"):format(ns.Intl.Number(#r.loop),
-                    L("UNIT_YARDS"):format(math.floor(r.length / 10 + 0.5) * 10)) }
-    if r.total > #r.loop then lines[2] = L("ROUTE_CAPPED"):format(#r.loop) end
+                    L("UNIT_YARDS"):format(math.floor(r.length / 10 + 0.5) * 10)),
+                    L(FarmMapDB.routeReverse and "ROUTE_DIR_CCW" or "ROUTE_DIR_CW") }
+    if r.total > #r.loop then lines[#lines + 1] = L("ROUTE_CAPPED"):format(#r.loop) end
     return lines
 end
 
@@ -366,8 +387,10 @@ end
 -- Within ARRIVAL yards of the node the waypoint points at (flying over it
 -- included), the waypoint moves on: an empty node or one already taken
 -- no longer holds the guidance (Kroosstii, 2026-10-22). Harvesting it
--- next sends it to the same next node, so nothing is skipped.
-local ARRIVAL = 10
+-- next sends it to the same next node, so nothing is skipped. Height
+-- never counts; 30 yards, as landing on the slope above a node left the
+-- player more than 10 yards away from it.
+local ARRIVAL = 30
 C_Timer.NewTicker(0.5, function()
     if not (target and Guiding()) then return end
     local px, py, instance = HBD:GetPlayerWorldPosition()
@@ -410,6 +433,14 @@ function Route.Toggle()
 end
 
 function Route.IsGuiding() return Guiding() and true or false end
+
+-- Clockwise or anticlockwise (right-click on the Route button). The
+-- guidance keeps its node; the next one follows the new direction.
+function Route.Reverse()
+    FarmMapDB.routeReverse = not FarmMapDB.routeReverse or nil
+    Route.Refresh()
+    Changed()
+end
 
 -- The guidance turned on or off in one click (a pin's right-click menu,
 -- the session window): on, the route is shown too, and the waypoint goes

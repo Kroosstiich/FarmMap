@@ -1452,7 +1452,8 @@ end
 -- A WaypointUI waypoint set by a click on a pin goes once the player is
 -- within ARRIVAL yards of it, flying over it included (Kroosstii,
 -- 2026-10-22: it stayed after passing it). Only while it is still ours.
-Integ.ARRIVAL = 10
+-- Height never counts; 30 yards like the route's guidance.
+Integ.ARRIVAL = 30
 function Integ.CheckArrival()
     local w = Integ.wuiClick
     if not w then return end
@@ -3380,6 +3381,7 @@ local function CreateFilterButtons()
             end
         end
         GameTooltip:AddLine(L.ROUTE_HINT, 0.7, 0.7, 0.7, true)
+        GameTooltip:AddLine(L.ROUTE_DIR_HINT, 0.7, 0.7, 0.7, true)
         GameTooltip:AddLine(L.ROUTE_SKIP_HINT, 0.7, 0.7, 0.7, true)
         GameTooltip:AddLine(L.FILTERBAR_DRAG_HINT, 0.7, 0.7, 0.7)
         GameTooltip:AddLine(L.FILTERBAR_FLIP_HINT, 0.7, 0.7, 0.7)
@@ -3392,6 +3394,10 @@ local function CreateFilterButtons()
             if IsShiftKeyDown() then
                 FarmMapDB.filterBarHorizontal = not FarmMapDB.filterBarHorizontal
                 LayoutBar()
+            elseif ns.Route then
+                -- Right-click alone: the route the other way round.
+                ns.Route.Reverse()
+                if GameTooltip:GetOwner() == self then self:GetScript("OnEnter")(self) end
             end
             return
         end
@@ -3609,6 +3615,7 @@ local function ClearNodeDatabase()
         -- The route (2.2): shown or not, and its guidance.
         routeShown        = FarmMapDB.routeShown,
         routeGuide        = FarmMapDB.routeGuide,
+        routeReverse      = FarmMapDB.routeReverse,
     }
     ns.MinimapProximity.Clear()
     ClearWorldMapPins()
