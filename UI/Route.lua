@@ -363,6 +363,23 @@ local function GuideNearest()
     if node then GuideTo(mapID, node) end
 end
 
+-- Within ARRIVAL yards of the node the waypoint points at (flying over it
+-- included), the waypoint moves on: an empty node or one already taken
+-- no longer holds the guidance (Kroosstii, 2026-10-22). Harvesting it
+-- next sends it to the same next node, so nothing is skipped.
+local ARRIVAL = 10
+C_Timer.NewTicker(0.5, function()
+    if not (target and Guiding()) then return end
+    local px, py, instance = HBD:GetPlayerWorldPosition()
+    local wx, wy, winst = HBD:GetWorldCoordinatesFromZone(target.node.x, target.node.y, target.mapID)
+    if not (px and wx) or instance ~= winst then return end
+    local d = HBD:GetWorldDistance(instance, px, py, wx, wy)
+    if not (d and d <= ARRIVAL) then return end
+    local loop = Route.Get(target.mapID).loop
+    local i = IndexOf(loop, target.node)
+    if i and #loop > 1 then GuideTo(target.mapID, loop[i % #loop + 1]) end
+end)
+
 -- ---- public ----------------------------------------------------------------------
 
 -- Drawn again now; a loop is rebuilt only if its zone's nodes or the

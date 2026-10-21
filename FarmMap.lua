@@ -1400,13 +1400,16 @@ function Integ.ToggleWaypoint(mapID, nodeData)
         local current = nav.GetUserNavigation and nav.GetUserNavigation()
         if Integ.wuiKey == key and current and current.name == Integ.NodeName(nodeData) then
             nav.ClearUserNavigation()
-            Integ.wuiKey = nil
+            Integ.wuiKey, Integ.wuiClick = nil, nil
             return
         end
         -- WaypointUI takes coordinates in percent, FarmMap stores 0-1.
         nav.NewUserNavigation({ name = Integ.NodeName(nodeData), mapID = mapID,
                                 x = nodeData.x * 100, y = nodeData.y * 100 })
         Integ.wuiKey = key
+        -- Cleared on arrival by FarmMap (Integ.CheckArrival): WaypointUI
+        -- never clears another addon's waypoint by itself, TomTom does.
+        Integ.wuiClick = { mapID = mapID, x = nodeData.x, y = nodeData.y, name = Integ.NodeName(nodeData) }
         return
     end
     local uid = Integ.waypoints[key]
@@ -1429,6 +1432,8 @@ end
 function Integ.SetWaypoint(mapID, nodeData)
     local addon = Integ.WaypointAddon(true)
     if addon == "WaypointUI" then
+        -- The route's waypoint replaces a click's one: WaypointUI has one.
+        Integ.wuiClick = nil
         Integ.routeWui = Integ.NodeName(nodeData)
         WaypointUIAPI.Navigation.NewUserNavigation({ name = Integ.routeWui, mapID = mapID,
                                                      x = nodeData.x * 100, y = nodeData.y * 100 })
@@ -1443,6 +1448,29 @@ function Integ.SetWaypoint(mapID, nodeData)
         })
     end
 end
+
+-- A WaypointUI waypoint set by a click on a pin goes once the player is
+-- within ARRIVAL yards of it, flying over it included (Kroosstii,
+-- 2026-10-22: it stayed after passing it). Only while it is still ours.
+Integ.ARRIVAL = 10
+function Integ.CheckArrival()
+    local w = Integ.wuiClick
+    if not w then return end
+    local nav = WaypointUIAPI and WaypointUIAPI.Navigation
+    local current = nav and nav.GetUserNavigation and nav.GetUserNavigation()
+    if not (current and current.name == w.name) then Integ.wuiClick = nil return end
+    local px, py, instance = HBD:GetPlayerWorldPosition()
+    local wx, wy, winst = HBD:GetWorldCoordinatesFromZone(w.x, w.y, w.mapID)
+    if not (px and wx) or instance ~= winst then return end
+    local d = HBD:GetWorldDistance(instance, px, py, wx, wy)
+    if d and d <= Integ.ARRIVAL then
+        nav.ClearUserNavigation()
+        Integ.wuiKey, Integ.wuiClick = nil, nil
+    end
+end
+Integ.arrivalTicker = C_Timer.NewTicker(0.5, function()
+    if Integ.wuiClick then Integ.CheckArrival() end
+end)
 
 -- The route or its guidance switched off: the waypoint it set goes too
 -- (WaypointUI kept it, and only the world map could clear it - Kroosstii,
