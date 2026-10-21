@@ -1275,6 +1275,11 @@ function OptionsWindow.LayoutItems(frame, items, width, wheel)
     -- letter typed. Only the rows left unused are hidden, at the end.
     local used = {}
     local y = 0
+    -- Rows start on whole screen pixels (the page itself is snapped by
+    -- Theme.ScrollFrame): at the window's scale, whole UI units are not
+    -- whole pixels, and 1 px edges came out thinner on one side.
+    local px = Theme.PixelSize(frame)
+    local function Snap(v) return math.floor(v / px + 0.5) * px end
     for _, item in ipairs(items) do
         if item.visible ~= false then
             used[item.key] = true
@@ -1301,7 +1306,7 @@ function OptionsWindow.LayoutItems(frame, items, width, wheel)
                 -- clipping edge would lose that side of its outline.
                 local x = item.inset and 1 or 0
                 row:ClearAllPoints()
-                row:SetPoint("TOPLEFT", x, -y)
+                row:SetPoint("TOPLEFT", Snap(x), -Snap(y))
                 row:SetWidth(width - x * 2)
                 if item.type == "section" then
                     row:SetContent(item.text)
@@ -1860,12 +1865,13 @@ ItemsPage({
               end,
               get = function() return FarmMapDB.routeReverse and "ccw" or "cw" end,
               set = function(v) if ns.Route then ns.Route.SetReverse(v == "ccw") end end },
-            -- 5 to 60 minutes; the last step (65) means no limit.
+            -- 5 to 60 minutes, to the minute (typed or dragged); the last
+            -- step (61) means no limit.
             { type = "slider", key = "routeMaxMinutes",
               name = L("UI_ROUTE_MAXTIME"), desc = L("UI_ROUTE_MAXTIME_DESC"),
-              min = 5, max = 65, step = 5,
-              format = function(v) return v >= 65 and L("ROUTE_NO_LIMIT") or L("UI_DUR_MIN"):format(v) end,
-              get = function() return FarmMapDB.routeMaxMinutes or 65 end,
+              min = 5, max = 61, step = 1,
+              format = function(v) return v >= 61 and L("ROUTE_NO_LIMIT") or L("UI_DUR_MIN"):format(v) end,
+              get = function() return math.min(FarmMapDB.routeMaxMinutes or 61, 61) end,
               set = function(v)
                   FarmMapDB.routeMaxMinutes = v
                   if ns.Route then ns.Route.RefreshSoon() end

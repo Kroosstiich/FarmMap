@@ -60,7 +60,7 @@ end
 local BASE_SPEED   = 14     -- yards per second, a ground mount (100% bonus)
 local HARVEST_TIME = 3      -- seconds per node: cast and loot
 local MIN_SAMPLES  = 20     -- half-second samples before trusting the measure
-local NO_LIMIT     = 65     -- the time slider's last step: no limit
+local NO_LIMIT     = 61     -- the time slider's last step: no limit (65 before, read the same)
 
 local function Speed()
     local s = FarmMapDB.routeSpeed
@@ -513,13 +513,33 @@ local function GuideNearest()
     if node then GuideTo(mapID, node) end
 end
 
+-- The route changed under the guidance (direction, another route): the
+-- waypoint goes at once to the nearest node, or past it when the player
+-- stands on it - in the route's new order. It waited for the next
+-- arrival before (Kroosstii, 2026-10-22).
+local ARRIVAL = 30
+local function GuideAhead()
+    local mapID, node = Nearest()
+    if not node then return end
+    local px, py, instance = HBD:GetPlayerWorldPosition()
+    local wx, wy, winst = HBD:GetWorldCoordinatesFromZone(node.x, node.y, mapID)
+    if px and wx and instance == winst then
+        local d = HBD:GetWorldDistance(instance, px, py, wx, wy)
+        if d and d <= ARRIVAL then
+            local loop = Route.Get(mapID).loop
+            local i = IndexOf(loop, node)
+            if i and #loop > 1 then node = loop[i % #loop + 1] end
+        end
+    end
+    GuideTo(mapID, node)
+end
+
 -- Within ARRIVAL yards of the node the waypoint points at (flying over it
 -- included), the waypoint moves on: an empty node or one already taken
 -- no longer holds the guidance (Kroosstii, 2026-10-22). Harvesting it
 -- next sends it to the same next node, so nothing is skipped. Height
--- never counts; 30 yards, as landing on the slope above a node left the
--- player more than 10 yards away from it.
-local ARRIVAL = 30
+-- never counts; 30 yards (ARRIVAL, above), as landing on the slope above
+-- a node left the player more than 10 yards away from it.
 C_Timer.NewTicker(0.5, function()
     -- The lap time learns the player's speed while the route is shown.
     if FarmMapDB and FarmMapDB.routeShown then SampleSpeed(0.5) else lastPos = nil end
@@ -570,6 +590,7 @@ function Route.IsGuiding() return Guiding() and true or false end
 function Route.SetReverse(on)
     FarmMapDB.routeReverse = on and true or nil
     Route.Refresh()
+    if Guiding() then GuideAhead() end
     Changed()
 end
 
@@ -621,7 +642,7 @@ function Route.NewRoute()
     end
     if not fresh then offered[mapID] = nil end   -- all seen: a new cycle
     Route.Refresh()
-    if Guiding() then GuideNearest() end
+    if Guiding() then GuideAhead() end
     Changed()
 end
 

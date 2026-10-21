@@ -622,6 +622,12 @@ function Theme.Band(frame, colorName, side)
     return rounded, square
 end
 
+-- The size of one screen pixel in a frame's own units (its effective
+-- scale), as Blizzard's PixelUtil counts it.
+function Theme.PixelSize(frame)
+    return PixelUtil.GetPixelToUIUnitFactor() / frame:GetEffectiveScale()
+end
+
 -- Puts a window's edges on whole screen pixels. At most UI scales a
 -- centred window lands between pixels, and every edge of the bands inside
 -- it rounds its own way: the margins around the title bar and the footer
@@ -1224,12 +1230,14 @@ function Theme.SliderRow(parent)
     local row = CreateFrame("Frame", nil, parent)
     RowText(row)
 
+    -- Wide enough for a word, not only a number: "No limit" was cut to
+    -- "No limi" and pushed against the edge (route's longest lap, 2.2).
     local value = CreateFrame("EditBox", nil, row)
-    value:SetSize(70, 28)
+    value:SetSize(96, 28)
     value:SetPoint("TOPRIGHT", -1, -7)
     value:SetAutoFocus(false)
     value:SetJustifyH("RIGHT")
-    value:SetMaxLetters(7)
+    value:SetMaxLetters(14)
     value:SetTextInsets(4, 7, 0, 0)
     Theme.Font(value, 13, "dim")
     Theme.Plate(value, "bg", "line", true)
@@ -1265,7 +1273,7 @@ function Theme.SliderRow(parent)
     end
 
     function row:SetContent(name, desc, width)
-        local y = RowMeasure(self, name, desc, width - 84) + 12
+        local y = RowMeasure(self, name, desc, width - 110) + 12
         slider:ClearAllPoints()
         slider:SetPoint("TOPLEFT", 2, -y)
         slider:SetPoint("TOPRIGHT", -2, -y)
@@ -1302,7 +1310,9 @@ function Theme.SliderRow(parent)
     -- Typed values are clamped, snapped to the step, applied, then rewritten
     -- from the setting: the box never shows a value the addon is not using.
     local function Commit(self)
-        local v = tonumber(((self:GetText() or ""):gsub(",", ".")))
+        -- The first number in the box: "23", "23 min" and "23,5" all read.
+        local typed = (self:GetText() or ""):match("%-?%d+[.,]?%d*") or ""
+        local v = tonumber((typed:gsub(",", ".")))
         if v and row.set and row.minValue then
             v = math.max(row.minValue, math.min(row.maxValue, v))
             v = math.floor((v - row.minValue) / row.step + 0.5) * row.step + row.minValue
@@ -1361,11 +1371,33 @@ function Theme.ScrollFrame(parent)
         thumb:SetPoint("TOP", rail, "TOP", 0, -math.floor(offset * (viewport - height)))
     end
 
+    -- Puts the page's top on a whole screen pixel. A scroll offset (or the
+    -- page's own anchor, at the window's scale) between two pixels drew the
+    -- 1 px edges of switches and buttons thinner on one side, top or bottom
+    -- depending on the row (seen again in 2.2, Kroosstii, 2026-10-22).
+    local snapping
+    local function SnapScroll()
+        if snapping then return end
+        local top = scroll:GetTop()
+        if not top then return end
+        local px = Theme.PixelSize(content)
+        local v = scroll:GetVerticalScroll()
+        local pageTop = top + v
+        local nv = v + (math.floor(pageTop / px + 0.5) * px - pageTop)
+        if nv < 0 then nv = nv + px end
+        if math.abs(nv - v) > 0.0001 then
+            snapping = true
+            scroll:SetVerticalScroll(nv)
+            snapping = false
+        end
+    end
+
     -- The wheel must work over every control drawn on top of the page.
     local function Wheel(_, delta)
         local overflow = math.max(0, (content:GetHeight() or 0) - (scroll:GetHeight() or 0))
         scroll:SetVerticalScroll(math.max(0, math.min(overflow,
             scroll:GetVerticalScroll() - delta * 40)))
+        SnapScroll()
     end
     scroll:EnableMouseWheel(true)
     scroll:SetScript("OnMouseWheel", Wheel)
@@ -1376,6 +1408,11 @@ function Theme.ScrollFrame(parent)
     scroll:HookScript("OnVerticalScroll", Layout)
     scroll:HookScript("OnSizeChanged", Layout)
     content:HookScript("OnSizeChanged", Layout)
+    -- Once the page is placed: shown, resized, or a new page laid out.
+    scroll:HookScript("OnShow", function() C_Timer.After(0, SnapScroll) end)
+    scroll:HookScript("OnSizeChanged", function() C_Timer.After(0, SnapScroll) end)
+    content:HookScript("OnSizeChanged", function() C_Timer.After(0, SnapScroll) end)
+    scroll.SnapScroll = SnapScroll
     return scroll, content
 end
 
