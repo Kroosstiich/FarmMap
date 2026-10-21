@@ -46,6 +46,11 @@ Anniversary, where not every feature has been tested yet.
 - **Integrations**: TradeSkillMaster as a second price source, and a click on a
   node sets a waypoint with [TomTom](https://www.curseforge.com/wow/addons/tomtom)
   or WaypointUI
+- **Route**: a button on the filter bar draws a loop through the nodes you know
+  in the zone, on the world map and the minimap, with its direction, a longest
+  lap and an estimated lap time; with TomTom or WaypointUI, the waypoint moves
+  to the next node after each harvest or as you reach it
+- A setup assistant that explains each main setting, with an animated example
 - A "What's new" window once per version
 - Harvest statistics per resource type
 - Minimap button — left click for the options, right click for the debug window
