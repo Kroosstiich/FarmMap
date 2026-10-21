@@ -62,8 +62,11 @@ local STEPS = {
     { id = "waypoint", text = "WAYPOINT", page = "integ", key = "waypointClick", extra = { "waypointAddon" },
       demo = "waypoint",
       when = function() return ns.IsTomTomLoaded() or ns.IsWaypointUILoaded() end },
-    -- 2.2: shown on its own to the players who went through in 2.1.
-    { id = "routeGuide", text = "ROUTE_GUIDE", page = "integ", key = "routeGuide",
+    -- 2.2: shown on their own to the players who went through in 2.1.
+    -- The route itself, for everyone: where its controls are.
+    { id = "route", text = "ROUTE", demo = "route",
+      item = function() return { type = "hint", key = "setupRouteHowTo", text = L("SETUP_ROUTE_HOWTO") } end },
+    { id = "routeGuide", text = "ROUTE_GUIDE", page = "integ", key = "routeGuide", demo = "routeGuide",
       when = function() return ns.IsTomTomLoaded() or ns.IsWaypointUILoaded() end },
     { id = "theme", text = "THEME", item = ThemeItem },
 }
@@ -104,6 +107,20 @@ local DISC_TEX = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"   -- a white
 local ARROW_TEX = "Interface\\Minimap\\MinimapArrow"
 local DEMO_PINS = { { -35, 28 }, { 18, 38 }, { 42, -4 }, { -12, -32 }, { 30, -36 },
                     { -46, -10 }, { -20, 6 }, { 14, -8 } }
+
+-- The route screens' loop: the pins taken clockwise around the disc's
+-- centre (y grows upwards here, so clockwise = falling angle).
+local ROUTE_ORDER = {}
+for i in ipairs(DEMO_PINS) do ROUTE_ORDER[i] = i end
+table.sort(ROUTE_ORDER, function(a, b)
+    return math.atan2(DEMO_PINS[a][2], DEMO_PINS[a][1]) > math.atan2(DEMO_PINS[b][2], DEMO_PINS[b][1])
+end)
+local ROUTE_SEGMENTS, ROUTE_LENGTH = {}, 0
+for i = 1, #ROUTE_ORDER do
+    local a, b = DEMO_PINS[ROUTE_ORDER[i]], DEMO_PINS[ROUTE_ORDER[i % #ROUTE_ORDER + 1]]
+    ROUTE_SEGMENTS[i] = math.sqrt((b[1] - a[1]) ^ 2 + (b[2] - a[2]) ^ 2)
+    ROUTE_LENGTH = ROUTE_LENGTH + ROUTE_SEGMENTS[i]
+end
 local YD_TO_PX = 0.25   -- 50 yd = 12 px: the whole disc is about 260 yd across
 
 local function Disc(parent, size, color, alpha, layer)
@@ -138,6 +155,18 @@ local function BuildDemo(parent)
     d.arrow = d.map:CreateTexture(nil, "OVERLAY", nil, 7)
     d.arrow:SetTexture(ARROW_TEX)
     d.arrow:SetSize(18, 18)
+    -- The route screens: the pins joined in a loop, drawn once.
+    d.routeLines = {}
+    for i = 1, #ROUTE_ORDER do
+        local a = DEMO_PINS[ROUTE_ORDER[i]]
+        local b = DEMO_PINS[ROUTE_ORDER[i % #ROUTE_ORDER + 1]]
+        local line = d.map:CreateLine(nil, "ARTWORK")
+        line:SetThickness(2)
+        line:SetStartPoint("CENTER", d.map, a[1], a[2])
+        line:SetEndPoint("CENTER", d.map, b[1], b[2])
+        Theme.Track(line, function(self) self:SetColorTexture(Theme.RGBA("accent", 0.8)) end)
+        d.routeLines[i] = line
+    end
     d.button = d.map:CreateTexture(nil, "OVERLAY")
     d.button:SetTexture("Interface\\AddOns\\FarmMap\\Textures\\icon")
     d.button:SetSize(26, 26)
@@ -171,7 +200,23 @@ local function BuildDemo(parent)
             return
         end
 
-        if kind == "nearby" then
+        -- The route: the arrow rides the loop in 10 s; with the guidance
+        -- on, the node ahead is ringed and joined to the arrow.
+        local routeKind = kind == "route" or kind == "routeGuide"
+        local ahead
+        for _, line in ipairs(self.routeLines) do line:SetShown(routeKind) end
+        if routeKind then
+            local n = #ROUTE_ORDER
+            local rest, i = (t % 10) / 10 * ROUTE_LENGTH, 1
+            while rest > ROUTE_SEGMENTS[i] and i < n do
+                rest, i = rest - ROUTE_SEGMENTS[i], i + 1
+            end
+            local a, b = DEMO_PINS[ROUTE_ORDER[i]], DEMO_PINS[ROUTE_ORDER[i % n + 1]]
+            local f = math.min(1, rest / ROUTE_SEGMENTS[i])
+            arrowX, arrowY = a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f
+            self.arrow:SetRotation(math.atan2(b[2] - a[2], b[1] - a[1]) - math.pi / 2)
+            ahead = ROUTE_ORDER[i % n + 1]
+        elseif kind == "nearby" then
             -- Back and forth across the disc in 8 s, facing where it goes.
             local p = (t % 8) / 8
             arrowX = (p < 0.5 and (p * 4 - 1) or (3 - p * 4)) * 44
@@ -220,6 +265,15 @@ local function BuildDemo(parent)
         if guided then
             self.line:SetStartPoint("CENTER", self.map, arrowX, arrowY)
             self.line:SetEndPoint("CENTER", self.map, DEMO_PINS[2][1], DEMO_PINS[2][2])
+        end
+        if kind == "routeGuide" and on and ahead then
+            self.ring:SetSize(22, 22)
+            self.ring:ClearAllPoints()
+            self.ring:SetPoint("CENTER", self.pins[ahead], "CENTER")
+            self.ring:Show()
+            self.line:SetStartPoint("CENTER", self.map, arrowX, arrowY)
+            self.line:SetEndPoint("CENTER", self.map, DEMO_PINS[ahead][1], DEMO_PINS[ahead][2])
+            self.line:Show()
         end
     end
 
