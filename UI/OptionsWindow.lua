@@ -948,16 +948,20 @@ OptionsWindow:AddPage({
             local rowsTop = by + 4 + math.floor(ed.gradTitle:GetStringHeight() + 0.5) + 4
                 + math.floor(ed.gradDesc:GetStringHeight() + 0.5) + 10
             -- GRADIENT_KEYS are the first three TOKENS (bg, panel, panel2):
-            -- each row is named like that colour.
+            -- each row is named like that colour. The three rows share the
+            -- whole width: in the colours' columns, a tick, the hex and the
+            -- swatch left "Window background" cut short (seen in game).
+            local gradCols = math.min(#ed.gradients, tokenCols)
+            local gradW = math.floor((width - 28) / gradCols)
             for i, row in ipairs(ed.gradients) do
-                local col, line = (i - 1) % tokenCols, math.floor((i - 1) / tokenCols)
+                local col, line = (i - 1) % gradCols, math.floor((i - 1) / gradCols)
                 row.label:SetText(L(TOKENS[i][2]))
-                row:SetWidth(colW - 8)
+                row:SetWidth(gradW - 8)
                 row:ClearAllPoints()
-                row:SetPoint("TOPLEFT", 11 + col * colW, -(rowsTop + line * TOKEN_H))
+                row:SetPoint("TOPLEFT", 11 + col * gradW, -(rowsTop + line * TOKEN_H))
                 row:Fill()
             end
-            by = rowsTop + math.ceil(#ed.gradients / tokenCols) * TOKEN_H + 8
+            by = rowsTop + math.ceil(#ed.gradients / gradCols) * TOKEN_H + 8
         end
         ed.copy:ClearAllPoints()
         ed.copy:SetPoint("TOPLEFT", 14, -by)
