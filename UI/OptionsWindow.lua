@@ -774,7 +774,8 @@ local function GradientRow(parent)
         local bottom = Theme.g[self.key]
         self.on = bottom ~= nil
         self.check.tick:SetShown(self.on)
-        Theme.PaintPlate(self.check, nil, self.on and "accent" or "line")
+        -- Off: the secondary text colour, as "line" vanished on dark themes.
+        Theme.PaintPlate(self.check, nil, self.on and "accent" or "dim")
         self.swatch:SetShown(self.on)
         self.hex:SetText(self.on and ("#" .. Hex(bottom)) or L("UI_THEME_GRADIENT_OFF"))
         if self.on then self.swatch.fill:SetVertexColor(bottom[1], bottom[2], bottom[3]) end
