@@ -2243,6 +2243,9 @@ local function CaptureLootData()
     local posFishing = GetFishingPosition(mapID)
 
     local lootItems, lootItemIDs, lootQuantities, lootQualities = {}, {}, {}, {}
+    -- The game's expansion of each item, in slot order: ProcessHarvestLoot may
+    -- name the node after another item than the first one.
+    local lootExpIDs = {}
     local nodeName, nodeNameID, extensionName = L.UNKNOWN, 0, L.UNKNOWN_EXP
     local nodeExpID
     -- Debug lines held back until the loot proves to be a harvest: any
@@ -2274,6 +2277,7 @@ local function CaptureLootData()
                 table.insert(lootItemIDs,    itemID)
                 table.insert(lootQuantities, quantity)
                 table.insert(lootQualities,  quality or 1)
+                lootExpIDs[#lootItems] = tonumber(expID)
                 debugSlots[#debugSlots + 1] = name .. " x" .. quantity
             end
         end
@@ -2287,6 +2291,7 @@ local function CaptureLootData()
         itemIDs       = lootItemIDs,
         quantities    = lootQuantities,
         qualities     = lootQualities,
+        expIDs        = lootExpIDs,
         nodeName      = nodeName,
         nodeNameID    = nodeNameID,
         extensionName = extensionName,
@@ -2323,6 +2328,37 @@ local function ProcessHarvestLoot()
     if pos ~= data.pos then
         AddDebug("FISH_OFFSET", string.format("%.4f,%.4f → %.4f,%.4f", data.pos.x, data.pos.y, pos.x, pos.y))
     end
+
+    -- Herbs and ores come first, the bonus items after them in their slot
+    -- order: the game may list Crystallized Water or Primal Spirit first, and
+    -- the node was named after it (Kroosstii, 2026-10-29). Trade Goods (7):
+    -- subclass Herb 9, Metal & Stone 7. No match = slot order kept.
+    local wanted = ({ Herbo = 9, Minage = 7 })[(foundType:gsub("R$", ""))]
+    if wanted and #data.itemIDs > 1 then
+        local order = {}
+        for pass = 1, 2 do
+            for i, id in ipairs(data.itemIDs) do
+                local _, _, _, _, _, classID, subClassID = C_Item.GetItemInfoInstant(id)
+                if (classID == 7 and subClassID == wanted) == (pass == 1) then
+                    order[#order + 1] = i
+                end
+            end
+        end
+        if order[1] ~= 1 then
+            local function Reorder(t)
+                local out = {}
+                for k, i in ipairs(order) do out[k] = t[i] end
+                return out
+            end
+            data.items, data.itemIDs = Reorder(data.items), Reorder(data.itemIDs)
+            data.quantities, data.qualities = Reorder(data.quantities), Reorder(data.qualities)
+            local gameExpID = Reorder(data.expIDs)[1]
+            data.nodeName, data.nodeNameID = data.items[1], data.itemIDs[1]
+            data.expID = ItemExpansionID(data.nodeNameID, gameExpID)
+            data.extensionName = ExpansionName(data.expID) or ("ID: " .. (gameExpID or "?"))
+        end
+    end
+
     local lootItems      = data.items
     local lootItemIDs    = data.itemIDs
     local lootQuantities = data.quantities
