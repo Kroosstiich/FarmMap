@@ -216,6 +216,17 @@ local HARVEST_SPELLS = {
     [471009] = "Herbo",
         -- Classic
     [265819] = "Herbo",
+        -- Retail, one per expansion (confirmed in game 29/10/2026). Shadowlands
+        -- casts 2366, as does the first harvest that teaches Draenor or Legion.
+    [265821] = "Herbo",   -- Outland
+    [265823] = "Herbo",   -- Northrend
+    [265825] = "Herbo",   -- Cataclysm
+    [265827] = "Herbo",   -- Pandaria
+    [265829] = "Herbo",   -- Draenor
+    [265834] = "Herbo",   -- Legion
+    [265831] = "Herbo",   -- Kul Tiras
+    [366252] = "Herbo",   -- Dragon Isles
+    [441327] = "Herbo",   -- Khaz Algar
 
     -- Minage
         -- Forever and Classic Era (vanilla "Mining", confirmed in game 07/10/2026)
@@ -224,8 +235,18 @@ local HARVEST_SPELLS = {
     [471013] = "Minage",
         -- Classic
     [265837] = "Minage",
-        -- Outland (reported by a player, 29/10/2026)
-    [265839] = "Minage",
+        -- Retail, one per expansion (Outland reported by a player, the others
+        -- confirmed in game 29/10/2026). Shadowlands casts 2575.
+    [265839] = "Minage",  -- Outland
+    [265841] = "Minage",  -- Northrend
+    [265843] = "Minage",  -- Cataclysm
+    [265845] = "Minage",  -- Pandaria
+    [265847] = "Minage",  -- Draenor
+    [265849] = "Minage",  -- Legion
+    [265851] = "Minage",  -- Kul Tiras
+    [366260] = "Minage",  -- Dragon Isles
+    -- "Khaz Algar Mining": its name differs, the name match cannot catch it
+    [423341] = "Minage",  -- Khaz Algar
 
     -- Fishing
         -- Classic Era (vanilla "Fishing" rank 1, confirmed in game 07/10/2026)
