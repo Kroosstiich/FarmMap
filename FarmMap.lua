@@ -224,6 +224,8 @@ local HARVEST_SPELLS = {
     [471013] = "Minage",
         -- Classic
     [265837] = "Minage",
+        -- Outland (reported by a player, 29/10/2026)
+    [265839] = "Minage",
 
     -- Fishing
         -- Classic Era (vanilla "Fishing" rank 1, confirmed in game 07/10/2026)
@@ -236,15 +238,19 @@ local HARVEST_SPELLS = {
     [1239682] = "Bois",
 }
 
--- Forever only: its gathering spells are vanilla's, whose IDs are not the ones
--- above and are not known yet. Unknown casts are matched on their NAME instead,
--- read from these reference spells, the way GatherMate2 does on Classic. The
--- names come from the client, so they are already localized, and a vanilla
--- rank change keeps the same name. See ResolveHarvestType.
+-- Unknown casts are matched on their NAME, read from these reference spells,
+-- the way GatherMate2 does on Classic: Classic has one ID per rank, Forever may
+-- add its own, and Retail has one per expansion (Outland Mining, Northrend
+-- Mining...), all named "Mining". The names come from the client, so they are
+-- already localized. A reference missing on a client reads nil and is skipped.
+-- See ResolveHarvestType.
 local HARVEST_NAME_SOURCES = {
-    [2366] = "Herbo",   -- Herb Gathering
-    [2575] = "Minage",  -- Mining
-    [7620] = "Peche",   -- Fishing
+    [2366]   = "Herbo",   -- Herb Gathering
+    [2575]   = "Minage",  -- Mining
+    [7620]   = "Peche",   -- Fishing
+    [471009] = "Herbo",   -- Retail (Midnight) names, in case the old IDs
+    [471013] = "Minage",  -- read nothing there
+    [131474] = "Peche",
 }
 
 -- RGB colors per type (used for pins and for the UI)
@@ -4837,16 +4843,15 @@ end
 
 -- Node type of a spell the player just cast, or nil when it is no harvest.
 --
--- By ID everywhere. Off Retail, an unknown ID falls back on the spell name
--- (see HARVEST_NAME_SOURCES): Classic's gathering spells come in RANKS, one ID
--- per rank, all sharing one name, and Forever may add new ones with its new
--- ores. A name match is written back into HARVEST_SPELLS and logged as
--- SPELL_LEARNED, so the real IDs can be read from the debug window and
--- hardcoded once confirmed. Retail never takes the name path, so its
--- detection is exactly what it was.
+-- By ID first. An unknown ID falls back on the spell name (see
+-- HARVEST_NAME_SOURCES): Classic's gathering spells come in RANKS, Forever may
+-- add new ones, and Retail has one per expansion; Retail used to skip this and
+-- missed every Outland or Cataclysm node once their mining was trained. A
+-- name match is written back into HARVEST_SPELLS and logged as SPELL_LEARNED,
+-- so the real IDs can be read from the debug window and hardcoded.
 local function ResolveHarvestType(spellID)
     local known = HARVEST_SPELLS[spellID]
-    if known or IS_RETAIL then return known end
+    if known then return known end
 
     local GetSpellName = C_Spell and C_Spell.GetSpellName
     local castName = GetSpellName and GetSpellName(spellID)
