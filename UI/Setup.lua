@@ -55,6 +55,8 @@ local STEPS = {
       extra = { "nearbyMinimapPinRadius" }, demo = "nearby",
       when = function() return FarmMapDB.showMinimapPins ~= false end },
     { id = "minimapButton", text = "MINIMAP_BUTTON", page = "icons", key = "minimapButton", demo = "button" },
+    -- 2.3: what the button's clicks do (minimap and broker bars).
+    { id = "buttonClicks", text = "BUTTON_CLICKS", page = "icons", key = "brokerLeft", extra = { "brokerRight" } },
     { id = "floatingText", text = "FLOAT", page = "display", key = "showFloatingText", demo = "float" },
     { id = "profit", text = "PROFIT", page = "integ", key = "showProfit", extra = { "priceSource" },
       demo = "profit",
@@ -68,6 +70,8 @@ local STEPS = {
       item = function() return { type = "hint", key = "setupRouteHowTo", text = L("SETUP_ROUTE_HOWTO") } end },
     { id = "routeGuide", text = "ROUTE_GUIDE", page = "integ", key = "routeGuide", demo = "routeGuide",
       when = function() return ns.IsTomTomLoaded() or ns.IsWaypointUILoaded() end },
+    -- 2.3: the radar in the middle of the screen.
+    { id = "radar", text = "RADAR", page = "icons", key = "radarShown", extra = { "radarRotate" } },
     { id = "theme", text = "THEME", item = ThemeItem },
 }
 
@@ -385,6 +389,10 @@ local function Draw()
     else
         for _, card in ipairs(c.cards) do card:Hide() end
         items[1] = item
+        -- A choice may come with its companions (both clicks of the button).
+        for _, key in ipairs(step.extra or {}) do
+            items[#items + 1] = OptionsWindow.FindItem(step.page, key)
+        end
     end
 
     -- The scene plays the selected answer; a screen without an on/off

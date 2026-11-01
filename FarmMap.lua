@@ -4848,6 +4848,42 @@ function ns.SetMinimapButtonShown(shown)
     end
 end
 
+-- What a click on the FarmMap button does (2.3), on the minimap and in any
+-- broker bar: chosen in the options, left = options window and right = the
+-- quick menu by default.
+ns.BROKER_ACTIONS = { "options", "menu", "session", "debug" }
+
+function ns.BrokerClick(side)
+    return FarmMapDB["broker" .. side] or (side == "Left" and "options" or "menu")
+end
+
+function ns.BrokerActionLabel(action)
+    return L[action == "debug" and "BROKER_DEBUG" or "BROKER_ACT_" .. action:upper()]
+end
+
+function ns.BrokerAction(action)
+    if action == "menu" then
+        ns.ShowBrokerMenu()
+    elseif action == "session" then
+        if ns.SessionWindow then ns.SessionWindow:SetEnabled(not ns.SessionWindow:IsEnabled()) end
+    elseif action == "debug" then
+        ns.SetDebugShown(not FarmMapDB.showDebug)
+    elseif not ns.legacyOptionsAtLogin and ns.OptionsWindow then
+        -- FarmMap's own window: not protected, it opens in combat.
+        ns.OptionsWindow:Toggle()
+    elseif ns.optionsCategory then
+        -- OpenSettingsPanel is a protected function (HasRestrictions,
+        -- on Retail and Forever alike): an addon may not open the
+        -- options during combat, and trying raises ADDON_ACTION_BLOCKED.
+        -- Same refusal Blizzard's own UI shows in that situation.
+        if InCombatLockdown() then
+            UIErrorsFrame:AddExternalErrorMessage(ERR_NOT_IN_COMBAT)
+        else
+            Settings.OpenToCategory(ns.optionsCategory:GetID())
+        end
+    end
+end
+
 -- Right-click menu of the DataBroker object (2.3, asked by a player): the
 -- node types and the route switched without opening the world map, from
 -- the minimap button or any broker display (Titan Panel, ChocolateBar...).
@@ -4857,14 +4893,17 @@ function ns.ShowBrokerMenu()
     local menu = ns.brokerMenu
     if menu and menu:IsShown() then menu:Hide() return end
     local ROW_H = 26
+    -- { label, isOn(), toggle(), locked() }; a line with `header` opens a
+    -- group under that title.
     local rows = {}
-    -- { label, isOn(), toggle(), locked() }
+    local groupHeader = L.BROKER_NODES
     for _, t in ipairs({ { "Herbo", "showHerbo" }, { "Minage", "showMinage" },
                          { "Peche", "showPeche" }, { "Bois", "showBois" } }) do
         local nodeType, key = t[1], t[2]
         if IS_RETAIL or nodeType ~= "Bois" then
             local prof = nodeType ~= "Bois" and nodeType or nil
             rows[#rows + 1] = {
+                header = groupHeader,
                 label  = L["TYPE_" .. nodeType],
                 isOn   = function() return FarmMapDB[key] end,
                 locked = function() return prof and not playerProfessions[prof] end,
@@ -4876,28 +4915,27 @@ function ns.ShowBrokerMenu()
                     RefreshAllPins()
                 end,
             }
+            groupHeader = nil
         end
     end
     if ns.Route then
-        rows[#rows + 1] = { gap = true, label = L.ROUTE_TITLE,
+        rows[#rows + 1] = { header = L.ROUTE_TITLE, label = L.ROUTE_TITLE,
             isOn = function() return FarmMapDB.routeShown end, toggle = ns.Route.Toggle }
         if Integ.WaypointAddon(true) then
             rows[#rows + 1] = { label = L.UI_ROUTE_GUIDE, isOn = ns.Route.IsGuiding,
                 toggle = function() ns.Route.Guide(not ns.Route.IsGuiding()) end }
         end
     end
+    groupHeader = L.BROKER_WINDOWS
     if ns.SessionWindow then
-        rows[#rows + 1] = { gap = true, label = L.UI_DASH_MINI,
+        rows[#rows + 1] = { header = groupHeader, label = L.UI_DASH_MINI,
             isOn = function() return ns.SessionWindow:IsEnabled() end,
             toggle = function() ns.SessionWindow:SetEnabled(not ns.SessionWindow:IsEnabled()) end }
+        groupHeader = nil
     end
-    rows[#rows + 1] = { gap = not ns.SessionWindow, label = L.BROKER_DEBUG,
+    rows[#rows + 1] = { header = groupHeader, label = L.BROKER_DEBUG,
         isOn = function() return FarmMapDB.showDebug end,
-        toggle = function()
-            FarmMapDB.showDebug = not FarmMapDB.showDebug
-            if FarmMapDB.showDebug then FarmMapDebug:Show() else FarmMapDebug:Hide() end
-            if FarmMapShowDebugCheck then FarmMapShowDebugCheck:SetChecked(FarmMapDB.showDebug) end
-        end }
+        toggle = function() ns.SetDebugShown(not FarmMapDB.showDebug) end }
 
     -- Drawn like FarmMap's own windows (UI\Theme.lua): a rounded plate in the
     -- theme's colours, one tick box per line. Frames are never freed in WoW,
@@ -4911,7 +4949,7 @@ function ns.ShowBrokerMenu()
         -- The palette is read when a window opens: this may be the first.
         if not Theme.c.panel then Theme.Reload() end
         Theme.Plate(menu, "panel", "line")
-        menu.pool, menu.rules = {}, {}
+        menu.pool, menu.rules, menu.headers = {}, {}, {}
         ns.brokerMenu = menu
     end
 
@@ -4964,16 +5002,36 @@ function ns.ShowBrokerMenu()
         return rule
     end
 
-    local y, width, nRules = -6, 160, 0
+    local function Header(i)
+        local fs = menu.headers[i]
+        if not fs then
+            fs = Theme.Font(menu:CreateFontString(nil, "OVERLAY"), 11, "accent")
+            menu.headers[i] = fs
+        end
+        return fs
+    end
+
+    local y, width, nRules, nHeaders = -8, 160, 0, 0
     for i, data in ipairs(rows) do
-        if data.gap then
-            nRules = nRules + 1
-            local rule = Rule(nRules)
-            rule:ClearAllPoints()
-            rule:SetPoint("TOPLEFT", 8, y - 4)
-            rule:SetPoint("TOPRIGHT", -8, y - 4)
-            rule:Show()
-            y = y - 9
+        if data.header then
+            -- A rule between two groups, then the group's title.
+            if nHeaders > 0 then
+                nRules = nRules + 1
+                local rule = Rule(nRules)
+                rule:ClearAllPoints()
+                rule:SetPoint("TOPLEFT", 8, y - 4)
+                rule:SetPoint("TOPRIGHT", -8, y - 4)
+                rule:Show()
+                y = y - 10
+            end
+            nHeaders = nHeaders + 1
+            local fs = Header(nHeaders)
+            fs:SetText(data.header)
+            fs:ClearAllPoints()
+            fs:SetPoint("TOPLEFT", 11, y - 2)
+            fs:Show()
+            width = math.max(width, fs:GetStringWidth() + 22)
+            y = y - 18
         end
         local row = Row(i)
         row.data = data
@@ -4988,6 +5046,7 @@ function ns.ShowBrokerMenu()
     end
     for i = #rows + 1, #menu.pool do menu.pool[i]:Hide() end
     for i = nRules + 1, #menu.rules do menu.rules[i]:Hide() end
+    for i = nHeaders + 1, #menu.headers do menu.headers[i]:Hide() end
     menu:SetSize(width, -y + 6)
 
     local mx, my = GetCursorPosition()
@@ -5018,23 +5077,8 @@ local function CreateMinimapButton()
         icon = TEX_PATH .. "icon",
 
         OnClick = function(_, button)
-            if button == "RightButton" then
-                GameTooltip:Hide()
-                ns.ShowBrokerMenu()
-            elseif not ns.legacyOptionsAtLogin and ns.OptionsWindow then
-                -- FarmMap's own window: not protected, it opens in combat.
-                ns.OptionsWindow:Toggle()
-            elseif ns.optionsCategory then
-                -- OpenSettingsPanel is a protected function (HasRestrictions,
-                -- on Retail and Forever alike): an addon may not open the
-                -- options during combat, and trying raises ADDON_ACTION_BLOCKED.
-                -- Same refusal Blizzard's own UI shows in that situation.
-                if InCombatLockdown() then
-                    UIErrorsFrame:AddExternalErrorMessage(ERR_NOT_IN_COMBAT)
-                else
-                    Settings.OpenToCategory(ns.optionsCategory:GetID())
-                end
-            end
+            GameTooltip:Hide()
+            ns.BrokerAction(button == "RightButton" and ns.BrokerClick("Right") or ns.BrokerClick("Left"))
         end,
 
         OnTooltipShow = function(tooltip)
@@ -5052,8 +5096,8 @@ local function CreateMinimapButton()
                 tooltip:AddDoubleLine(L.ROUTE_TITLE, FarmMapDB.routeShown and L.TOGGLE_ON or L.TOGGLE_OFF, 1, 0.82, 0)
             end
             tooltip:AddLine(" ")
-            tooltip:AddLine(L.MINIMAP_BTN_LEFT, 0.9, 0.9, 0.9)
-            tooltip:AddLine(L.BROKER_RIGHT,     0.9, 0.9, 0.9)
+            tooltip:AddLine(L.BROKER_LEFT_HINT:format(ns.BrokerActionLabel(ns.BrokerClick("Left"))), 0.9, 0.9, 0.9)
+            tooltip:AddLine(L.BROKER_RIGHT_HINT:format(ns.BrokerActionLabel(ns.BrokerClick("Right"))), 0.9, 0.9, 0.9)
         end,
     })
 

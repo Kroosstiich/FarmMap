@@ -1666,6 +1666,15 @@ local function PackItem(key, pack)
              onClick = function() ShowLink(pack.url) end }
 end
 
+-- The actions a click of the FarmMap button may run (FarmMap.lua).
+local function BrokerChoices()
+    local list = {}
+    for _, action in ipairs(ns.BROKER_ACTIONS) do
+        list[#list + 1] = { value = action, label = ns.BrokerActionLabel(action) }
+    end
+    return list
+end
+
 ItemsPage({
     id = "icons", titleKey = "UI_ICONS", descKey = "UI_ICONS_DESC",
     items = function()
@@ -1708,6 +1717,60 @@ ItemsPage({
                   ns.SetMinimapButtonShown(on)
                   SyncLegacyCheck("FarmMapShowMinimapButtonCheck", on)
               end },
+            -- 2.3: what each click of the button does, on the minimap and in
+            -- the broker bars (Titan Panel, Bazooka...), hidden button or not.
+            { type = "choice", key = "brokerLeft",
+              name = L("UI_BROKER_LEFT"), desc = L("UI_BROKER_CLICK_DESC"),
+              choices = BrokerChoices,
+              get = function() return ns.BrokerClick("Left") end,
+              set = function(v) FarmMapDB.brokerLeft = v end },
+            { type = "choice", key = "brokerRight",
+              name = L("UI_BROKER_RIGHT"),
+              choices = BrokerChoices,
+              get = function() return ns.BrokerClick("Right") end,
+              set = function(v) FarmMapDB.brokerRight = v end },
+
+            -- 2.3: the radar in the middle of the screen (UI\Radar.lua).
+            { type = "section", key = "secRadar", text = L("UI_SEC_RADAR") },
+            { type = "switch", key = "radarShown",
+              name = L("UI_RADAR"), desc = L("UI_RADAR_DESC"),
+              get = function() return ns.Radar.Get("shown") end,
+              set = function(on) ns.Radar.Set("shown", on and true or false) end },
+            { type = "slider", key = "radarRange",
+              name = L("UI_RADAR_RANGE"), min = 50, max = 500, step = 10,
+              format = function(v) return L("UNIT_YARDS"):format(v) end,
+              get = function() return ns.Radar.Get("range") end,
+              set = function(v) ns.Radar.Set("range", v) end },
+            { type = "slider", key = "radarSize",
+              name = L("UI_RADAR_SIZE"), min = 150, max = 600, step = 10,
+              format = function(v) return ("%d px"):format(v) end,
+              get = function() return ns.Radar.Get("size") end,
+              set = function(v) ns.Radar.Set("size", v) end },
+            { type = "slider", key = "radarAlpha",
+              name = L("UI_RADAR_ALPHA"), min = 0, max = 100, step = 5,
+              format = function(v) return ("%d %%"):format(v) end,
+              get = function() return ns.Radar.Get("alpha") end,
+              set = function(v) ns.Radar.Set("alpha", v) end },
+            { type = "switch", key = "radarRotate",
+              name = L("UI_RADAR_ROTATE"), desc = L("UI_RADAR_ROTATE_DESC"),
+              get = function() return ns.Radar.Get("rotate") end,
+              set = function(on) ns.Radar.Set("rotate", on and true or false) end },
+            { type = "switch", key = "radarCardinals",
+              name = L("UI_RADAR_CARDINALS"), desc = L("UI_RADAR_CARDINALS_DESC"),
+              get = function() return ns.Radar.Get("cardinals") end,
+              set = function(on) ns.Radar.Set("cardinals", on and true or false) end },
+            { type = "choice", key = "radarMoveKey",
+              name = L("UI_RADAR_MOVE"), desc = L("UI_RADAR_MOVE_DESC"),
+              choices = function()
+                  return { { value = "shift", label = L("RADAR_MOVE_SHIFT") },
+                           { value = "ctrl", label = L("RADAR_MOVE_CTRL") },
+                           { value = "none", label = L("RADAR_MOVE_NONE") } }
+              end,
+              get = function() return ns.Radar.Get("moveKey") end,
+              set = function(v) ns.Radar.Set("moveKey", v) end },
+            { type = "button", key = "radarReset", gap = 12,
+              name = L("UI_RADAR_RESET"), desc = L("UI_RADAR_RESET_DESC"), label = L("UI_RADAR_RESET_LABEL"),
+              onClick = function() ns.Radar.Set("pos", nil) end },
 
 
             { type = "section", key = "packs", text = L("UI_SEC_PACKS") },

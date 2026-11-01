@@ -30,7 +30,7 @@ local DEFAULTS    = { shown = false, range = 150, size = 300, rotate = true, alp
 local MOVE_KEYS   = { shift = IsShiftKeyDown, ctrl = IsControlKeyDown }
 -- Where each point lies from the player, in the (px - wx, py - wy) terms of
 -- the nodes below: north is towards +y in world yards, east towards -x.
-local CARDINALS   = { { "N", 0, -1 }, { "E", 1, 0 }, { "S", 0, 1 }, { "W", -1, 0 } }
+local CARDINALS   = { { "RADAR_N", 0, -1 }, { "RADAR_E", 1, 0 }, { "RADAR_S", 0, 1 }, { "RADAR_W", -1, 0 } }
 
 local frame, disc, arrow
 local letters = {}
@@ -240,9 +240,9 @@ local function Build()
 
     for i, c in ipairs(CARDINALS) do
         local fs = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        fs:SetText(c[1])
+        fs:SetText(ns.L[c[1]] or c[1])
         -- North stands out, as on a compass.
-        if c[1] == "N" then fs:SetTextColor(1, 0.3, 0.25) else fs:SetTextColor(0.9, 0.9, 0.9) end
+        if i == 1 then fs:SetTextColor(1, 0.3, 0.25) else fs:SetTextColor(0.9, 0.9, 0.9) end
         letters[i] = fs
     end
 
@@ -283,8 +283,17 @@ function Radar.Apply()
         frame:SetPoint("CENTER")
     end
     disc:SetAlpha(db.alpha / 100)
-    cacheAge = CACHE_TICK   -- read the nodes again at once
+    -- Read the nodes again at once when it comes back (not on every step of
+    -- a slider: that read goes through the whole database).
+    if db.shown and not frame:IsShown() then cacheAge = CACHE_TICK end
     frame:SetShown(db.shown)
+end
+
+-- For the options page: one setting read or changed, then applied.
+function Radar.Get(key) return DB()[key] end
+function Radar.Set(key, value)
+    DB()[key] = value
+    Radar.Apply()
 end
 
 function Radar.Command(args)
