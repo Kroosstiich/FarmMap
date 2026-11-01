@@ -4886,7 +4886,12 @@ function ns.ShowBrokerMenu()
                 toggle = function() ns.Route.Guide(not ns.Route.IsGuiding()) end }
         end
     end
-    rows[#rows + 1] = { gap = true, label = L.BROKER_DEBUG,
+    if ns.SessionWindow then
+        rows[#rows + 1] = { gap = true, label = L.UI_DASH_MINI,
+            isOn = function() return ns.SessionWindow:IsEnabled() end,
+            toggle = function() ns.SessionWindow:SetEnabled(not ns.SessionWindow:IsEnabled()) end }
+    end
+    rows[#rows + 1] = { gap = not ns.SessionWindow, label = L.BROKER_DEBUG,
         isOn = function() return FarmMapDB.showDebug end,
         toggle = function()
             FarmMapDB.showDebug = not FarmMapDB.showDebug
@@ -4894,72 +4899,96 @@ function ns.ShowBrokerMenu()
             if FarmMapShowDebugCheck then FarmMapShowDebugCheck:SetChecked(FarmMapDB.showDebug) end
         end }
 
-    -- One frame, kept; its lines are rebuilt on each opening, as the guidance
-    -- line comes and goes with TomTom / WaypointUI.
-    menu = menu or CreateFrame("Frame", "FarmMapBrokerMenu", UIParent, "BackdropTemplate")
-    ns.brokerMenu = menu
-    for _, old in ipairs(menu.rows or {}) do old:Hide() end
-    menu.rows = {}
-    menu:SetFrameStrata("TOOLTIP")
-    menu:SetClampedToScreen(true)
-    menu:SetBackdrop({
-        bgFile   = "Interface\\ChatFrame\\ChatFrameBackground",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 8, edgeSize = 8,
-        insets = {left=2, right=2, top=2, bottom=2}
-    })
-    menu:SetBackdropColor(0.05, 0.05, 0.05, 0.95)
-    menu:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+    -- Drawn like FarmMap's own windows (UI\Theme.lua): a rounded plate in the
+    -- theme's colours, one tick box per line. Frames are never freed in WoW,
+    -- so the lines are a pool reused on each opening: the guidance line
+    -- comes and goes with TomTom / WaypointUI.
+    local Theme = ns.Theme
+    if not menu then
+        menu = CreateFrame("Frame", "FarmMapBrokerMenu", UIParent)
+        menu:SetFrameStrata("TOOLTIP")
+        menu:SetClampedToScreen(true)
+        -- The palette is read when a window opens: this may be the first.
+        if not Theme.c.panel then Theme.Reload() end
+        Theme.Plate(menu, "panel", "line")
+        menu.pool, menu.rules = {}, {}
+        ns.brokerMenu = menu
+    end
 
-    local y, width = -4, 160
-    for _, data in ipairs(rows) do
-        if data.gap then y = y - 6 end
-        local row = CreateFrame("Button", nil, menu)
-        row:SetPoint("TOPLEFT", 3, y)
-        row:SetPoint("TOPRIGHT", -3, y)
+    local function Row(i)
+        local row = menu.pool[i]
+        if row then return row end
+        row = CreateFrame("Button", nil, menu)
         row:SetHeight(ROW_H - 2)
-        local hi = row:CreateTexture(nil, "BACKGROUND")
-        hi:SetAllPoints()
-        hi:SetColorTexture(1, 0.82, 0, 0.25)
-        hi:Hide()
-        local box = row:CreateTexture(nil, "ARTWORK")
-        box:SetSize(20, 20)
-        box:SetPoint("LEFT", 2, 0)
-        box:SetTexture("Interface\\Buttons\\UI-CheckBox-Up")
-        local check = row:CreateTexture(nil, "OVERLAY")
-        check:SetAllPoints(box)
-        check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
-        local label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        label:SetPoint("LEFT", box, "RIGHT", 4, 0)
-        label:SetText(data.label)
-        width = math.max(width, label:GetStringWidth() + 40)
-        local function Paint()
-            local locked = data.locked and data.locked()
-            check:SetShown(data.isOn() and not locked)
-            check:SetDesaturated(locked or false)
-            label:SetTextColor(locked and 0.5 or 1, locked and 0.5 or 1, locked and 0.5 or 1)
-        end
-        Paint()
+        row.hi = row:CreateTexture(nil, "BACKGROUND")
+        row.hi:SetAllPoints()
+        row.hi:SetTexture("Interface\\Buttons\\WHITE8X8")
+        row.hi:Hide()
+        row.box = Theme.Plate(CreateFrame("Frame", nil, row), "panel2", "dim", true)
+        row.box:SetSize(14, 14)
+        row.box:SetPoint("LEFT", 8, 0)
+        row.label = Theme.Font(row:CreateFontString(nil, "OVERLAY"), 12, "text")
+        row.label:SetPoint("LEFT", row.box, "RIGHT", 8, 0)
         row:SetScript("OnEnter", function(self)
-            hi:Show()
-            if data.locked and data.locked() then
+            self.hi:SetVertexColor(Theme.RGBA("accent", 0.15))
+            self.hi:Show()
+            if self.data.locked and self.data.locked() then
                 GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
                 GameTooltip:SetText(L.SKILL_MISSING, 1, 1, 1)
                 GameTooltip:Show()
             end
         end)
-        row:SetScript("OnLeave", function() hi:Hide() GameTooltip:Hide() end)
-        row:SetScript("OnClick", function()
-            if data.locked and data.locked() then return end
-            data.toggle()
+        row:SetScript("OnLeave", function(self) self.hi:Hide() GameTooltip:Hide() end)
+        row:SetScript("OnClick", function(self)
+            if self.data.locked and self.data.locked() then return end
+            self.data.toggle()
             -- The route and its guidance depend on each other: repaint all.
-            for _, r in ipairs(menu.rows) do r.Paint() end
+            for _, r in ipairs(menu.pool) do if r:IsShown() then r:Paint() end end
         end)
-        row.Paint = Paint
-        menu.rows[#menu.rows + 1] = row
+        function row:Paint()
+            local locked = self.data.locked and self.data.locked()
+            local on = self.data.isOn() and not locked
+            Theme.PaintPlate(self.box, on and "accent" or "panel2", on and "accent" or "dim")
+            self.label:SetTextColor(Theme.RGB(locked and "faint" or "text"))
+        end
+        menu.pool[i] = row
+        return row
+    end
+
+    local function Rule(i)
+        local rule = menu.rules[i]
+        if not rule then
+            rule = Theme.Rule(menu, false, "line")
+            menu.rules[i] = rule
+        end
+        return rule
+    end
+
+    local y, width, nRules = -6, 160, 0
+    for i, data in ipairs(rows) do
+        if data.gap then
+            nRules = nRules + 1
+            local rule = Rule(nRules)
+            rule:ClearAllPoints()
+            rule:SetPoint("TOPLEFT", 8, y - 4)
+            rule:SetPoint("TOPRIGHT", -8, y - 4)
+            rule:Show()
+            y = y - 9
+        end
+        local row = Row(i)
+        row.data = data
+        row.label:SetText(data.label)
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", 3, y)
+        row:SetPoint("TOPRIGHT", -3, y)
+        row:Paint()
+        row:Show()
+        width = math.max(width, row.label:GetStringWidth() + 44)
         y = y - (ROW_H - 2)
     end
-    menu:SetSize(width, -y + 4)
+    for i = #rows + 1, #menu.pool do menu.pool[i]:Hide() end
+    for i = nRules + 1, #menu.rules do menu.rules[i]:Hide() end
+    menu:SetSize(width, -y + 6)
 
     local mx, my = GetCursorPosition()
     local s = UIParent:GetEffectiveScale()

@@ -9,6 +9,8 @@
 --    /fm radar size 300    diameter on screen
 --    /fm radar rotate      turns with the player / north up
 --    /fm radar alpha 60    opacity of the disc, in %
+--    /fm radar cardinals   N, E, S, W on the edge, on / off
+--    /fm radar move shift  key held to drag it: shift, ctrl or none
 -- ============================================================
 
 local _, ns = ...
@@ -23,9 +25,15 @@ local CACHE_TICK  = 3      -- seconds between two reads of the node database
 local MAX_ICONS   = 120
 local MAX_LINES   = 200
 local ICON_PX     = 18
-local DEFAULTS    = { shown = false, range = 150, size = 300, rotate = true, alpha = 35 }
+local DEFAULTS    = { shown = false, range = 150, size = 300, rotate = true, alpha = 35,
+                      cardinals = true, moveKey = "shift" }
+local MOVE_KEYS   = { shift = IsShiftKeyDown, ctrl = IsControlKeyDown }
+-- Where each point lies from the player, in the (px - wx, py - wy) terms of
+-- the nodes below: north is towards +y in world yards, east towards -x.
+local CARDINALS   = { { "N", 0, -1 }, { "E", 1, 0 }, { "S", 0, 1 }, { "W", -1, 0 } }
 
 local frame, disc, arrow
+local letters = {}
 local icons, lines = {}, {}
 local nodes = {}           -- { wx, wy, type } of the player's instance
 local nodesInstance, cacheAge = nil, CACHE_TICK
@@ -184,6 +192,23 @@ local function Redraw()
     end
     for i = used + 1, #lines do lines[i]:Hide() end
 
+    -- The cardinal points, just inside the edge, turning with the radar.
+    for i, c in ipairs(CARDINALS) do
+        local fs = letters[i]
+        if db.cardinals then
+            local dx, dy = c[2], c[3]
+            if facing then dx, dy = dx * cos - dy * sin, dx * sin + dy * cos end
+            fs:ClearAllPoints()
+            fs:SetPoint("CENTER", frame, "CENTER", dx * (half - 12), -dy * (half - 12))
+        end
+        fs:SetShown(db.cardinals)
+    end
+
+    -- Dragged only while the chosen key is held: the rest of the time the
+    -- mouse goes through, so the radar never takes a click from the game.
+    local held = MOVE_KEYS[db.moveKey]
+    frame:EnableMouse(held and held() or frame.moving or false)
+
     -- North up: the arrow shows where the player faces.
     if not db.rotate and GetPlayerFacing then
         arrow:SetRotation(GetPlayerFacing() or 0)
@@ -213,6 +238,28 @@ local function Build()
     arrow:SetPoint("CENTER")
     arrow:SetTexture("Interface\\Minimap\\MinimapArrow")
 
+    for i, c in ipairs(CARDINALS) do
+        local fs = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        fs:SetText(c[1])
+        -- North stands out, as on a compass.
+        if c[1] == "N" then fs:SetTextColor(1, 0.3, 0.25) else fs:SetTextColor(0.9, 0.9, 0.9) end
+        letters[i] = fs
+    end
+
+    frame:SetMovable(true)
+    frame:SetClampedToScreen(true)
+    frame:RegisterForDrag("LeftButton")
+    frame:SetScript("OnDragStart", function(self)
+        self.moving = true
+        self:StartMoving()
+    end)
+    frame:SetScript("OnDragStop", function(self)
+        self.moving = nil
+        self:StopMovingOrSizing()
+        local point, _, relPoint, x, y = self:GetPoint()
+        DB().pos = { point, relPoint, x, y }
+    end)
+
     frame:SetScript("OnUpdate", function(_, dt)
         elapsed = elapsed + dt
         cacheAge = cacheAge + dt
@@ -229,6 +276,12 @@ function Radar.Apply()
         Build()
     end
     frame:SetSize(db.size, db.size)
+    frame:ClearAllPoints()
+    if db.pos then
+        frame:SetPoint(db.pos[1], UIParent, db.pos[2], db.pos[3], db.pos[4])
+    else
+        frame:SetPoint("CENTER")
+    end
     disc:SetAlpha(db.alpha / 100)
     cacheAge = CACHE_TICK   -- read the nodes again at once
     frame:SetShown(db.shown)
@@ -236,8 +289,8 @@ end
 
 function Radar.Command(args)
     local db = DB()
-    local key, value = args:match("^(%a+)%s*(%d*)$")
-    value = tonumber(value)
+    local key, word = args:match("^(%a+)%s*(%w*)$")
+    local value = tonumber(word)
     if args == "" then
         db.shown = not db.shown
     elseif key == "range" and value then
@@ -248,13 +301,20 @@ function Radar.Command(args)
         db.alpha = math.max(0, math.min(100, value))
     elseif key == "rotate" then
         db.rotate = not db.rotate
+    elseif key == "cardinals" then
+        db.cardinals = not db.cardinals
+    elseif key == "move" and (word == "shift" or word == "ctrl" or word == "none") then
+        db.moveKey = word
+    elseif key == "reset" then
+        db.pos = nil
     else
-        print("|cffffd100FarmMap|r radar: /fm radar [range N | size N | alpha N | rotate]")
+        print("|cffffd100FarmMap|r radar: /fm radar [range N | size N | alpha N | rotate | cardinals | move shift/ctrl/none | reset]")
         return
     end
-    print(("|cffffd100FarmMap|r radar: %s, range %d yd, size %d px, %s, disc %d%%"):format(
+    print(("|cffffd100FarmMap|r radar: %s, range %d yd, size %d px, %s, disc %d%%, cardinals %s, move with %s"):format(
         db.shown and "on" or "off", db.range, db.size,
-        db.rotate and "turns with you" or "north up", db.alpha))
+        db.rotate and "turns with you" or "north up", db.alpha,
+        db.cardinals and "on" or "off", db.moveKey))
     Radar.Apply()
 end
 
