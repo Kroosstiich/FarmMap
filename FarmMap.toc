@@ -9,7 +9,7 @@
 ## Notes-frFR: Enregistre la position des minerais, plantes, poissons et bois.
 ## Notes-zhCN: 记录矿石、草药、鱼和树木节点的位置。
 ## Author: Kroosstii
-## Version: v2.2.2
+## Version: v2.3.0-dev
 ## X-Date: 29/10/2026
 ## IconTexture: Interface\AddOns\FarmMap\Textures\icon
 ## SavedVariables: FarmMapDB FarmMapStatsDB
@@ -48,6 +48,8 @@ UI\OptionsWindow.lua
 UI\SessionWindow.lua
 # Optimal route (2.2): after FarmMap.lua and Theme.lua, which it reads.
 UI\Route.lua
+# Radar (2.3): after Route.lua, whose loop it draws.
+UI\Radar.lua
 # Setup assistant: after OptionsWindow.lua, whose settings it shows.
 UI\Setup.lua
 
