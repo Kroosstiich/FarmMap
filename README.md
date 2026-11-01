@@ -50,10 +50,15 @@ Anniversary, where not every feature has been tested yet.
   in the zone, on the world map and the minimap, with its direction, a longest
   lap and an estimated lap time; with TomTom or WaypointUI, the waypoint moves
   to the next node after each harvest or as you reach it
+- **Radar**: a transparent disc in the middle of the screen with the nodes
+  around you, the route and the cardinal points; range, size, opacity and
+  rotation are set in Map and icons, and a held key (Shift by default) moves it
 - A setup assistant that explains each main setting, with an animated example
 - A "What's new" window once per version
 - Harvest statistics per resource type
-- Minimap button — left click for the options, right click for the debug window
+- Minimap button, also shown in broker bars (Titan Panel, Bazooka...): by
+  default left click for the options and right click for a quick menu (node
+  types, route, windows); both clicks can be changed in Map and icons
 - English and French, plus Korean, Simplified Chinese and Russian by the
   community, auto-detected from the game client with a manual override in the
   options
