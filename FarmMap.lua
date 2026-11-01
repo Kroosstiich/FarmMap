@@ -4832,6 +4832,135 @@ function ns.SetMinimapButtonShown(shown)
     end
 end
 
+-- Right-click menu of the DataBroker object (2.3, asked by a player): the
+-- node types and the route switched without opening the world map, from
+-- the minimap button or any broker display (Titan Panel, ChocolateBar...).
+-- Same settings as the filter bar, so both stay in step. It stays open while
+-- lines are ticked; a click elsewhere closes it.
+function ns.ShowBrokerMenu()
+    local menu = ns.brokerMenu
+    if menu and menu:IsShown() then menu:Hide() return end
+    local ROW_H = 26
+    local rows = {}
+    -- { label, isOn(), toggle(), locked() }
+    for _, t in ipairs({ { "Herbo", "showHerbo" }, { "Minage", "showMinage" },
+                         { "Peche", "showPeche" }, { "Bois", "showBois" } }) do
+        local nodeType, key = t[1], t[2]
+        if IS_RETAIL or nodeType ~= "Bois" then
+            local prof = nodeType ~= "Bois" and nodeType or nil
+            rows[#rows + 1] = {
+                label  = L["TYPE_" .. nodeType],
+                isOn   = function() return FarmMapDB[key] end,
+                locked = function() return prof and not playerProfessions[prof] end,
+                toggle = function()
+                    FarmMapDB[key] = not FarmMapDB[key]
+                    -- The player's choice from now on (see profAutoOff).
+                    if FarmMapDB.profAutoOff then FarmMapDB.profAutoOff[key] = nil end
+                    if FarmMap_UpdateFilterButtons then FarmMap_UpdateFilterButtons() end
+                    RefreshAllPins()
+                end,
+            }
+        end
+    end
+    if ns.Route then
+        rows[#rows + 1] = { gap = true, label = L.ROUTE_TITLE,
+            isOn = function() return FarmMapDB.routeShown end, toggle = ns.Route.Toggle }
+        if Integ.WaypointAddon(true) then
+            rows[#rows + 1] = { label = L.UI_ROUTE_GUIDE, isOn = ns.Route.IsGuiding,
+                toggle = function() ns.Route.Guide(not ns.Route.IsGuiding()) end }
+        end
+    end
+    rows[#rows + 1] = { gap = true, label = L.BROKER_DEBUG,
+        isOn = function() return FarmMapDB.showDebug end,
+        toggle = function()
+            FarmMapDB.showDebug = not FarmMapDB.showDebug
+            if FarmMapDB.showDebug then FarmMapDebug:Show() else FarmMapDebug:Hide() end
+            if FarmMapShowDebugCheck then FarmMapShowDebugCheck:SetChecked(FarmMapDB.showDebug) end
+        end }
+
+    -- One frame, kept; its lines are rebuilt on each opening, as the guidance
+    -- line comes and goes with TomTom / WaypointUI.
+    menu = menu or CreateFrame("Frame", "FarmMapBrokerMenu", UIParent, "BackdropTemplate")
+    ns.brokerMenu = menu
+    for _, old in ipairs(menu.rows or {}) do old:Hide() end
+    menu.rows = {}
+    menu:SetFrameStrata("TOOLTIP")
+    menu:SetClampedToScreen(true)
+    menu:SetBackdrop({
+        bgFile   = "Interface\\ChatFrame\\ChatFrameBackground",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 8, edgeSize = 8,
+        insets = {left=2, right=2, top=2, bottom=2}
+    })
+    menu:SetBackdropColor(0.05, 0.05, 0.05, 0.95)
+    menu:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+
+    local y, width = -4, 160
+    for _, data in ipairs(rows) do
+        if data.gap then y = y - 6 end
+        local row = CreateFrame("Button", nil, menu)
+        row:SetPoint("TOPLEFT", 3, y)
+        row:SetPoint("TOPRIGHT", -3, y)
+        row:SetHeight(ROW_H - 2)
+        local hi = row:CreateTexture(nil, "BACKGROUND")
+        hi:SetAllPoints()
+        hi:SetColorTexture(1, 0.82, 0, 0.25)
+        hi:Hide()
+        local box = row:CreateTexture(nil, "ARTWORK")
+        box:SetSize(20, 20)
+        box:SetPoint("LEFT", 2, 0)
+        box:SetTexture("Interface\\Buttons\\UI-CheckBox-Up")
+        local check = row:CreateTexture(nil, "OVERLAY")
+        check:SetAllPoints(box)
+        check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+        local label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        label:SetPoint("LEFT", box, "RIGHT", 4, 0)
+        label:SetText(data.label)
+        width = math.max(width, label:GetStringWidth() + 40)
+        local function Paint()
+            local locked = data.locked and data.locked()
+            check:SetShown(data.isOn() and not locked)
+            check:SetDesaturated(locked or false)
+            label:SetTextColor(locked and 0.5 or 1, locked and 0.5 or 1, locked and 0.5 or 1)
+        end
+        Paint()
+        row:SetScript("OnEnter", function(self)
+            hi:Show()
+            if data.locked and data.locked() then
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetText(L.SKILL_MISSING, 1, 1, 1)
+                GameTooltip:Show()
+            end
+        end)
+        row:SetScript("OnLeave", function() hi:Hide() GameTooltip:Hide() end)
+        row:SetScript("OnClick", function()
+            if data.locked and data.locked() then return end
+            data.toggle()
+            -- The route and its guidance depend on each other: repaint all.
+            for _, r in ipairs(menu.rows) do r.Paint() end
+        end)
+        row.Paint = Paint
+        menu.rows[#menu.rows + 1] = row
+        y = y - (ROW_H - 2)
+    end
+    menu:SetSize(width, -y + 4)
+
+    local mx, my = GetCursorPosition()
+    local s = UIParent:GetEffectiveScale()
+    menu:ClearAllPoints()
+    menu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", mx / s, my / s)
+
+    menu.dismiss = menu.dismiss or CreateFrame("Frame", nil, UIParent)
+    local dismiss = menu.dismiss
+    dismiss:SetAllPoints(UIParent)
+    dismiss:SetFrameStrata("DIALOG")
+    dismiss:EnableMouse(true)
+    dismiss:SetScript("OnMouseDown", function() menu:Hide() end)
+    menu:SetScript("OnHide", function() dismiss:Hide() end)
+    dismiss:Show()
+    menu:Show()
+end
+
 local function CreateMinimapButton()
     if not ns.HasMinimapButton() then return end
     if LDBIcon:IsRegistered(addonName) then return end
@@ -4845,11 +4974,8 @@ local function CreateMinimapButton()
 
         OnClick = function(_, button)
             if button == "RightButton" then
-                FarmMapDB.showDebug = not FarmMapDB.showDebug
-                if FarmMapDB.showDebug then FarmMapDebug:Show() else FarmMapDebug:Hide() end
-                if FarmMapShowDebugCheck then
-                    FarmMapShowDebugCheck:SetChecked(FarmMapDB.showDebug)
-                end
+                GameTooltip:Hide()
+                ns.ShowBrokerMenu()
             elseif not ns.legacyOptionsAtLogin and ns.OptionsWindow then
                 -- FarmMap's own window: not protected, it opens in combat.
                 ns.OptionsWindow:Toggle()
@@ -4868,9 +4994,21 @@ local function CreateMinimapButton()
 
         OnTooltipShow = function(tooltip)
             tooltip:AddLine(addonName, 1, 0.82, 0)
+            -- What is shown right now: each node type, then the route.
+            for _, t in ipairs({ { "Herbo", "showHerbo" }, { "Minage", "showMinage" },
+                                 { "Peche", "showPeche" }, { "Bois", "showBois" } }) do
+                if IS_RETAIL or t[1] ~= "Bois" then
+                    local c = TYPE_COLORS[t[1]]
+                    tooltip:AddDoubleLine(L["TYPE_" .. t[1]], FarmMapDB[t[2]] and L.TOGGLE_ON or L.TOGGLE_OFF,
+                                          c[1], c[2], c[3])
+                end
+            end
+            if ns.Route then
+                tooltip:AddDoubleLine(L.ROUTE_TITLE, FarmMapDB.routeShown and L.TOGGLE_ON or L.TOGGLE_OFF, 1, 0.82, 0)
+            end
             tooltip:AddLine(" ")
-            tooltip:AddLine(L.MINIMAP_BTN_LEFT,  0.9, 0.9, 0.9)
-            tooltip:AddLine(L.MINIMAP_BTN_RIGHT, 0.9, 0.9, 0.9)
+            tooltip:AddLine(L.MINIMAP_BTN_LEFT, 0.9, 0.9, 0.9)
+            tooltip:AddLine(L.BROKER_RIGHT,     0.9, 0.9, 0.9)
         end,
     })
 
