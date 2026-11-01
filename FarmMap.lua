@@ -3700,6 +3700,22 @@ ns.IsTomTomLoaded = function() return (TomTom and TomTom.AddWaypoint) and true o
 -- For the route (UI\Route.lua): which nodes the filters show, how often a
 -- node was harvested, and the guidance's waypoint.
 ns.ShouldShowNode = ShouldShowNode
+-- The radar (UI/Radar.lua) draws a node with the world map's icon style:
+-- the minimap styles may be rings meant to frame the game's own dot.
+ns.ApplyNodeIcon = function(tex, nodeType)
+    local pins = GetStylePins(FarmMapDB.worldmapStyle or "blizzard")
+    local pin  = pins and pins[nodeType]
+    if pin then
+        ApplyPinTexture(tex, pin)
+    else
+        local coords = WORLD_MAP_TEXCOORDS[nodeType]
+        tex:SetTexture(coords and BLIP_DEFAULT or "Interface\\Minimap\\UI-Minimap-Ping-Center")
+        tex:SetTexCoord(unpack(coords or { 0, 1, 0, 1 }))
+        tex:SetDesaturated(false)
+        tex:SetVertexColor(1, 1, 1)
+    end
+    if RICH_TYPES[nodeType] then tex:SetVertexColor(1, 0.85, 0.1) end
+end
 ns.NodeHarvests = function(mapID, node)
     local zone = FarmMapStatsDB and FarmMapStatsDB.byNode and FarmMapStatsDB.byNode[mapID]
     local entry = zone and zone[NodeStatKey(node)]
@@ -5873,6 +5889,11 @@ SlashCmdList["FARMMAP"] = function(msg)
     -- Runs the setup assistant again, every screen.
     elseif cmd == "setup" then
         if ns.Setup then ns.Setup.Show(true) end
+
+    -- Radar prototype (2.3), not listed in /fm help yet:
+    -- /fm radar, /fm radar range 150, /fm radar size 300, /fm radar rotate
+    elseif cmd:match("^radar") then
+        if ns.Radar then ns.Radar.Command(strtrim(cmd:sub(6))) end
 
     elseif cmd == "atlas" then
         if not calibFrame then calibFrame = CreateAtlasCalibrator() end
