@@ -1,4 +1,4 @@
-## Interface: 120105, 120100, 120007, 16001, 50504, 20506, 11509
+## Interface: 120107, 120105, 120100, 120007, 16001, 50504, 20506, 11509
 # 16001 = WoW: Forever, 50504 = MoP Classic, 20506 = TBC Anniversary,
 # 11509 = Classic Era (also Season of Discovery and Hardcore).
 # One manifest for every client, as Auctionator does:
@@ -9,7 +9,7 @@
 ## Notes-frFR: Enregistre la position des minerais, plantes, poissons et bois.
 ## Notes-zhCN: 记录矿石、草药、鱼和树木节点的位置。
 ## Author: Kroosstii
-## Version: v2.3.2
+## Version: v2.4.0-dev
 ## X-Date: 03/11/2026
 ## IconTexture: Interface\AddOns\FarmMap\Textures\icon
 ## SavedVariables: FarmMapDB FarmMapStatsDB

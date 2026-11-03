@@ -127,6 +127,11 @@ ns.locales.zhCN = {
         SETUP_RADAR_OFF        = "不显示雷达。之后可以在「地图与图标」中开启。",
         SETUP_BUTTON_CLICKS_TITLE = "FarmMap 按钮",
         SETUP_BUTTON_CLICKS_TEXT  = "选择左键点击和右键点击分别做什么，作用于小地图按钮，以及 Titan Panel、Bazooka 等信息条插件中的 FarmMap。",
+        -- 2.4: the radar's key binding and "hide in combat".
+        BINDING_RADAR          = "Show or hide the radar",  -- [TRANSLATE]
+        UI_RADAR_BIND_HINT     = "A key to show or hide the radar can be set in the game's Key Bindings, under AddOns > FarmMap.",  -- [TRANSLATE]
+        UI_RADAR_COMBAT        = "Hide in combat",  -- [TRANSLATE]
+        UI_RADAR_COMBAT_DESC   = "The radar disappears while you are in combat and comes back when it ends.",  -- [TRANSLATE]
         WORLDMAP_SECTION       = "世界地图",
         PRESET_BLANK           = "白色轮廓",
         PRESET_VIVID           = "鲜艳色彩",

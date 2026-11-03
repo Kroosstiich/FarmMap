@@ -11,6 +11,7 @@
 --    /fm radar alpha 60    opacity of the disc, in %
 --    /fm radar cardinals   N, E, S, W on the edge, on / off
 --    /fm radar move shift  key held to drag it: shift, ctrl or none
+--  A key binding shows / hides it (Bindings.xml, 2.4).
 -- ============================================================
 
 local _, ns = ...
@@ -26,7 +27,7 @@ local MAX_ICONS   = 120
 local MAX_LINES   = 200
 local ICON_PX     = 18
 local DEFAULTS    = { shown = false, range = 150, size = 300, rotate = true, alpha = 35,
-                      cardinals = true, moveKey = "shift" }
+                      cardinals = true, moveKey = "shift", hideCombat = false }
 local MOVE_KEYS   = { shift = IsShiftKeyDown, ctrl = IsControlKeyDown }
 -- Where each point lies from the player, in the (px - wx, py - wy) terms of
 -- the nodes below: north is towards +y in world yards, east towards -x.
@@ -39,6 +40,9 @@ local nodes = {}           -- { wx, wy, type } of the player's instance
 local nodesInstance, cacheAge = nil, CACHE_TICK
 local loopSeen, loopWorld          -- the route's loop, and its points in world yards
 local elapsed = 0
+-- Set by PLAYER_REGEN_DISABLED / ENABLED: InCombatLockdown() still reads
+-- false while the first of them is being handled.
+local inCombat = false
 
 local function DB()
     FarmMapDB.radar = FarmMapDB.radar or {}
@@ -285,9 +289,18 @@ function Radar.Apply()
     disc:SetAlpha(db.alpha / 100)
     -- Read the nodes again at once when it comes back (not on every step of
     -- a slider: that read goes through the whole database).
-    if db.shown and not frame:IsShown() then cacheAge = CACHE_TICK end
-    frame:SetShown(db.shown)
+    local visible = db.shown and not (db.hideCombat and inCombat)
+    if visible and not frame:IsShown() then cacheAge = CACHE_TICK end
+    frame:SetShown(visible)
 end
+
+-- The key binding (Bindings.xml) calls this global: the binding runs
+-- outside the addon, without its namespace.
+function FarmMap_ToggleRadar()
+    Radar.Set("shown", not DB().shown)
+end
+BINDING_HEADER_FARMMAP = "FarmMap"
+BINDING_NAME_FARMMAP_TOGGLE_RADAR = ns.L.BINDING_RADAR
 
 -- For the options page: one setting read or changed, then applied.
 function Radar.Get(key) return DB()[key] end
@@ -329,4 +342,12 @@ end
 
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_LOGIN")
-events:SetScript("OnEvent", function() Radar.Apply() end)
+-- "Hide in combat" (2.4): the radar goes when combat starts and comes back
+-- when it ends.
+events:RegisterEvent("PLAYER_REGEN_DISABLED")
+events:RegisterEvent("PLAYER_REGEN_ENABLED")
+events:SetScript("OnEvent", function(_, event)
+    if event == "PLAYER_REGEN_DISABLED" then inCombat = true
+    elseif event == "PLAYER_REGEN_ENABLED" then inCombat = false end
+    Radar.Apply()
+end)

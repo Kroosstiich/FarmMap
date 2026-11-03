@@ -171,6 +171,11 @@ ns.locales.koKR = {
         SETUP_RADAR_OFF        = "레이더를 사용하지 않습니다. 나중에 '지도 및 아이콘' 설정에서 다시 켤 수 있습니다.",
         SETUP_BUTTON_CLICKS_TITLE = "FarmMap 버튼 설정",
         SETUP_BUTTON_CLICKS_TEXT  = "미니맵 버튼이나 Titan Panel, Bazooka 같은 브로커 바의 FarmMap 아이콘을 좌클릭/우클릭했을 때 실행할 행동을 선택하세요.",
+        -- 2.4: the radar's key binding and "hide in combat".
+        BINDING_RADAR          = "Show or hide the radar",  -- [TRANSLATE]
+        UI_RADAR_BIND_HINT     = "A key to show or hide the radar can be set in the game's Key Bindings, under AddOns > FarmMap.",  -- [TRANSLATE]
+        UI_RADAR_COMBAT        = "Hide in combat",  -- [TRANSLATE]
+        UI_RADAR_COMBAT_DESC   = "The radar disappears while you are in combat and comes back when it ends.",  -- [TRANSLATE]
         WORLDMAP_SECTION       = "세계 지도",
         PRESET_BLANK           = "흰색 테두리",
         PRESET_VIVID           = "선명한 색상",

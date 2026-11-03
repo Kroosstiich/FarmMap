@@ -1736,6 +1736,12 @@ ItemsPage({
               name = L("UI_RADAR"), desc = L("UI_RADAR_DESC"),
               get = function() return ns.Radar.Get("shown") end,
               set = function(on) ns.Radar.Set("shown", on and true or false) end },
+            -- 2.4: the key binding lives in the game's own Key Bindings.
+            { type = "hint", key = "radarBindHint", text = L("UI_RADAR_BIND_HINT") },
+            { type = "switch", key = "radarHideCombat",
+              name = L("UI_RADAR_COMBAT"), desc = L("UI_RADAR_COMBAT_DESC"),
+              get = function() return ns.Radar.Get("hideCombat") end,
+              set = function(on) ns.Radar.Set("hideCombat", on and true or false) end },
             { type = "slider", key = "radarRange",
               name = L("UI_RADAR_RANGE"), min = 50, max = 500, step = 10,
               format = function(v) return L("UNIT_YARDS"):format(v) end,

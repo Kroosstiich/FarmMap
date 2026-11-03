@@ -174,6 +174,11 @@ ns.locales.enUS = {
         SETUP_RADAR_OFF        = "No radar. You can turn it on later in Map and icons.",
         SETUP_BUTTON_CLICKS_TITLE = "The FarmMap button",
         SETUP_BUTTON_CLICKS_TEXT  = "Choose what a left click and a right click do, on the minimap button and on FarmMap in broker bars such as Titan Panel or Bazooka.",
+        -- 2.4: the radar's key binding and "hide in combat".
+        BINDING_RADAR          = "Show or hide the radar",
+        UI_RADAR_BIND_HINT     = "A key to show or hide the radar can be set in the game's Key Bindings, under AddOns > FarmMap.",
+        UI_RADAR_COMBAT        = "Hide in combat",
+        UI_RADAR_COMBAT_DESC   = "The radar disappears while you are in combat and comes back when it ends.",
         WORLDMAP_SECTION       = "World Map",
         PRESET_BLANK           = "White outline",
         PRESET_VIVID           = "Vivid colors",

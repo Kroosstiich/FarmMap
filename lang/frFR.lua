@@ -154,6 +154,11 @@ ns.locales.frFR = {
         SETUP_RADAR_OFF        = "Pas de radar. Vous pourrez l'activer plus tard dans Carte et icônes.",
         SETUP_BUTTON_CLICKS_TITLE = "Le bouton FarmMap",
         SETUP_BUTTON_CLICKS_TEXT  = "Choisissez ce que font le clic gauche et le clic droit, sur le bouton de la minicarte et sur FarmMap dans les barres comme Titan Panel ou Bazooka.",
+        -- 2.4 : le raccourci du radar et « masquer en combat ».
+        BINDING_RADAR          = "Afficher ou masquer le radar",
+        UI_RADAR_BIND_HINT     = "Un raccourci pour afficher ou masquer le radar se règle dans les raccourcis clavier du jeu, rubrique AddOns > FarmMap.",
+        UI_RADAR_COMBAT        = "Masquer en combat",
+        UI_RADAR_COMBAT_DESC   = "Le radar disparaît pendant les combats et revient à la fin.",
         WORLDMAP_SECTION       = "Carte du monde",
         PRESET_BLANK           = "Outline blanc",
         PRESET_VIVID           = "Couleurs vives",

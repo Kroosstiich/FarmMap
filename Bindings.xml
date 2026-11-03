@@ -1,0 +1,7 @@
+<Bindings>
+	<!-- Read by the game on its own (no line in the toc). Names come from
+	     BINDING_HEADER_FARMMAP / BINDING_NAME_* set in UI\Radar.lua. -->
+	<Binding name="FARMMAP_TOGGLE_RADAR" header="FARMMAP" category="ADDONS">
+		FarmMap_ToggleRadar()
+	</Binding>
+</Bindings>
