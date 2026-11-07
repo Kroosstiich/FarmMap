@@ -50,6 +50,8 @@ UI\SessionWindow.lua
 UI\Route.lua
 # Radar (2.3): after Route.lua, whose loop it draws.
 UI\Radar.lua
+# Sharing nodes in chat (2.4): after OptionsWindow.lua, whose import preview it opens.
+UI\Share.lua
 # Setup assistant: after OptionsWindow.lua, whose settings it shows.
 UI\Setup.lua
 

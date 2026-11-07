@@ -2850,10 +2850,62 @@ local function LayoutThemePreview(card, width)
     return h
 end
 
+-- Nodes received through a share in chat (UI\Share.lua, 2.4): the same
+-- preview as a pasted export, nothing written before the player confirms.
+function OptionsWindow.ImportFromText(text, from)
+    themePlan = nil
+    local plan, err = ns.ParseImport(text)
+    importPlan = plan
+    importStatus = plan and ("|cff4fd36a" .. L("SHARE_FROM"):format(from) .. "|r")
+        or ("|cffe05a4a" .. L("IMPORT_ERROR") .. " : " .. (err or "?") .. "|r")
+    OptionsWindow:Toggle("io")
+    OptionsWindow:Refresh()
+end
+
+-- What to share in chat: the player's zone first when it has nodes, then
+-- every zone with nodes, then the whole database (value 0).
+local shareChoice
+local function ShareChoices()
+    local zones = {}
+    for mapID, list in pairs(FarmMapDB) do
+        if type(mapID) == "number" and type(list) == "table" and #list > 0 then
+            local info = C_Map.GetMapInfo(mapID)
+            zones[#zones + 1] = { value = mapID, label = ("%s (%d)"):format(info and info.name or mapID, #list) }
+        end
+    end
+    table.sort(zones, function(a, b) return Intl.Less(a.label, b.label) end)
+    zones[#zones + 1] = { value = 0, label = L("SHARE_ALL") }
+    return zones
+end
+local function ShareDefault()
+    local here = C_Map.GetBestMapForUnit("player")
+    if here and type(FarmMapDB[here]) == "table" and #FarmMapDB[here] > 0 then return here end
+    for mapID, list in pairs(FarmMapDB) do
+        if type(mapID) == "number" and type(list) == "table" and #list > 0 then return mapID end
+    end
+    return 0
+end
+
 ItemsPage({
     id = "io", titleKey = "UI_IO", descKey = "UI_IO_DESC",
     items = function()
         return {
+            -- 2.4: a share in chat, opened with a click by any FarmMap player.
+            { type = "section", key = "secShare", text = L("SHARE_SECTION") },
+            { type = "hint", key = "shareHint", text = L("SHARE_HINT") },
+            { type = "choice", key = "shareWhat",
+              name = L("SHARE_WHAT"), desc = L("SHARE_WHAT_DESC"),
+              choices = ShareChoices,
+              get = function() shareChoice = shareChoice or ShareDefault() return shareChoice end,
+              set = function(v) shareChoice = v end },
+            { type = "button", key = "shareGo", gap = 12,
+              name = L("SHARE_GO"), desc = L("SHARE_GO_DESC"), label = L("SHARE_GO_LABEL"),
+              onClick = function()
+                  local v = shareChoice or ShareDefault()
+                  if ns.Share then ns.Share.Start(v ~= 0 and v or nil) end
+              end },
+
+            { type = "section", key = "secExport", text = L("UI_IO") },
             { type = "button", key = "export", name = L("DB_EXPORT"), desc = L("UI_EXPORT_DESC"),
               label = L("DB_EXPORT"), onClick = function() ns.OpenExportPopup() end, gap = 4 },
             -- Themes travel through the same box: export the active one here,

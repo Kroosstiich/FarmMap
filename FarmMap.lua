@@ -876,13 +876,15 @@ local function ClientKey()
 end
 ns.ClientKey = ClientKey
 
-local function SerializeDB()
+-- onlyMapID: one zone only (sharing in chat, 2.4); nil = the whole database.
+local function SerializeDB(onlyMapID)
     local lines = {
         ("-- FarmMap %s export, client=%s (%s)"):format(addonVersion, ClientKey(), ClientLabel()),
         "return {",
     }
     for mapID, nodes in pairs(FarmMapDB) do
-        if type(nodes) == "table" and #nodes > 0 then
+        if type(mapID) == "number" and type(nodes) == "table" and #nodes > 0
+           and (not onlyMapID or mapID == onlyMapID) then
             table.insert(lines, "  [" .. mapID .. "]={")
             for _, n in ipairs(nodes) do
                 local items, itemIDs = {}, {}
@@ -3691,6 +3693,7 @@ end
 ns.ClearNodeDatabase   = ClearNodeDatabase
 ns.ManualMigration     = function() ManualMigration() end
 ns.OpenExportPopup     = function() OpenExportPopup() end
+ns.SerializeNodes      = function(mapID) return SerializeDB(mapID) end
 ns.OpenImportPopup     = function() OpenImportPopup() end
 ns.RefreshAllPins      = function() RefreshAllPins() end
 ns.UpdateMinimapPinProximity = function() ns.MinimapProximity.Update() end
