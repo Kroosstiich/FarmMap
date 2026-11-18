@@ -36,6 +36,22 @@ local MINIMAP_REF   = "FarmMapRoute"   -- its own HBD key: node pins are untouch
 
 local function L(key) return ns.L[key] or key end
 
+-- The route's colour (2.4, asked by players): the theme's accent, or one
+-- chosen in Integrations > Route. The world map, the minimap and the radar
+-- all draw with it.
+local ROUTE_COLORS = {
+    gold = { 1, 0.82, 0 }, white = { 1, 1, 1 }, red = { 1, 0.3, 0.25 },
+    green = { 0.31, 0.83, 0.42 }, blue = { 0.42, 0.71, 1 },
+    purple = { 0.73, 0.42, 0.85 }, cyan = { 0.3, 0.9, 0.95 },
+}
+Route.COLORS = { "theme", "gold", "white", "red", "green", "blue", "purple", "cyan" }
+
+function Route.Color()
+    local c = FarmMapDB and ROUTE_COLORS[FarmMapDB.routeColor]
+    if c then return c[1], c[2], c[3] end
+    return ns.Theme.RGB("accent")
+end
+
 -- The zone a sub-zone (a town, a cave) belongs to: the player is often on
 -- such a smaller map while the route lives on the zone's. The minimap
 -- showed the route only now and then because of this (Kroosstii,
@@ -375,7 +391,7 @@ function provider:RefreshAllData()
     -- the same width on screen.
     local scale = map:GetCanvasScale() or 1
     local thick, outline, arrow = LINE_PX / scale, OUTLINE_PX / scale, ARROW_PX / scale
-    local cr, cg, cb = ns.Theme.RGB("accent")
+    local cr, cg, cb = Route.Color()
     for i = 1, n do
         local a, b = loop[i], loop[i % n + 1]
         local x1, y1, x2, y2 = a.x * W, a.y * H, b.x * W, b.y * H
@@ -414,10 +430,17 @@ local function Dot(i)
     local tex = dot:CreateTexture(nil, "OVERLAY")
     tex:SetAllPoints()
     tex:SetTexture("Interface\\CHARACTERFRAME\\TempPortraitAlphaMask")   -- a white disc
-    ns.Theme.Track(tex, function(self) self:SetVertexColor(ns.Theme.RGBA("accent", 0.9)) end)
+    ns.Theme.Track(tex, function(self) local r, g, b = Route.Color() self:SetVertexColor(r, g, b, 0.9) end)
+    dot.tex = tex
     dots[i] = dot
     return dot
 end
+
+-- A thin line instead of the dots (2.4, asked by players): only where the
+-- game gives the minimap's radius in yards (Retail and WoW: Forever); the
+-- Classic clients keep the dots.
+local CanLine = C_Minimap and C_Minimap.GetViewRadius and true or false
+local function LineMode() return CanLine and FarmMapDB and FarmMapDB.routeMinimap == "line" end
 
 -- The route's dots in FarmMap's proximity list (fiote's "hide nearby
 -- pins"): the ones close to the player fade like the node pins, so the
@@ -440,7 +463,7 @@ local function UpdateMinimap()
     HBDPins:RemoveAllMinimapIcons(MINIMAP_REF)
     Unlist()
     built = nil
-    if not (FarmMapDB and FarmMapDB.routeShown) then return end
+    if not (FarmMapDB and FarmMapDB.routeShown) or LineMode() then return end
     local px, py, instance = HBD:GetPlayerWorldPosition()
     local mapID = HBD:GetPlayerZone()
     if not (px and mapID) then return end
@@ -480,10 +503,124 @@ local function UpdateMinimap()
     end
 end
 
+-- The line: segments between the route's nodes, drawn on a layer over the
+-- minimap and cut at its edge, with HereBeDragons' own minimap maths (the
+-- one its pins use): a point at (wx, wy) sits at (px - wx, py - wy) from the
+-- player, turned by the facing when the minimap rotates.
+local mmFrame, mmLines = nil, {}
+local mmLoop, mmPts, mmZone   -- the loop drawn, its points in world yards, its zone
+
+local function MinimapLoop(instance)
+    local mapID = HBD:GetPlayerZone()
+    if not mapID then return end
+    local zone = ZoneOf(mapID)
+    local r = Route.Get(zone)
+    if #r.loop < 2 and zone ~= mapID then zone, r = mapID, Route.Get(mapID) end
+    if #r.loop < 2 then return end
+    if r.loop ~= mmLoop or zone ~= mmZone then
+        mmLoop, mmZone, mmPts = r.loop, zone, {}
+        for i, node in ipairs(r.loop) do
+            local wx, wy, inst = HBD:GetWorldCoordinatesFromZone(node.x, node.y, zone)
+            if wx and inst == instance then mmPts[i] = { wx, wy } end
+        end
+    end
+    return mmPts, #r.loop
+end
+
+-- The part of segment a-b (unit coordinates) inside the minimap: a disc, or
+-- a square for the interfaces that make the minimap square.
+local function ClipUnit(ax, ay, bx, by, square)
+    local dx, dy = bx - ax, by - ay
+    local t0, t1 = 0, 1
+    if square then
+        for _, p in ipairs({ { -dx, ax + 1 }, { dx, 1 - ax }, { -dy, ay + 1 }, { dy, 1 - ay } }) do
+            local q, d = p[2], p[1]
+            if d == 0 then
+                if q < 0 then return nil end
+            else
+                local t = q / d
+                if d < 0 then t0 = math.max(t0, t) else t1 = math.min(t1, t) end
+            end
+        end
+    else
+        local a = dx * dx + dy * dy
+        if a == 0 then return nil end
+        local b = 2 * (ax * dx + ay * dy)
+        local c = ax * ax + ay * ay - 1
+        local disc = b * b - 4 * a * c
+        if disc <= 0 then return nil end
+        local r = math.sqrt(disc)
+        t0 = math.max(0, (-b - r) / (2 * a))
+        t1 = math.min(1, (-b + r) / (2 * a))
+    end
+    if t0 >= t1 then return nil end
+    return ax + dx * t0, ay + dy * t0, ax + dx * t1, ay + dy * t1
+end
+
+local function DrawMinimapLine()
+    local used = 0
+    local px, py, instance = HBD:GetPlayerWorldPosition()
+    local pts, n = nil, 0
+    if px and FarmMapDB.routeShown then pts, n = MinimapLoop(instance) end
+    if pts then
+        local facing = GetCVar("rotateMinimap") == "1" and GetPlayerFacing and GetPlayerFacing()
+        local sin, cos = 0, 1
+        if facing then sin, cos = math.sin(facing), math.cos(facing) end
+        -- 0.98: the minimap's border covers its very edge.
+        local radius = C_Minimap.GetViewRadius() * 0.98
+        local hw, hh = Minimap:GetWidth() / 2 * 0.98, Minimap:GetHeight() / 2 * 0.98
+        local square = GetMinimapShape and GetMinimapShape() == "SQUARE"
+        local r, g, b = Route.Color()
+        local width = FarmMapDB.routeLineWidth or 2
+        local function Unit(p)
+            local dx, dy = px - p[1], py - p[2]
+            if facing then dx, dy = dx * cos - dy * sin, dx * sin + dy * cos end
+            return dx / radius, dy / radius
+        end
+        for i = 1, n do
+            local a, c = pts[i], pts[i % n + 1]
+            if a and c and used < MAX_DOTS then
+                local ax, ay = Unit(a)
+                local bx, by = Unit(c)
+                local x1, y1, x2, y2 = ClipUnit(ax, ay, bx, by, square)
+                if x1 then
+                    used = used + 1
+                    local line = mmLines[used]
+                    if not line then
+                        line = mmFrame:CreateLine(nil, "ARTWORK")
+                        mmLines[used] = line
+                    end
+                    line:SetThickness(width)
+                    line:SetColorTexture(r, g, b, 0.9)
+                    line:SetStartPoint("CENTER", mmFrame, x1 * hw, -y1 * hh)
+                    line:SetEndPoint("CENTER", mmFrame, x2 * hw, -y2 * hh)
+                    line:Show()
+                end
+            end
+        end
+    end
+    for i = used + 1, #mmLines do mmLines[i]:Hide() end
+end
+
+if CanLine then
+    mmFrame = CreateFrame("Frame", nil, Minimap)
+    mmFrame:SetAllPoints(Minimap)
+    mmFrame:SetFrameLevel(Minimap:GetFrameLevel() + 2)
+    local elapsed = 0
+    mmFrame:SetScript("OnUpdate", function(_, dt)
+        elapsed = elapsed + dt
+        if elapsed < 0.05 then return end
+        elapsed = 0
+        if LineMode() then DrawMinimapLine() elseif mmLines[1] and mmLines[1]:IsShown() then
+            for _, l in ipairs(mmLines) do l:Hide() end
+        end
+    end)
+end
+
 -- Once a second: moved far enough, the dots around the player are placed
 -- again. Cheap when standing still (one position read).
 C_Timer.NewTicker(1, function()
-    if not (FarmMapDB and FarmMapDB.routeShown) then return end
+    if not (FarmMapDB and FarmMapDB.routeShown) or LineMode() then return end
     local px, py, instance = HBD:GetPlayerWorldPosition()
     if not px then return end
     if not built or built.instance ~= instance
@@ -588,6 +725,15 @@ local function Changed()
     if FarmMap_UpdateRouteButton then FarmMap_UpdateRouteButton() end
     if ns.SessionWindow then ns.SessionWindow:Update() end
     if ns.OptionsWindow then ns.OptionsWindow:Refresh() end
+end
+
+-- Its look (2.4): colour, minimap dots or line, line width. Applied at once.
+function Route.CanLine() return CanLine end
+function Route.SetLook(key, value)
+    FarmMapDB[key] = value
+    local r, g, b = Route.Color()
+    for _, dot in ipairs(dots) do dot.tex:SetVertexColor(r, g, b, 0.9) end
+    Route.Refresh()
 end
 
 function Route.Toggle()

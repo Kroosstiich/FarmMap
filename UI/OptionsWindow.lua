@@ -1950,6 +1950,35 @@ ItemsPage({
                   FarmMapDB.routeMaxMinutes = v
                   if ns.Route then ns.Route.RefreshSoon() end
               end },
+            -- 2.4: its look, asked by players.
+            { type = "choice", key = "routeColor",
+              name = L("UI_ROUTE_COLOR"), desc = L("UI_ROUTE_COLOR_DESC"),
+              choices = function()
+                  local list = {}
+                  for _, key in ipairs(ns.Route.COLORS) do
+                      list[#list + 1] = { value = key, label = L("ROUTE_COLOR_" .. key:upper()) }
+                  end
+                  return list
+              end,
+              get = function() return FarmMapDB.routeColor or "theme" end,
+              set = function(v) ns.Route.SetLook("routeColor", v ~= "theme" and v or nil) end },
+            { type = "choice", key = "routeMinimap", visible = ns.Route.CanLine(),
+              name = L("UI_ROUTE_MINIMAP"), desc = L("UI_ROUTE_MINIMAP_DESC"),
+              choices = function()
+                  return { { value = "dots", label = L("ROUTE_MINIMAP_DOTS") },
+                           { value = "line", label = L("ROUTE_MINIMAP_LINE") } }
+              end,
+              get = function() return FarmMapDB.routeMinimap == "line" and "line" or "dots" end,
+              set = function(v)
+                  ns.Route.SetLook("routeMinimap", v)
+                  OptionsWindow:Refresh()
+              end },
+            { type = "slider", key = "routeLineWidth", visible = ns.Route.CanLine(),
+              name = L("UI_ROUTE_WIDTH"), min = 1, max = 5, step = 1,
+              disabled = function() return FarmMapDB.routeMinimap ~= "line" end,
+              format = function(v) return ("%d px"):format(v) end,
+              get = function() return FarmMapDB.routeLineWidth or 2 end,
+              set = function(v) FarmMapDB.routeLineWidth = v end },
             { type = "button", key = "routeNew", gap = 12,
               name = L("UI_ROUTE_NEW"), desc = L("UI_ROUTE_NEW_DESC"), label = L("ROUTE_NEW_LABEL"),
               onClick = function() if ns.Route then ns.Route.NewRoute() end end },

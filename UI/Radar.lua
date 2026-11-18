@@ -165,6 +165,8 @@ local function Redraw()
         local mapID = ns.Route.PlayerZone()
         local loop = mapID and ns.Route.Get(mapID).loop or {}
         local n = #loop
+        -- The route's own colour (Integrations > Route, 2.4).
+        local cr, cg, cb = ns.Route.Color()
         if n >= 2 then
             -- World yards of the loop, kept until the loop itself changes.
             if loop ~= loopSeen then
@@ -186,6 +188,7 @@ local function Redraw()
                     if x1 then
                         used = used + 1
                         local line = Line(used)
+                        line:SetColorTexture(cr, cg, cb, 0.8)
                         line:SetStartPoint("CENTER", frame, x1 * half, -y1 * half)
                         line:SetEndPoint("CENTER", frame, x2 * half, -y2 * half)
                         line:Show()
