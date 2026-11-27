@@ -180,8 +180,8 @@ ns.locales.enUS = {
         UI_RADAR_COMBAT        = "Hide in combat",
         UI_RADAR_COMBAT_DESC   = "The radar disappears while you are in combat and comes back when it ends.",
         -- 2.4: sharing nodes in chat (UI\Share.lua).
-        SHARE_SECTION          = "Share in chat",
-        SHARE_HINT             = "Puts a short text in your chat input: send it in your guild, a group, a whisper or a channel. Other FarmMap players click it to receive your nodes, with the usual preview before anything is added. Stay online while they receive them.",
+        SHARE_SECTION          = "Share in chat (beta)",
+        SHARE_HINT             = "Puts a short text in your chat input: send it in your guild, a group, a whisper or a channel. Other FarmMap players click it to receive your nodes, with the usual preview before anything is added. Stay online while they receive them. This is a beta: if something goes wrong, please report it on CurseForge or Discord.",
         SHARE_WHAT             = "What to share",
         SHARE_WHAT_DESC        = "One zone is quick. The whole database can take several minutes: Blizzard limits how fast addons may send data to each other.",
         SHARE_ALL              = "Whole database (slow)",

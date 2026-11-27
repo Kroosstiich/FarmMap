@@ -160,8 +160,8 @@ ns.locales.frFR = {
         UI_RADAR_COMBAT        = "Masquer en combat",
         UI_RADAR_COMBAT_DESC   = "Le radar disparaît pendant les combats et revient à la fin.",
         -- 2.4 : partager des nœuds dans le chat (UI\Share.lua).
-        SHARE_SECTION          = "Partager dans le chat",
-        SHARE_HINT             = "Place un court texte dans votre zone de saisie du chat : envoyez-le dans votre guilde, un groupe, un chuchotement ou un canal. Les autres joueurs de FarmMap cliquent dessus pour recevoir vos nœuds, avec l'aperçu habituel avant tout ajout. Restez connecté pendant qu'ils les reçoivent.",
+        SHARE_SECTION          = "Partager dans le chat (bêta)",
+        SHARE_HINT             = "Place un court texte dans votre zone de saisie du chat : envoyez-le dans votre guilde, un groupe, un chuchotement ou un canal. Les autres joueurs de FarmMap cliquent dessus pour recevoir vos nœuds, avec l'aperçu habituel avant tout ajout. Restez connecté pendant qu'ils les reçoivent. Cette fonction est en bêta : si quelque chose ne marche pas, signalez-le sur CurseForge ou sur Discord.",
         SHARE_WHAT             = "Que partager",
         SHARE_WHAT_DESC        = "Une zone part vite. Toute la base peut prendre plusieurs minutes : Blizzard limite la vitesse à laquelle les addons s'échangent des données.",
         SHARE_ALL              = "Toute la base (lent)",
