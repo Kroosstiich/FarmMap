@@ -186,13 +186,24 @@ local function Redraw()
                 if a and b and used < MAX_LINES then
                     local x1, y1, x2, y2 = Clip(a[1], a[2], b[1], b[2])
                     if x1 then
-                        used = used + 1
-                        local line = Line(used)
-                        line:SetColorTexture(cr, cg, cb, 0.8)
-                        line:SetThickness(FarmMapDB.routeRadarWidth or 2)
-                        line:SetStartPoint("CENTER", frame, x1 * half, -y1 * half)
-                        line:SetEndPoint("CENTER", frame, x2 * half, -y2 * half)
-                        line:Show()
+                        local width = FarmMapDB.routeRadarWidth or 2
+                        local function Draw(sx1, sy1, sx2, sy2)
+                            used = used + 1
+                            local line = Line(used)
+                            line:SetColorTexture(cr, cg, cb, 0.8)
+                            line:SetThickness(width)
+                            line:SetStartPoint("CENTER", frame, sx1, sy1)
+                            line:SetEndPoint("CENTER", frame, sx2, sy2)
+                            line:Show()
+                        end
+                        local sx1, sy1, sx2, sy2 = x1 * half, -y1 * half, x2 * half, -y2 * half
+                        Draw(sx1, sy1, sx2, sy2)
+                        -- Its direction, as on the world map and the minimap.
+                        local tx, ty, ex, ey, fx, fy = ns.Route.Arrow(sx1, sy1, sx2, sy2, math.max(6, width * 3))
+                        if tx and ns.Route.ShowArrows() then
+                            Draw(tx, ty, ex, ey)
+                            Draw(tx, ty, fx, fy)
+                        end
                     end
                 end
             end

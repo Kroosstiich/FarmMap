@@ -48,6 +48,25 @@ local ROUTE_COLORS = {
 -- in FarmMapDB.routeColorCustom.
 Route.COLORS = { "theme", "gold", "white", "red", "green", "blue", "purple", "cyan", "custom" }
 
+-- An arrow at the middle of segment 1-2, pointing towards 2: its tip and
+-- the ends of its two strokes, 35 degrees either side (world map, minimap
+-- line and radar, 2.4). nil when the segment is too short to hold one.
+-- Any coordinates: the shape only depends on the segment's direction.
+function Route.Arrow(x1, y1, x2, y2, size)
+    local dx, dy = x2 - x1, y2 - y1
+    local len = math.sqrt(dx * dx + dy * dy)
+    if len < size * 3 then return nil end
+    local ux, uy = dx / len, dy / len
+    local mx, my = (x1 + x2) / 2 + ux * size * 0.5, (y1 + y2) / 2 + uy * size * 0.5
+    local c, s = 0.8192, 0.5736   -- cos and sin of 35 degrees
+    return mx, my,
+        mx - (ux * c - uy * s) * size, my - (uy * c + ux * s) * size,
+        mx - (ux * c + uy * s) * size, my - (uy * c - ux * s) * size
+end
+
+-- Whether the route shows its direction (2.4, on by default).
+function Route.ShowArrows() return not (FarmMapDB and FarmMapDB.routeArrows == false) end
+
 function Route.Color()
     local key = FarmMapDB and FarmMapDB.routeColor
     local c = key == "custom" and FarmMapDB.routeColorCustom or ROUTE_COLORS[key]
@@ -405,19 +424,14 @@ function provider:RefreshAllData()
         local x1, y1, x2, y2 = a.x * W, a.y * H, b.x * W, b.y * H
         self:Line(0, outline, 0, 0, 0, 0.45, x1, y1, x2, y2)
         self:Line(1, thick, cr, cg, cb, 0.95, x1, y1, x2, y2)
-        -- The direction, at the middle of each segment long enough for it.
-        local dx, dy = x2 - x1, y2 - y1
-        local len = math.sqrt(dx * dx + dy * dy)
-        if arrows and len > arrow * 6 then
-            local ux, uy = dx / len, dy / len
-            local mx, my = (x1 + x2) / 2 + ux * arrow * 0.5, (y1 + y2) / 2 + uy * arrow * 0.5
-            -- Two strokes back from the tip, 35 degrees either side.
-            local c, s = math.cos(math.rad(35)), math.sin(math.rad(35))
-            for _, side in ipairs({ 1, -1 }) do
-                local bx = -(ux * c - side * uy * s) * arrow
-                local by = -(uy * c + side * ux * s) * arrow
-                self:Line(2, thick, cr, cg, cb, 0.95, mx, my, mx + bx, my + by)
-            end
+        -- The direction, at the middle of each segment long enough for it,
+        -- outlined like the line so it stands out on a busy map.
+        local mx, my, ax, ay, bx, by = Route.Arrow(x1, y1, x2, y2, arrow)
+        if arrows and mx then
+            self:Line(2, outline, 0, 0, 0, 0.45, mx, my, ax, ay)
+            self:Line(2, outline, 0, 0, 0, 0.45, mx, my, bx, by)
+            self:Line(3, thick, cr, cg, cb, 0.95, mx, my, ax, ay)
+            self:Line(3, thick, cr, cg, cb, 0.95, mx, my, bx, by)
         end
     end
 end
@@ -580,10 +594,24 @@ local function DrawMinimapLine()
         local square = GetMinimapShape and GetMinimapShape() == "SQUARE"
         local r, g, b = Route.Color()
         local width = FarmMapDB.routeLineWidth or 2
+        local arrows, size = Route.ShowArrows(), math.max(6, width * 3)
         local function Unit(p)
             local dx, dy = px - p[1], py - p[2]
             if facing then dx, dy = dx * cos - dy * sin, dx * sin + dy * cos end
             return dx / radius, dy / radius
+        end
+        local function Draw(sx1, sy1, sx2, sy2)
+            used = used + 1
+            local line = mmLines[used]
+            if not line then
+                line = mmFrame:CreateLine(nil, "ARTWORK")
+                mmLines[used] = line
+            end
+            line:SetThickness(width)
+            line:SetColorTexture(r, g, b, 0.9)
+            line:SetStartPoint("CENTER", mmFrame, sx1, sy1)
+            line:SetEndPoint("CENTER", mmFrame, sx2, sy2)
+            line:Show()
         end
         for i = 1, n do
             local a, c = pts[i], pts[i % n + 1]
@@ -592,17 +620,14 @@ local function DrawMinimapLine()
                 local bx, by = Unit(c)
                 local x1, y1, x2, y2 = ClipUnit(ax, ay, bx, by, square)
                 if x1 then
-                    used = used + 1
-                    local line = mmLines[used]
-                    if not line then
-                        line = mmFrame:CreateLine(nil, "ARTWORK")
-                        mmLines[used] = line
+                    local sx1, sy1, sx2, sy2 = x1 * hw, -y1 * hh, x2 * hw, -y2 * hh
+                    Draw(sx1, sy1, sx2, sy2)
+                    -- Its direction, on the part of the segment shown.
+                    local tx, ty, ex, ey, fx, fy = Route.Arrow(sx1, sy1, sx2, sy2, size)
+                    if arrows and tx then
+                        Draw(tx, ty, ex, ey)
+                        Draw(tx, ty, fx, fy)
                     end
-                    line:SetThickness(width)
-                    line:SetColorTexture(r, g, b, 0.9)
-                    line:SetStartPoint("CENTER", mmFrame, x1 * hw, -y1 * hh)
-                    line:SetEndPoint("CENTER", mmFrame, x2 * hw, -y2 * hh)
-                    line:Show()
                 end
             end
         end
