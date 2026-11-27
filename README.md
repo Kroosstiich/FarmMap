@@ -42,23 +42,29 @@ Anniversary, where not every feature has been tested yet.
 - **Node manager**: every node grouped by item and zone, search by item, filter
   by zone or resource, delete a selection
 - **Export / import** to share your node database, with a preview before
-  anything is written; an export names the game client it comes from
+  anything is written; an export names the game client it comes from. Nodes
+  can also be shared right in the chat (beta): other FarmMap players click the
+  text to receive them
 - **Integrations**: TradeSkillMaster as a second price source, and a click on a
   node sets a waypoint with [TomTom](https://www.curseforge.com/wow/addons/tomtom)
   or WaypointUI
 - **Route**: a button on the filter bar draws a loop through the nodes you know
   in the zone, on the world map and the minimap, with its direction, a longest
   lap and an estimated lap time; with TomTom or WaypointUI, the waypoint moves
-  to the next node after each harvest or as you reach it
+  to the next node after each harvest or as you reach it; its colour, line
+  widths, direction arrows and a thin line instead of dots on the minimap
+  (Retail and WoW: Forever) are set in Map and icons
 - **Radar**: a transparent disc in the middle of the screen with the nodes
   around you, the route and the cardinal points; range, size, opacity and
-  rotation are set in Map and icons, and a held key (Shift by default) moves it
+  rotation are set in Map and icons, a held key (Shift by default) moves it,
+  a key binding shows or hides it, and it can hide itself in combat
 - A setup assistant that explains each main setting, with an animated example
 - A "What's new" window once per version
 - Harvest statistics per resource type
 - Minimap button, also shown in broker bars (Titan Panel, Bazooka...): by
   default left click for the options and right click for a quick menu (node
-  types, route, windows); both clicks can be changed in Map and icons
+  types, route, windows); both clicks can be changed in Map and icons, and
+  Shift-click always opens the options
 - English and French, plus Korean, Simplified Chinese and Russian by the
   community, auto-detected from the game client with a manual override in the
   options
