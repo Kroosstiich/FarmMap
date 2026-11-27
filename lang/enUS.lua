@@ -175,6 +175,14 @@ ns.locales.enUS = {
         SETUP_RADAR_OFF        = "No radar. You can turn it on later in Map and icons.",
         SETUP_BUTTON_CLICKS_TITLE = "The FarmMap button",
         SETUP_BUTTON_CLICKS_TEXT  = "Choose what a left click and a right click do, on the minimap button and on FarmMap in broker bars such as Titan Panel or Bazooka.",
+        -- 2.4: the setup assistant's screens for the 2.4 features.
+        SETUP_RADAR_KEY_TITLE  = "A key for the radar",
+        SETUP_RADAR_KEY_TEXT   = "Show or hide the radar with a key of your choice: click the button, then press the key. The radar can also hide itself while you are in combat.",
+        SETUP_ROUTE_LOOK_TITLE = "The route's look",
+        SETUP_ROUTE_LOOK_TEXT  = "Choose the route's colour, dots or a thin line on the minimap (Retail and WoW: Forever), and the direction arrows. Line widths are in Map and icons, Route section.",
+        SETUP_SHARE_TITLE      = "Share in chat (beta)",
+        SETUP_SHARE_TEXT       = "Send your nodes to other FarmMap players, right from the chat.",
+        SETUP_SHARE_HOWTO      = "- Options, Import / Export page, Share in chat: pick a zone, or your whole database (slower).\n- A short text goes into your chat input: send it in your guild, a group, a whisper or a channel.\n- Other FarmMap players click it and get the usual import preview. Stay online while they receive the nodes.\n- This is a beta: if something goes wrong, please report it on CurseForge or Discord.",
         -- 2.4: the radar's key binding and "hide in combat".
         BINDING_RADAR          = "Show or hide the radar",
         UI_RADAR_BIND_HINT     = "Click, then press the key. It is also in the game's Key Bindings, under FarmMap.",

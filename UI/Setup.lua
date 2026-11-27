@@ -72,6 +72,12 @@ local STEPS = {
       when = function() return ns.IsTomTomLoaded() or ns.IsWaypointUILoaded() end },
     -- 2.3: the radar in the middle of the screen.
     { id = "radar", text = "RADAR", page = "icons", key = "radarShown", extra = { "radarRotate" } },
+    -- 2.4: shown on their own to the players who went through in 2.3.
+    { id = "radarKey", text = "RADAR_KEY", page = "icons", key = "radarKey", extra = { "radarHideCombat" } },
+    { id = "routeLook", text = "ROUTE_LOOK", page = "icons", key = "routeColor",
+      extra = { "routeMinimap", "routeArrows" }, demo = "route" },
+    { id = "share", text = "SHARE",
+      item = function() return { type = "hint", key = "setupShareHowTo", text = L("SETUP_SHARE_HOWTO") } end },
     { id = "theme", text = "THEME", item = ThemeItem },
 }
 

@@ -172,6 +172,14 @@ ns.locales.koKR = {
         SETUP_RADAR_OFF        = "레이더를 사용하지 않습니다. 나중에 '지도 및 아이콘' 설정에서 다시 켤 수 있습니다.",
         SETUP_BUTTON_CLICKS_TITLE = "FarmMap 버튼 설정",
         SETUP_BUTTON_CLICKS_TEXT  = "미니맵 버튼이나 Titan Panel, Bazooka 같은 브로커 바의 FarmMap 아이콘을 좌클릭/우클릭했을 때 실행할 행동을 선택하세요.",
+        -- 2.4: the setup assistant's screens for the 2.4 features.
+        SETUP_RADAR_KEY_TITLE  = "A key for the radar",  -- [TRANSLATE]
+        SETUP_RADAR_KEY_TEXT   = "Show or hide the radar with a key of your choice: click the button, then press the key. The radar can also hide itself while you are in combat.",  -- [TRANSLATE]
+        SETUP_ROUTE_LOOK_TITLE = "The route's look",  -- [TRANSLATE]
+        SETUP_ROUTE_LOOK_TEXT  = "Choose the route's colour, dots or a thin line on the minimap (Retail and WoW: Forever), and the direction arrows. Line widths are in Map and icons, Route section.",  -- [TRANSLATE]
+        SETUP_SHARE_TITLE      = "Share in chat (beta)",  -- [TRANSLATE]
+        SETUP_SHARE_TEXT       = "Send your nodes to other FarmMap players, right from the chat.",  -- [TRANSLATE]
+        SETUP_SHARE_HOWTO      = "- Options, Import / Export page, Share in chat: pick a zone, or your whole database (slower).\n- A short text goes into your chat input: send it in your guild, a group, a whisper or a channel.\n- Other FarmMap players click it and get the usual import preview. Stay online while they receive the nodes.\n- This is a beta: if something goes wrong, please report it on CurseForge or Discord.",  -- [TRANSLATE]
         -- 2.4: the radar's key binding and "hide in combat".
         BINDING_RADAR          = "Show or hide the radar",  -- [TRANSLATE]
         UI_RADAR_BIND_HINT     = "Click, then press the key. It is also in the game's Key Bindings, under FarmMap.",  -- [TRANSLATE]

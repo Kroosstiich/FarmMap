@@ -155,6 +155,14 @@ ns.locales.frFR = {
         SETUP_RADAR_OFF        = "Pas de radar. Vous pourrez l'activer plus tard dans Carte et icônes.",
         SETUP_BUTTON_CLICKS_TITLE = "Le bouton FarmMap",
         SETUP_BUTTON_CLICKS_TEXT  = "Choisissez ce que font le clic gauche et le clic droit, sur le bouton de la minicarte et sur FarmMap dans les barres comme Titan Panel ou Bazooka.",
+        -- 2.4 : les écrans de l'assistant pour les nouveautés de la 2.4.
+        SETUP_RADAR_KEY_TITLE  = "Une touche pour le radar",
+        SETUP_RADAR_KEY_TEXT   = "Affichez ou masquez le radar avec la touche de votre choix : cliquez sur le bouton, puis appuyez sur la touche. Le radar peut aussi se masquer pendant les combats.",
+        SETUP_ROUTE_LOOK_TITLE = "L'apparence de la route",
+        SETUP_ROUTE_LOOK_TEXT  = "Choisissez la couleur de la route, des points ou une ligne fine sur la minicarte (Retail et WoW: Forever), et les flèches de direction. Les épaisseurs se règlent dans Carte et icônes, section Route.",
+        SETUP_SHARE_TITLE      = "Partager dans le chat (bêta)",
+        SETUP_SHARE_TEXT       = "Envoyez vos nœuds aux autres joueurs de FarmMap, directement depuis le chat.",
+        SETUP_SHARE_HOWTO      = "- Options, page Import / Export, section Partager dans le chat : choisissez une zone, ou toute votre base (plus lent).\n- Un court texte s'ajoute à votre zone de saisie du chat : envoyez-le dans votre guilde, un groupe, un chuchotement ou un canal.\n- Les autres joueurs de FarmMap cliquent dessus et obtiennent l'aperçu d'import habituel. Restez connecté pendant qu'ils reçoivent les nœuds.\n- C'est une bêta : si quelque chose ne marche pas, signalez-le sur CurseForge ou sur Discord.",
         -- 2.4 : le raccourci du radar et « masquer en combat ».
         BINDING_RADAR          = "Afficher ou masquer le radar",
         UI_RADAR_BIND_HINT     = "Cliquez, puis appuyez sur la touche. Elle se trouve aussi dans les raccourcis clavier du jeu, rubrique FarmMap.",
