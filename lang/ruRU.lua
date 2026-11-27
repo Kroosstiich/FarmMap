@@ -98,6 +98,7 @@ ns.locales.ruRU = {
         -- 2.3: the FarmMap button (minimap and broker bars) and the radar.
         BROKER_LEFT_HINT       = "ЛКМ: %s",
         BROKER_RIGHT_HINT      = "ПКМ: %s",
+        BROKER_SHIFT_HINT      = "Shift-click: options window, always",  -- [TRANSLATE]
         BROKER_DEBUG           = "Debug window",  -- [TRANSLATE]
         BROKER_NODES           = "Nodes",  -- [TRANSLATE]
         BROKER_WINDOWS         = "Windows",  -- [TRANSLATE]

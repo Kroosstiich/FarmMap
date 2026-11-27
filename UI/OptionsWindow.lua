@@ -563,6 +563,9 @@ local function Create()
     return window
 end
 
+-- For the quick menu's tick (FarmMap.lua).
+function OptionsWindow:IsShown() return window ~= nil and window:IsShown() end
+
 function OptionsWindow:Toggle(pageID)
     if not window then
         -- The saved theme is only readable once the SavedVariables exist.

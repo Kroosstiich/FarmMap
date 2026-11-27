@@ -4930,6 +4930,12 @@ function ns.ShowBrokerMenu()
         end
     end
     groupHeader = L.BROKER_WINDOWS
+    if ns.OptionsWindow then
+        rows[#rows + 1] = { header = groupHeader, label = L.BROKER_ACT_OPTIONS,
+            isOn = function() return ns.OptionsWindow:IsShown() end,
+            toggle = function() ns.OptionsWindow:Toggle() end }
+        groupHeader = nil
+    end
     if ns.SessionWindow then
         rows[#rows + 1] = { header = groupHeader, label = L.UI_DASH_MINI,
             isOn = function() return ns.SessionWindow:IsEnabled() end,
@@ -5081,6 +5087,12 @@ local function CreateMinimapButton()
 
         OnClick = function(_, button)
             GameTooltip:Hide()
+            -- Shift-click always opens the options, whatever both clicks are
+            -- set to: with neither on "options", the button had no way back.
+            if IsShiftKeyDown() then
+                ns.BrokerAction("options")
+                return
+            end
             ns.BrokerAction(button == "RightButton" and ns.BrokerClick("Right") or ns.BrokerClick("Left"))
         end,
 
@@ -5101,6 +5113,7 @@ local function CreateMinimapButton()
             tooltip:AddLine(" ")
             tooltip:AddLine(L.BROKER_LEFT_HINT:format(ns.BrokerActionLabel(ns.BrokerClick("Left"))), 0.9, 0.9, 0.9)
             tooltip:AddLine(L.BROKER_RIGHT_HINT:format(ns.BrokerActionLabel(ns.BrokerClick("Right"))), 0.9, 0.9, 0.9)
+            tooltip:AddLine(L.BROKER_SHIFT_HINT, 0.7, 0.7, 0.7)
         end,
     })
 

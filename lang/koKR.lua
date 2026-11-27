@@ -134,6 +134,7 @@ ns.locales.koKR = {
         -- 2.3: the FarmMap button (minimap and broker bars) and the radar.
         BROKER_LEFT_HINT       = "좌클릭: %s",
         BROKER_RIGHT_HINT      = "우클릭: %s",
+        BROKER_SHIFT_HINT      = "Shift-click: options window, always",  -- [TRANSLATE]
         BROKER_DEBUG           = "디버그 창",
         BROKER_NODES           = "노드",
         BROKER_WINDOWS         = "창 목록",

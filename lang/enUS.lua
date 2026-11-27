@@ -137,6 +137,7 @@ ns.locales.enUS = {
         -- 2.3: the FarmMap button (minimap and broker bars) and the radar.
         BROKER_LEFT_HINT       = "Left click: %s",
         BROKER_RIGHT_HINT      = "Right click: %s",
+        BROKER_SHIFT_HINT      = "Shift-click: options window, always",
         BROKER_DEBUG           = "Debug window",
         BROKER_NODES           = "Nodes",
         BROKER_WINDOWS         = "Windows",

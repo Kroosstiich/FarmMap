@@ -117,6 +117,7 @@ ns.locales.frFR = {
         -- 2.3 : le bouton FarmMap (minicarte et barres DataBroker) et le radar.
         BROKER_LEFT_HINT       = "Clic gauche : %s",
         BROKER_RIGHT_HINT      = "Clic droit : %s",
+        BROKER_SHIFT_HINT      = "Maj + clic : fenêtre d'options, toujours",
         BROKER_DEBUG           = "Fenêtre debug",
         BROKER_NODES           = "Nœuds",
         BROKER_WINDOWS         = "Fenêtres",

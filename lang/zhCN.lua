@@ -90,6 +90,7 @@ ns.locales.zhCN = {
         -- 2.3: the FarmMap button (minimap and broker bars) and the radar.
         BROKER_LEFT_HINT       = "左键：%s",
         BROKER_RIGHT_HINT      = "右键：%s",
+        BROKER_SHIFT_HINT      = "Shift-click: options window, always",  -- [TRANSLATE]
         BROKER_DEBUG           = "调试窗口",
         BROKER_NODES           = "节点",
         BROKER_WINDOWS         = "窗口",
