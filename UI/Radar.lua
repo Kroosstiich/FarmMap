@@ -189,6 +189,7 @@ local function Redraw()
                         used = used + 1
                         local line = Line(used)
                         line:SetColorTexture(cr, cg, cb, 0.8)
+                        line:SetThickness(FarmMapDB.routeRadarWidth or 2)
                         line:SetStartPoint("CENTER", frame, x1 * half, -y1 * half)
                         line:SetEndPoint("CENTER", frame, x2 * half, -y2 * half)
                         line:Show()
@@ -302,8 +303,8 @@ end
 function FarmMap_ToggleRadar()
     Radar.Set("shown", not DB().shown)
 end
-BINDING_HEADER_FARMMAP = "FarmMap"
 BINDING_NAME_FARMMAP_TOGGLE_RADAR = ns.L.BINDING_RADAR
+Radar.BINDING = "FARMMAP_TOGGLE_RADAR"
 
 -- For the options page: one setting read or changed, then applied.
 function Radar.Get(key) return DB()[key] end

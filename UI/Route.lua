@@ -44,10 +44,13 @@ local ROUTE_COLORS = {
     green = { 0.31, 0.83, 0.42 }, blue = { 0.42, 0.71, 1 },
     purple = { 0.73, 0.42, 0.85 }, cyan = { 0.3, 0.9, 0.95 },
 }
-Route.COLORS = { "theme", "gold", "white", "red", "green", "blue", "purple", "cyan" }
+-- "custom": the player's own, picked with the game's colour picker and kept
+-- in FarmMapDB.routeColorCustom.
+Route.COLORS = { "theme", "gold", "white", "red", "green", "blue", "purple", "cyan", "custom" }
 
 function Route.Color()
-    local c = FarmMapDB and ROUTE_COLORS[FarmMapDB.routeColor]
+    local key = FarmMapDB and FarmMapDB.routeColor
+    local c = key == "custom" and FarmMapDB.routeColorCustom or ROUTE_COLORS[key]
     if c then return c[1], c[2], c[3] end
     return ns.Theme.RGB("accent")
 end
@@ -390,7 +393,9 @@ function provider:RefreshAllData()
     -- The canvas is scaled when zooming: widths divided by that scale keep
     -- the same width on screen.
     local scale = map:GetCanvasScale() or 1
-    local thick, outline, arrow = LINE_PX / scale, OUTLINE_PX / scale, ARROW_PX / scale
+    -- The line's width can be set (2.4); its dark outline stays twice as wide.
+    local px = FarmMapDB.routeMapWidth or LINE_PX
+    local thick, outline, arrow = px / scale, px * OUTLINE_PX / LINE_PX / scale, ARROW_PX / scale
     local cr, cg, cb = Route.Color()
     for i = 1, n do
         local a, b = loop[i], loop[i % n + 1]

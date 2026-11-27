@@ -3809,6 +3809,17 @@ local function CreateOptions()
     title:SetPoint("TOPLEFT", 16, -16)
     title:SetText(L.OPTIONS_TITLE)
 
+    -- This panel no longer has every setting (2.4, asked by Kroosstii): a
+    -- way to the full window for the players who land here.
+    local openNew = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    openNew:SetText(L.LEGACY_OPEN_NEW)
+    openNew:SetSize(openNew:GetFontString():GetStringWidth() + 30, 24)
+    openNew:SetPoint("TOPRIGHT", -16, -12)
+    openNew:SetScript("OnClick", function()
+        if SettingsPanel and SettingsPanel:IsShown() then HideUIPanel(SettingsPanel) end
+        if ns.OptionsWindow then ns.OptionsWindow:Toggle() end
+    end)
+
     -- Translator credit for the language currently displayed.
     local activeLocale   = ns.locales[gameLocale] or ns.locales.enUS
     local translatorName = (activeLocale and activeLocale.translator) or "-"

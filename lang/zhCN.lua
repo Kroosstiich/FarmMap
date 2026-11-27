@@ -130,7 +130,11 @@ ns.locales.zhCN = {
         SETUP_BUTTON_CLICKS_TEXT  = "选择左键点击和右键点击分别做什么，作用于小地图按钮，以及 Titan Panel、Bazooka 等信息条插件中的 FarmMap。",
         -- 2.4: the radar's key binding and "hide in combat".
         BINDING_RADAR          = "Show or hide the radar",  -- [TRANSLATE]
-        UI_RADAR_BIND_HINT     = "A key to show or hide the radar can be set in the game's Key Bindings, under AddOns > FarmMap.",  -- [TRANSLATE]
+        UI_RADAR_BIND_HINT     = "Click, then press the key. It is also in the game's Key Bindings, under FarmMap.",  -- [TRANSLATE]
+        UI_RADAR_KEY           = "Key to show or hide it",  -- [TRANSLATE]
+        RADAR_KEY_NONE         = "None",  -- [TRANSLATE]
+        RADAR_KEY_PRESS        = "Press the key for the radar (Escape cancels, Backspace removes the key).",  -- [TRANSLATE]
+        LEGACY_OPEN_NEW        = "Open the full options window",  -- [TRANSLATE]
         UI_RADAR_COMBAT        = "Hide in combat",  -- [TRANSLATE]
         UI_RADAR_COMBAT_DESC   = "The radar disappears while you are in combat and comes back when it ends.",  -- [TRANSLATE]
         -- 2.4: sharing nodes in chat (UI\Share.lua).
@@ -168,6 +172,10 @@ ns.locales.zhCN = {
         ROUTE_MINIMAP_DOTS     = "Dots",  -- [TRANSLATE]
         ROUTE_MINIMAP_LINE     = "Line",  -- [TRANSLATE]
         UI_ROUTE_WIDTH         = "Line width on the minimap",  -- [TRANSLATE]
+        UI_ROUTE_RADAR_WIDTH   = "Line width on the radar",  -- [TRANSLATE]
+        UI_ROUTE_MAP_WIDTH     = "Line width on the world map",  -- [TRANSLATE]
+        ROUTE_COLOR_CUSTOM     = "Custom...",  -- [TRANSLATE]
+        UI_ROUTE_GUIDE_WHERE   = "It needs TomTom or WaypointUI, so it is set in Integrations.",  -- [TRANSLATE]
         ROUTE_MENU_DOTS        = "Dots on the minimap",  -- [TRANSLATE]
         ROUTE_MENU_LINE        = "Line on the minimap",  -- [TRANSLATE]
         WORLDMAP_SECTION       = "世界地图",
@@ -414,6 +422,7 @@ ns.locales.zhCN = {
         UI_ROUTE_GUIDE_DESC    = "每采集完路线上的一个节点，或当你抵达该节点时，TomTom 或 WaypointUI 的导航点就会移到环线的下一个节点。按住 Shift 点击「路线」按钮可跳过一个节点。路线本身由世界地图筛选栏上的按钮显示。",
         SETUP_ROUTE_TITLE       = "路线",
         SETUP_ROUTE_TEXT        = "FarmMap 会在世界地图和小地图上，把你在一个区域中已知的节点串成一条环线，方便你一次采完。",
+        -- [TRANSLATE] English text changed in v2.4.0: its second line now reads "- Map and icons, Route section: direction, longest lap, another route, colour and line widths. The guidance is in Integrations."
         SETUP_ROUTE_HOWTO       = "- 世界地图筛选栏上的「路线」按钮：显示或隐藏当前区域的环线，仅针对已开启的筛选条件。\n- 「整合」中的「路线」部分：方向、最长一圈、换一条路线、引导。\n- 会话窗口：「路线」「引导」「方向」「换一条路线」按钮，以及一圈的预计时间。\n- 右键点击一个标记：从该节点开始引导（需 TomTom 或 WaypointUI）。",
         SETUP_ROUTE_GUIDE_TITLE = "沿路线引导",
         SETUP_ROUTE_GUIDE_TEXT  = "配合 TomTom 或 WaypointUI，FarmMap 可以沿路线把你从一个节点引导到下一个节点。",

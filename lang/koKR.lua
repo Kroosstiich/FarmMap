@@ -174,7 +174,11 @@ ns.locales.koKR = {
         SETUP_BUTTON_CLICKS_TEXT  = "미니맵 버튼이나 Titan Panel, Bazooka 같은 브로커 바의 FarmMap 아이콘을 좌클릭/우클릭했을 때 실행할 행동을 선택하세요.",
         -- 2.4: the radar's key binding and "hide in combat".
         BINDING_RADAR          = "Show or hide the radar",  -- [TRANSLATE]
-        UI_RADAR_BIND_HINT     = "A key to show or hide the radar can be set in the game's Key Bindings, under AddOns > FarmMap.",  -- [TRANSLATE]
+        UI_RADAR_BIND_HINT     = "Click, then press the key. It is also in the game's Key Bindings, under FarmMap.",  -- [TRANSLATE]
+        UI_RADAR_KEY           = "Key to show or hide it",  -- [TRANSLATE]
+        RADAR_KEY_NONE         = "None",  -- [TRANSLATE]
+        RADAR_KEY_PRESS        = "Press the key for the radar (Escape cancels, Backspace removes the key).",  -- [TRANSLATE]
+        LEGACY_OPEN_NEW        = "Open the full options window",  -- [TRANSLATE]
         UI_RADAR_COMBAT        = "Hide in combat",  -- [TRANSLATE]
         UI_RADAR_COMBAT_DESC   = "The radar disappears while you are in combat and comes back when it ends.",  -- [TRANSLATE]
         -- 2.4: sharing nodes in chat (UI\Share.lua).
@@ -212,6 +216,10 @@ ns.locales.koKR = {
         ROUTE_MINIMAP_DOTS     = "Dots",  -- [TRANSLATE]
         ROUTE_MINIMAP_LINE     = "Line",  -- [TRANSLATE]
         UI_ROUTE_WIDTH         = "Line width on the minimap",  -- [TRANSLATE]
+        UI_ROUTE_RADAR_WIDTH   = "Line width on the radar",  -- [TRANSLATE]
+        UI_ROUTE_MAP_WIDTH     = "Line width on the world map",  -- [TRANSLATE]
+        ROUTE_COLOR_CUSTOM     = "Custom...",  -- [TRANSLATE]
+        UI_ROUTE_GUIDE_WHERE   = "It needs TomTom or WaypointUI, so it is set in Integrations.",  -- [TRANSLATE]
         ROUTE_MENU_DOTS        = "Dots on the minimap",  -- [TRANSLATE]
         ROUTE_MENU_LINE        = "Line on the minimap",  -- [TRANSLATE]
         WORLDMAP_SECTION       = "세계 지도",
@@ -483,6 +491,7 @@ ns.locales.koKR = {
         UI_ROUTE_GUIDE_DESC    = "경로의 노드를 채집하거나 노드에 도달할 때마다 TomTom 또는 내장 지도(WaypointUI)의 목적지가 순환 경로의 다음 노드로 이동합니다. 노드를 건너뛰려면 경로 버튼을 Shift-클릭하세요. 경로는 세계 지도 필터 바에 있는 버튼으로 표시할 수 있습니다.",
         SETUP_ROUTE_TITLE       = "경로 시스템",
         SETUP_ROUTE_TEXT        = "FarmMap은 세계 지도와 미니맵에 해당 지역의 확인된 노드들을 연결하는 순환 경로를 그려주어, 한 번에 효율적으로 채집할 수 있도록 돕습니다.",
+        -- [TRANSLATE] English text changed in v2.4.0: its second line now reads "- Map and icons, Route section: direction, longest lap, another route, colour and line widths. The guidance is in Integrations."
         SETUP_ROUTE_HOWTO       = "- 세계 지도 필터 바의 '경로' 버튼: 활성화된 필터를 기준으로 표시된 지역의 순환 경로를 표시하거나 숨깁니다.\n- 통합 설정, 경로 섹션: 방향, 최대 순환 시간, 다른 경로 생성, 안내 기능.\n- 세션 창: 경로, 안내, 방향, 다른 경로 생성 버튼 및 예상 순환 시간이 표시됩니다.\n- 지도 핀 우클릭: 해당 노드부터 경로 안내를 시작합니다 (TomTom 또는 WaypointUI 연동).",
         SETUP_ROUTE_GUIDE_TITLE = "경로 안내 기능",
         SETUP_ROUTE_GUIDE_TEXT  = "FarmMap은 TomTom 또는 내장 지도(WaypointUI)를 통해 현재 경로의 다음 노드로 이동할 수 있도록 안내해 줍니다.",

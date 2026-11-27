@@ -1,7 +1,8 @@
 <Bindings>
-	<!-- Read by the game on its own (no line in the toc). Names come from
-	     BINDING_HEADER_FARMMAP / BINDING_NAME_* set in UI\Radar.lua. -->
-	<Binding name="FARMMAP_TOGGLE_RADAR" header="FARMMAP" category="ADDONS">
+	<!-- Read by the game on its own (no line in the toc). category = the
+	     section's name in the Key Bindings, as Baganator and Better Fishing
+	     do; the binding's own name is BINDING_NAME_* in UI\Radar.lua. -->
+	<Binding name="FARMMAP_TOGGLE_RADAR" category="FarmMap">
 		FarmMap_ToggleRadar()
 	</Binding>
 </Bindings>

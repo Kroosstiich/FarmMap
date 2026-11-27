@@ -1669,6 +1669,67 @@ local function PackItem(key, pack)
              onClick = function() ShowLink(pack.url) end }
 end
 
+-- The route's settings, defined with the Integrations page below.
+local RouteItems
+
+-- The route's own colour (2.4): the game's colour picker, as for the
+-- themes. Changes show live; Cancel goes back to the colour chosen before.
+local function PickRouteColor()
+    local beforeKey, beforeCustom = FarmMapDB.routeColor, FarmMapDB.routeColorCustom
+    local r, g, b = ns.Route.Color()
+    local function Set(cr, cg, cb)
+        FarmMapDB.routeColorCustom = { cr, cg, cb }
+        ns.Route.SetLook("routeColor", "custom")
+        OptionsWindow:Refresh()
+    end
+    ColorPickerFrame:SetupColorPickerAndShow({
+        r = r, g = g, b = b, hasOpacity = false,
+        swatchFunc = function() Set(ColorPickerFrame:GetColorRGB()) end,
+        cancelFunc = function()
+            FarmMapDB.routeColorCustom = beforeCustom
+            ns.Route.SetLook("routeColor", beforeKey)
+            OptionsWindow:Refresh()
+        end,
+    })
+end
+
+-- The radar's key, set from here as well as from the game's Key Bindings
+-- (asked by Kroosstii): a click, then the key. Escape cancels, Backspace
+-- or Delete removes the key. Bindings cannot change in combat.
+local keyCatcher
+local function RadarKeyText()
+    local key = GetBindingKey(ns.Radar.BINDING)
+    return key and (GetBindingText and GetBindingText(key) or key) or L("RADAR_KEY_NONE")
+end
+local function CatchRadarKey()
+    if InCombatLockdown() then
+        UIErrorsFrame:AddExternalErrorMessage(ERR_NOT_IN_COMBAT)
+        return
+    end
+    if not keyCatcher then
+        keyCatcher = CreateFrame("Frame", nil, UIParent)
+        keyCatcher:SetFrameStrata("FULLSCREEN_DIALOG")
+        keyCatcher:EnableKeyboard(true)
+        keyCatcher:SetPropagateKeyboardInput(false)
+        keyCatcher:SetScript("OnKeyDown", function(self, key)
+            -- A modifier alone is the start of a combination: wait for more.
+            if key:find("SHIFT") or key:find("CTRL") or key:find("ALT") then return end
+            self:Hide()
+            if key == "ESCAPE" or InCombatLockdown() then OptionsWindow:Refresh() return end
+            for _, old in ipairs({ GetBindingKey(ns.Radar.BINDING) }) do SetBinding(old) end
+            if key ~= "BACKSPACE" and key ~= "DELETE" then
+                local combo = (IsAltKeyDown() and "ALT-" or "") .. (IsControlKeyDown() and "CTRL-" or "")
+                    .. (IsShiftKeyDown() and "SHIFT-" or "") .. key
+                SetBinding(combo, ns.Radar.BINDING)
+            end
+            SaveBindings(GetCurrentBindingSet())
+            OptionsWindow:Refresh()
+        end)
+    end
+    keyCatcher:Show()
+    print("|cffffd100FarmMap :|r " .. L("RADAR_KEY_PRESS"))
+end
+
 -- The actions a click of the FarmMap button may run (FarmMap.lua).
 local function BrokerChoices()
     local list = {}
@@ -1681,7 +1742,7 @@ end
 ItemsPage({
     id = "icons", titleKey = "UI_ICONS", descKey = "UI_ICONS_DESC",
     items = function()
-        return {
+        local list = {
             { type = "section", key = "styles", text = L("UI_SEC_STYLES") },
             { type = "custom", key = "styleColumns",
               build = BuildStyleColumns, layout = LayoutStyleColumns },
@@ -1739,8 +1800,10 @@ ItemsPage({
               name = L("UI_RADAR"), desc = L("UI_RADAR_DESC"),
               get = function() return ns.Radar.Get("shown") end,
               set = function(on) ns.Radar.Set("shown", on and true or false) end },
-            -- 2.4: the key binding lives in the game's own Key Bindings.
-            { type = "hint", key = "radarBindHint", text = L("UI_RADAR_BIND_HINT") },
+            -- 2.4: its key, set here or in the game's own Key Bindings.
+            { type = "button", key = "radarKey",
+              name = L("UI_RADAR_KEY"), desc = L("UI_RADAR_BIND_HINT"), label = RadarKeyText(),
+              onClick = CatchRadarKey },
             { type = "switch", key = "radarHideCombat",
               name = L("UI_RADAR_COMBAT"), desc = L("UI_RADAR_COMBAT_DESC"),
               get = function() return ns.Radar.Get("hideCombat") end,
@@ -1787,6 +1850,13 @@ ItemsPage({
             PackItem("packOld", PACK_LINKS[1]),
             PackItem("packArtisan", PACK_LINKS[2]),
         }
+        -- The route (2.4) between the radar and the icon packs.
+        local at = #list + 1
+        for i, item in ipairs(list) do
+            if item.key == "packs" then at = i break end
+        end
+        for i, item in ipairs(RouteItems()) do table.insert(list, at + i - 1, item) end
+        return list
     end,
 })
 
@@ -1926,15 +1996,31 @@ ItemsPage({
               disabled = function() return not hasNav() end,
               get = function() return FarmMapDB.waypointClick ~= false end,
               set = function(on) FarmMapDB.waypointClick = on and true or false end },
-            -- The route (2.2, Route button of the filter bar): all its
-            -- settings together, under Navigation where its guidance belongs.
-            { type = "section", key = "secRoute", text = L("UI_SEC_ROUTE") },
-            { type = "hint", key = "routeHint", text = L("UI_ROUTE_HINT") },
-            { type = "switch", key = "routeGuide",
+            -- The route's guidance stays here, with the addons it needs; the
+            -- route's other settings moved to Map and icons in 2.4.
+            { type = "switch", key = "routeGuide", gap = 12,
               name = L("UI_ROUTE_GUIDE"), desc = L("UI_ROUTE_GUIDE_DESC"),
               disabled = function() return not hasNav() end,
               get = function() return FarmMapDB.routeGuide == true end,
               set = function(on) if ns.Route then ns.Route.SetGuide(on) end end },
+
+            { type = "custom", key = "ask", build = ask.build, layout = ask.layout,
+              search = L("UI_INTEG_ASK_TITLE") .. " " .. L("UI_INTEG_ASK"), inset = true },
+        }
+    end,
+})
+
+-- The route's settings (2.2, Route button of the filter bar), on the Map and
+-- icons page since 2.4 (asked by Kroosstii): direction, longest lap, its look.
+-- Declared above the Map and icons page, which calls it.
+RouteItems = function()
+    return {
+            { type = "section", key = "secRoute", text = L("UI_SEC_ROUTE") },
+            { type = "hint", key = "routeHint", text = L("UI_ROUTE_HINT") },
+            -- The guidance needs TomTom or WaypointUI: it lives in Integrations.
+            { type = "button", key = "routeGuideGo",
+              name = L("UI_ROUTE_GUIDE"), desc = L("UI_ROUTE_GUIDE_WHERE"), label = L("UI_INTEG"),
+              onClick = function() OptionsWindow:Select("integ") end },
             { type = "choice", key = "routeDir",
               name = L("UI_ROUTE_DIR"), desc = L("UI_ROUTE_DIR_DESC"),
               choices = function()
@@ -1964,7 +2050,12 @@ ItemsPage({
                   return list
               end,
               get = function() return FarmMapDB.routeColor or "theme" end,
-              set = function(v) ns.Route.SetLook("routeColor", v ~= "theme" and v or nil) end },
+              set = function(v)
+                  -- "Custom...": the game's colour picker, live, Cancel puts
+                  -- the previous colour back.
+                  if v == "custom" then return PickRouteColor() end
+                  ns.Route.SetLook("routeColor", v ~= "theme" and v or nil)
+              end },
             { type = "choice", key = "routeMinimap", visible = ns.Route.CanLine(),
               name = L("UI_ROUTE_MINIMAP"), desc = L("UI_ROUTE_MINIMAP_DESC"),
               choices = function()
@@ -1982,15 +2073,21 @@ ItemsPage({
               format = function(v) return ("%d px"):format(v) end,
               get = function() return FarmMapDB.routeLineWidth or 2 end,
               set = function(v) FarmMapDB.routeLineWidth = v end },
+            { type = "slider", key = "routeRadarWidth",
+              name = L("UI_ROUTE_RADAR_WIDTH"), min = 1, max = 5, step = 1,
+              format = function(v) return ("%d px"):format(v) end,
+              get = function() return FarmMapDB.routeRadarWidth or 2 end,
+              set = function(v) FarmMapDB.routeRadarWidth = v end },
+            { type = "slider", key = "routeMapWidth",
+              name = L("UI_ROUTE_MAP_WIDTH"), min = 1, max = 6, step = 0.5,
+              format = function(v) return ("%.1f px"):format(v) end,
+              get = function() return FarmMapDB.routeMapWidth or 2.5 end,
+              set = function(v) ns.Route.SetLook("routeMapWidth", v) end },
             { type = "button", key = "routeNew", gap = 12,
               name = L("UI_ROUTE_NEW"), desc = L("UI_ROUTE_NEW_DESC"), label = L("ROUTE_NEW_LABEL"),
               onClick = function() if ns.Route then ns.Route.NewRoute() end end },
-
-            { type = "custom", key = "ask", build = ask.build, layout = ask.layout,
-              search = L("UI_INTEG_ASK_TITLE") .. " " .. L("UI_INTEG_ASK"), inset = true },
-        }
-    end,
-})
+    }
+end
 
 -- ============================================================
 -- SHARED BITS FOR THE DATA PAGES
