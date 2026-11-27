@@ -395,7 +395,10 @@ function provider:RefreshAllData()
     local scale = map:GetCanvasScale() or 1
     -- The line's width can be set (2.4); its dark outline stays twice as wide.
     local px = FarmMapDB.routeMapWidth or LINE_PX
-    local thick, outline, arrow = px / scale, px * OUTLINE_PX / LINE_PX / scale, ARROW_PX / scale
+    -- The arrows grow with the line, so a thicker line keeps them readable.
+    local thick, outline = px / scale, px * OUTLINE_PX / LINE_PX / scale
+    local arrow = math.max(ARROW_PX, px * ARROW_PX / LINE_PX) / scale
+    local arrows = FarmMapDB.routeArrows ~= false
     local cr, cg, cb = Route.Color()
     for i = 1, n do
         local a, b = loop[i], loop[i % n + 1]
@@ -405,7 +408,7 @@ function provider:RefreshAllData()
         -- The direction, at the middle of each segment long enough for it.
         local dx, dy = x2 - x1, y2 - y1
         local len = math.sqrt(dx * dx + dy * dy)
-        if len > arrow * 6 then
+        if arrows and len > arrow * 6 then
             local ux, uy = dx / len, dy / len
             local mx, my = (x1 + x2) / 2 + ux * arrow * 0.5, (y1 + y2) / 2 + uy * arrow * 0.5
             -- Two strokes back from the tip, 35 degrees either side.
