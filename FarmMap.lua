@@ -4892,9 +4892,11 @@ end
 -- the minimap button or any broker display (Titan Panel, ChocolateBar...).
 -- Same settings as the filter bar, so both stay in step. It stays open while
 -- lines are ticked; a click elsewhere closes it.
-function ns.ShowBrokerMenu()
+-- relayout: laid out again where it stands (a line that adds or removes
+-- others was ticked), instead of opening or closing at the cursor.
+function ns.ShowBrokerMenu(relayout)
     local menu = ns.brokerMenu
-    if menu and menu:IsShown() then menu:Hide() return end
+    if not relayout and menu and menu:IsShown() then menu:Hide() return end
     local ROW_H = 26
     -- { label, isOn(), toggle(), locked() }; a line with `header` opens a
     -- group under that title.
@@ -4922,8 +4924,18 @@ function ns.ShowBrokerMenu()
         end
     end
     if ns.Route then
-        rows[#rows + 1] = { header = L.ROUTE_TITLE, label = L.ROUTE_TITLE,
+        rows[#rows + 1] = { header = L.ROUTE_TITLE, label = L.ROUTE_TITLE, relayout = true,
             isOn = function() return FarmMapDB.routeShown end, toggle = ns.Route.Toggle }
+        -- Dots or line on the minimap, right under the route while it is on
+        -- (asked by Kroosstii, 2026-11-27). Retail and Forever: Classic has
+        -- the dots only.
+        if FarmMapDB.routeShown and ns.Route.CanLine() then
+            for _, style in ipairs({ "dots", "line" }) do
+                rows[#rows + 1] = { indent = true, label = L["ROUTE_MENU_" .. style:upper()],
+                    isOn = function() return (FarmMapDB.routeMinimap == "line" and "line" or "dots") == style end,
+                    toggle = function() ns.Route.SetLook("routeMinimap", style) end }
+            end
+        end
         if Integ.WaypointAddon(true) then
             rows[#rows + 1] = { label = L.UI_ROUTE_GUIDE, isOn = ns.Route.IsGuiding,
                 toggle = function() ns.Route.Guide(not ns.Route.IsGuiding()) end }
@@ -4989,6 +5001,7 @@ function ns.ShowBrokerMenu()
         row:SetScript("OnClick", function(self)
             if self.data.locked and self.data.locked() then return end
             self.data.toggle()
+            if self.data.relayout then return ns.ShowBrokerMenu(true) end
             -- The route and its guidance depend on each other: repaint all.
             for _, r in ipairs(menu.pool) do if r:IsShown() then r:Paint() end end
         end)
@@ -5048,9 +5061,13 @@ function ns.ShowBrokerMenu()
         row:ClearAllPoints()
         row:SetPoint("TOPLEFT", 3, y)
         row:SetPoint("TOPRIGHT", -3, y)
+        -- A sub-line (the route's dots or line) sits further in.
+        local indent = data.indent and 16 or 0
+        row.box:ClearAllPoints()
+        row.box:SetPoint("LEFT", 8 + indent, 0)
         row:Paint()
         row:Show()
-        width = math.max(width, row.label:GetStringWidth() + 44)
+        width = math.max(width, row.label:GetStringWidth() + 44 + indent)
         y = y - (ROW_H - 2)
     end
     for i = #rows + 1, #menu.pool do menu.pool[i]:Hide() end
@@ -5058,10 +5075,12 @@ function ns.ShowBrokerMenu()
     for i = nHeaders + 1, #menu.headers do menu.headers[i]:Hide() end
     menu:SetSize(width, -y + 6)
 
-    local mx, my = GetCursorPosition()
-    local s = UIParent:GetEffectiveScale()
-    menu:ClearAllPoints()
-    menu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", mx / s, my / s)
+    if not relayout then
+        local mx, my = GetCursorPosition()
+        local s = UIParent:GetEffectiveScale()
+        menu:ClearAllPoints()
+        menu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", mx / s, my / s)
+    end
 
     menu.dismiss = menu.dismiss or CreateFrame("Frame", nil, UIParent)
     local dismiss = menu.dismiss
